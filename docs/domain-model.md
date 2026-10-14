@@ -44,5 +44,6 @@ Filter event type=harvest and activityDate year=selected year. Sum kg directly,
 convert g ÷ 1000 and lb × 0.45359237 to kg; count is a separate dimension. No stored
 annual-total field is authoritative. Floating-point totals are rounded for display
 only; unit tests use tolerances. Out-of-year events, notes and removals do not
-change totals. Validate quantity > 0, finite, and count quantities integral. Multiple
+change totals. Validate quantity > 0, finite, at most 10^12 per event (also enforced in rules),
+and count quantities integral. Multiple
 harvests on one day are legitimate independent events.

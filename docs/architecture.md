@@ -37,7 +37,10 @@ of asynchronous write rejections. Controllers handle synchronous validation erro
 - One owner-created default property per account in V1; UUID of that property is
   persisted in a local non-secret preference keyed by UID. A newly reinstalled
   device discovers the property by owner query online. Offline first-ever setup is
-  unavailable; this is surfaced instead of inventing a second property.
+  unavailable; this is surfaced instead of inventing a second property. Concurrent
+  first-time setup on multiple devices can create separate default properties;
+  a future trusted provisioning transaction should enforce owner uniqueness. V1
+  is intended for one device during initial setup.
 - Read whole property plant collection for the initial small-orchard slice; do
   viewport/geohash partitioning when collections reach thousands of records.
 - Append immutable events instead of mutable totals. Separate event documents

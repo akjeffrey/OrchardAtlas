@@ -1,0 +1,64 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function uuid(id) {
+      return id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
+    }
+    function owner(propertyId) {
+      return signedIn() && get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+    }
+    function text(value) { return value is string && value.size() > 0 && value.size() <= 500; }
+    function validItem(d) {
+      return d.keys().hasAll(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
+        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
+        && d.schemaVersion == 1 && d.kind == 'managedPlant'
+        && text(d.name) && d.taxonId is string && uuid(d.taxonId)
+        && d.location is latlng && d.createdAt is timestamp;
+    }
+    function validHarvest(d) {
+      return d.harvest is map && d.harvest.keys().hasAll(['quantity', 'unit'])
+        && d.harvest.keys().hasOnly(['quantity', 'unit'])
+        && d.harvest.quantity is number && d.harvest.quantity > 0
+        && d.harvest.quantity <= 1000000000000
+        && d.harvest.unit in ['kg', 'g', 'lb', 'count']
+        && (d.harvest.unit != 'count' || d.harvest.quantity == int(d.harvest.quantity));
+    }
+    function validEvent(d) {
+      return d.keys().hasAll(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes'])
+        && d.keys().hasOnly(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes', 'harvest'])
+        && d.schemaVersion == 1 && d.authorId == request.auth.uid
+        && d.type in ['planting', 'bloom', 'pruning', 'fertilizing', 'spraying', 'pestsDisease', 'watering', 'harvest', 'removal', 'note', 'photo']
+        && d.occurredAt is timestamp && d.recordedAt is timestamp
+        && d.activityDate is string && d.activityDate.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && d.notes is string && d.notes.size() <= 10000
+        && ((d.type == 'harvest' && validHarvest(d)) || (d.type != 'harvest' && !('harvest' in d)));
+    }
+    match /properties/{propertyId} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow create: if signedIn() && uuid(propertyId)
+        && request.resource.data.keys().hasAll(['schemaVersion', 'name', 'ownerId', 'createdAt'])
+        && request.resource.data.keys().hasOnly(['schemaVersion', 'name', 'ownerId', 'createdAt'])
+        && request.resource.data.schemaVersion == 1
+        && request.resource.data.ownerId == request.auth.uid
+        && text(request.resource.data.name) && request.resource.data.createdAt is timestamp;
+      allow update, delete: if false;
+      match /items/{itemId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data);
+        allow update: if owner(propertyId) && validItem(request.resource.data)
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.kind == resource.data.kind;
+        allow delete: if false;
+        match /events/{eventId} {
+          allow read: if owner(propertyId);
+          allow create: if owner(propertyId) && uuid(eventId)
+            && exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(itemId))
+            && validEvent(request.resource.data);
+          allow update, delete: if false;
+        }
+      }
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

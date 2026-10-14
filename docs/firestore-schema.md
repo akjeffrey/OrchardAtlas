@@ -42,7 +42,8 @@ be created offline; these are observations, not trusted audit/security timestamp
 A future additive migration retains old readers or bumps schema version explicitly.
 
 ## Rules
-Private owner access and member reads/writes are evaluated at the property path.
+V1 private owner access is evaluated at the property path. Member administration
+and access are deferred; the reserved membership path grants no access in V1.
 Owner-only property creation, fixed owner/creation identity, strict allowed keys,
 field types/ranges and enum validation. Item identity and creation date are stable.
 Events allow create/read only; author must match authenticated UID. Rules enforce

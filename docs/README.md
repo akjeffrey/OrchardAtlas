@@ -13,3 +13,5 @@ separated from shipped behavior.
 7. [Offline-first behavior](offline-first.md)
 8. [V1 implementation plan](v1-plan.md)
 9. [Developer setup](developer-setup.md)
+
+See [validation and release checks](validation.md) for observed results and remaining native testing.

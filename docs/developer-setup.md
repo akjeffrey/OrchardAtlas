@@ -1,17 +1,113 @@
 # Developer setup
 
-Implementation-specific commands and platform wiring will be expanded with the
-V1 slice. Required prerequisites: stable Flutter with Dart 3, Android Studio/SDK
-and Java 17 for Android, Xcode/CocoaPods on macOS for iOS, Firebase CLI, and a
-Firebase/Google Cloud project with Maps SDKs enabled.
+## Toolchain
+Install stable Flutter (this foundation was validated with the version recorded in
+[validation](validation.md)), Android Studio/SDK and Java 17+ for Android, or Xcode
+on macOS for iOS. The generated project uses Flutter's current native templates
+including Swift Package Manager; let Flutter resolve the plugins. Minimum Android
+API is 23 and iOS is 15. Run `flutter doctor` and resolve platform prerequisites.
 
-Use separate development and production Firebase projects. Enable email/password
-Authentication, provision Firestore and Storage, and deploy repository rules before
-use. Supply client Firebase options via ignored local configuration or dart defines;
-never check in API keys, google-services.json, GoogleService-Info.plist, service
-account JSON, keystores, key.properties, provisioning profiles, or passwords.
-Maps SDK keys must be platform-restricted and injected through local native config.
+```sh
+flutter pub get
+flutter analyze
+flutter test
+dart format --output=none --set-exit-if-changed lib test
+```
 
-Emulator testing and dependency/version commands will accompany implementation.
-Physical Android/iOS testing is mandatory for permission, GPS, map and persistence
-behavior. No credentials are needed for domain or mapping unit tests.
+Commit `pubspec.lock` for reproducible app dependencies. Domain/mapping/widget tests
+need no Firebase project, Maps key or native simulator. Fake-Firestore repository
+tests verify mapping and error propagation; they do not prove native disk durability.
+
+## Firebase configuration (local only)
+Create a development Firebase project, register Android application
+`com.orchardatlas.orchard_atlas` and iOS bundle `com.orchardatlas.orchardAtlas`, enable
+email/password Authentication, and provision Firestore and Storage. Deploy rules
+before using the app:
+
+```sh
+firebase deploy --project YOUR_PROJECT_ID --only firestore:rules,firestore:indexes,storage
+```
+
+Create ignored `config/android.json` and `config/ios.json`, each with string values
+copied from that platform's Firebase app settings:
+
+```text
+FIREBASE_PROJECT_ID
+FIREBASE_API_KEY
+FIREBASE_APP_ID
+FIREBASE_MESSAGING_SENDER_ID
+FIREBASE_STORAGE_BUCKET
+```
+
+These are JSON objects, for example `{ "FIREBASE_PROJECT_ID": "your-project", ... }`
+with every listed key populated. Use the platform-specific Firebase app ID and API
+key. App initialization uses explicit FirebaseOptions, so google-services.json and
+GoogleService-Info.plist are not required for this email/password slice. If later
+plugins require those native files, keep them ignored. Never include service-account
+JSON in the app. Registration first use needs network; returning sessions can work
+offline. A setup screen appears if config is missing or initialization fails.
+
+## Google Maps and GPS
+Enable **Maps SDK for Android** and **Maps SDK for iOS** in your Google Cloud project;
+configure billing and restrict separate keys to platform package/signature or bundle.
+
+Android: append `MAPS_API_KEY=your_local_key` to ignored `android/local.properties`.
+Keep the SDK/Flutter paths Flutter writes there. The Gradle manifest placeholder
+injects the key. Manifest includes Internet and foreground coarse/fine location.
+
+Android emulator Firebase endpoints use HTTP. For development only, add
+`android:usesCleartextTraffic="true"` to the application in the debug manifest;
+do not enable this in the production manifest. Android's emulator uses host
+`10.0.2.2`; iOS Simulator uses `127.0.0.1`.
+
+iOS: create ignored `ios/Flutter/Maps.local.xcconfig`:
+
+```text
+MAPS_API_KEY = your_local_key
+```
+
+Both Debug and Release xcconfig include it, Info.plist passes the key to AppDelegate,
+and AppDelegate initializes Google Maps. Foreground location purpose is declared.
+Do not add background location entitlement. Choose your own Apple development team
+locally; no signing configuration is committed. No production signing key or
+Android release debug signing is included. Profile and release builds need local
+Maps config, appropriate Firebase options and your own signing setup.
+
+```sh
+flutter run --dart-define-from-file=config/android.json
+# On macOS with an iOS device/simulator:
+flutter run --dart-define-from-file=config/ios.json
+```
+
+Run the acceptance scenario in [offline-first](offline-first.md) on both platforms.
+GPS accuracy is shown; manually adjust and confirm before saving. The map's default
+world view is not a proposed plant location. A plant list supports tile outages.
+
+## Emulator authorization tests
+Install Node 22+ and Java 21, then from the repository root:
+
+```sh
+npm ci --prefix security-test
+security-test/node_modules/.bin/firebase emulators:exec --project demo-orchard-atlas --only firestore "npm --prefix security-test test"
+```
+
+The demo project runs locally without production credentials. To run the mobile
+app against emulators, start auth/firestore/storage with the same project and use
+local Firebase defines for a registered test app plus
+`--dart-define=FIREBASE_EMULATOR_HOST=10.0.2.2` (Android) or `127.0.0.1` (iOS).
+For iOS simulator HTTP local endpoints, configure local networking ATS exceptions
+in a development configuration as needed; do not ship broad ATS exemptions.
+
+## Cache, sign-out and limits
+On sign-out, screens unmount and the native Firestore instance is terminated and
+its persistence cleared. Restart the app to initialize a fresh instance before
+another account signs in. If clearing fails the app stays blocked; retry sign-out
+on restart. Sign out only after pending writes sync, otherwise clearing the local
+cache can discard them. Local default-property preferences contain only non-secret
+IDs scoped by UID. Reinstallation/new device requires network to discover property.
+
+No API keys, Firebase configuration, credentials, password/token logs, keystores,
+provisioning profiles, or service accounts belong in Git. The ignore list covers
+common local files; review `git diff --cached` before each commit. Configuration is
+injected into builds and never printed. Production keys should have platform
+restrictions, quotas, and separate debug/release projects.

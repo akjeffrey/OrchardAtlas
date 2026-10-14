@@ -17,7 +17,8 @@ states with recoverable actions. Never show raw credentials in errors.
 3. **Add Plant**: plant name; dependent group, genus, species, cultivar selectors;
    changing a parent clears descendants. Current-GPS button, lat/lon with manual
    correction, explicit location confirmation. Save requires identity and valid
-   confirmed position. Success navigates to detail without awaiting network sync.
+   confirmed position. Success centers the map on the saved marker without awaiting network sync; tap
+   the marker to open detail.
 4. **Plant Detail**: taxonomy breadcrumb, coordinates, annual selector with kg and
    count totals, ordered activity history, Record Activity and Add Another Like
    This actions. Cache/pending status distinguishes local state from confirmation.
