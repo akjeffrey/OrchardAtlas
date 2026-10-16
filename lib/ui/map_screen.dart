@@ -7,6 +7,8 @@ import 'package:uuid/uuid.dart';
 import '../application/providers.dart';
 import '../domain/landscape.dart';
 import '../domain/models.dart';
+import '../domain/orchards.dart';
+import '../domain/filters.dart';
 import 'common.dart';
 import 'location_search.dart';
 import 'orchard_map.dart';
@@ -14,9 +16,41 @@ import 'plant_filters.dart';
 import 'plant_symbols.dart';
 import 'sections_screen.dart';
 import 'tasks_screen.dart';
+import 'orchard_picker.dart';
+
+class OrchardHome extends ConsumerWidget {
+  const OrchardHome({super.key, this.focus});
+  final Coordinates? focus;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) => ref
+      .watch(placeProvider)
+      .when(
+        skipLoadingOnRefresh: false,
+        data: (place) => ref
+            .watch(defaultMapViewProvider)
+            .when(
+              skipLoadingOnRefresh: false,
+              data: (view) => MapScreen(
+                key: ValueKey(place.id),
+                focus: focus,
+                initialView: view,
+              ),
+              error: (_, _) => MapScreen(key: ValueKey(place.id), focus: focus),
+              loading: () => const Scaffold(
+                body: Center(child: CircularProgressIndicator()),
+              ),
+            ),
+        error: (e, _) => Scaffold(
+          body: ErrorPanel(e, retry: () => ref.invalidate(placeProvider)),
+        ),
+        loading: () =>
+            const Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+}
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key, this.focus});
+  const MapScreen({super.key, this.focus, this.initialView});
+  final OrchardMapView? initialView;
   final Coordinates? focus;
   @override
   ConsumerState<MapScreen> createState() => _MapState();
@@ -27,6 +61,8 @@ class _MapState extends ConsumerState<MapScreen>
   late final TabController tabs;
   GoogleMapController? controller;
   Coordinates? selected, cameraCenter;
+  CameraPosition? cameraPosition;
+  bool beforeDrawingFullScreen = false;
   String? locationMessage;
   bool locating = false, fullScreen = false, saving = false;
   SectionKind? drawing;
@@ -35,6 +71,19 @@ class _MapState extends ConsumerState<MapScreen>
   @override
   void initState() {
     super.initState();
+    final view = widget.initialView;
+    if (view != null) {
+      fullScreen = view.fullScreen;
+      if (widget.focus == null) {
+        cameraCenter = view.center;
+        cameraPosition = CameraPosition(
+          target: LatLng(view.center.latitude, view.center.longitude),
+          zoom: view.zoom,
+          bearing: view.bearing,
+          tilt: view.tilt,
+        );
+      }
+    }
     tabs = TabController(length: 3, vsync: this)
       ..addListener(() {
         if (tabs.index != 0) controller = null;
@@ -65,6 +114,12 @@ class _MapState extends ConsumerState<MapScreen>
 
   void moveTo(Coordinates point) {
     cameraCenter = point;
+    cameraPosition = CameraPosition(
+      target: LatLng(point.latitude, point.longitude),
+      zoom: 19,
+      bearing: cameraPosition?.bearing ?? 0,
+      tilt: cameraPosition?.tilt ?? 0,
+    );
     controller?.animateCamera(
       CameraUpdate.newLatLngZoom(LatLng(point.latitude, point.longitude), 19),
     );
@@ -100,6 +155,7 @@ class _MapState extends ConsumerState<MapScreen>
   void startDrawing(SectionKind kind) => setState(() {
     cameraCenter ??= selected ?? widget.focus;
     drawing = kind;
+    beforeDrawingFullScreen = fullScreen;
     fullScreen = true;
     selected = null;
     draft.clear();
@@ -130,6 +186,7 @@ class _MapState extends ConsumerState<MapScreen>
     if (mounted) {
       setState(() {
         drawing = null;
+        fullScreen = beforeDrawingFullScreen;
         draft.clear();
       });
     }
@@ -216,6 +273,7 @@ class _MapState extends ConsumerState<MapScreen>
       ref.read(orchardRepositoryProvider).saveSection(section);
       setState(() {
         drawing = null;
+        fullScreen = beforeDrawingFullScreen;
         draft.clear();
         locationMessage = '${section.name} saved locally.';
       });
@@ -223,6 +281,69 @@ class _MapState extends ConsumerState<MapScreen>
       if (mounted) setState(() => locationMessage = '$e');
     } finally {
       if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> switchOrchard() async {
+    if (drawing != null && !await discardDrawing()) return;
+    if (!mounted) return;
+    final next = await showOrchardPicker(context);
+    if (next == null || !mounted) return;
+    ref.read(submittedTaxaProvider.notifier).state = {};
+    ref.read(plantFilterProvider.notifier).state = const PlantFilter();
+    context.go('/');
+    ref.read(selectedOrchardProvider.notifier).state = next;
+  }
+
+  Future<void> mapSettings() async {
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Map settings'),
+        content: const Text(
+          'Save this map location, zoom and display mode as the default for this orchard. It will reopen here next time.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Set current view as default'),
+          ),
+        ],
+      ),
+    );
+    if (saved != true || !mounted) return;
+    try {
+      final place = await ref.read(placeProvider.future);
+      final position = cameraPosition;
+      final center = cameraCenter ?? selected ?? widget.focus;
+      if (center == null || (position != null && position.zoom <= 2)) {
+        throw StateError('Move or locate the map at your orchard first');
+      }
+      await ref
+          .read(mapViewRepositoryProvider)
+          .save(
+            place.ownerId,
+            place.id,
+            OrchardMapView(
+              center: center,
+              zoom: position?.zoom ?? 19,
+              bearing: position?.bearing ?? 0,
+              tilt: position?.tilt ?? 0,
+              fullScreen: fullScreen,
+            ),
+          );
+      // Keep this screen/camera mounted; startup reloads the saved preference.
+      if (mounted) {
+        setState(
+          () => locationMessage = 'Default map view saved for ${place.name}.',
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => locationMessage = '$e');
     }
   }
 
@@ -263,20 +384,38 @@ class _MapState extends ConsumerState<MapScreen>
     final place = ref.watch(placeProvider), plants = ref.watch(plantsProvider);
     final taxonomy = ref.watch(taxonomyProvider);
     final sectionData = ref.watch(sectionsProvider);
-    final sections = sectionData.valueOrNull?.value ?? <OrchardSection>[];
+    final sections = sectionData.asData?.value.value ?? <OrchardSection>[];
     final isMap = tabs.index == 0;
     return PopScope(
       canPop: !fullScreen && drawing == null,
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop || saving) return;
-        if (drawing != null && !await discardDrawing()) return;
+        if (drawing != null) {
+          await discardDrawing();
+          return;
+        }
         if (mounted) setState(() => fullScreen = false);
       },
       child: Scaffold(
         appBar: AppBar(
+          leading: drawing != null || fullScreen
+              ? IconButton(
+                  tooltip: 'Back to map',
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: saving
+                      ? null
+                      : () async {
+                          if (drawing != null) {
+                            await discardDrawing();
+                          } else {
+                            setState(() => fullScreen = false);
+                          }
+                        },
+                )
+              : null,
           title: Text(
             fullScreen
-                ? 'Orchard map'
+                ? '${place.valueOrNull?.name ?? 'Orchard'} map'
                 : place.valueOrNull?.name ?? 'OrchardAtlas',
           ),
           actions: [
@@ -298,10 +437,19 @@ class _MapState extends ConsumerState<MapScreen>
               PopupMenuButton<String>(
                 tooltip: 'Orchard options',
                 onSelected: (v) {
-                  if (v == 'layout') context.push('/layout');
+                  if (v == 'layout') {
+                    context.push('/layout', extra: cameraPosition);
+                  }
+                  if (v == 'orchards') switchOrchard();
+                  if (v == 'settings') mapSettings();
                   if (v == 'logout') signOut();
                 },
                 itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'orchards',
+                    child: Text('Select orchard'),
+                  ),
+                  PopupMenuItem(value: 'settings', child: Text('Map settings')),
                   PopupMenuItem(
                     value: 'layout',
                     child: Text('Areas, beds & rows'),
@@ -350,6 +498,23 @@ class _MapState extends ConsumerState<MapScreen>
                   final items = ref
                       .watch(plantFilterProvider)
                       .apply(snapshot.value, taxonomy, sections: sections);
+                  final initialCenter =
+                      cameraCenter ??
+                      selected ??
+                      widget.focus ??
+                      items.firstOrNull?.location ??
+                      sections.firstOrNull?.vertices.first;
+                  final initialCamera =
+                      cameraPosition ??
+                      (initialCenter == null
+                          ? null
+                          : CameraPosition(
+                              target: LatLng(
+                                initialCenter.latitude,
+                                initialCenter.longitude,
+                              ),
+                              zoom: 19,
+                            ));
                   return Column(
                     children: [
                       if (!fullScreen) ...[
@@ -439,11 +604,23 @@ class _MapState extends ConsumerState<MapScreen>
                             draft: List.of(draft),
                             draftKind: drawing ?? SectionKind.row,
                             center: cameraCenter ?? selected ?? widget.focus,
+
+                            initialCamera: initialCamera,
+                            onCameraChanged: (position) =>
+                                cameraPosition = position,
                             onMapCreated: (map) {
                               controller = map;
-                              final latest =
-                                  cameraCenter ?? selected ?? widget.focus;
-                              if (latest != null) moveTo(latest);
+                              final latest = cameraPosition ?? initialCamera;
+                              if (latest != null) {
+                                cameraPosition = latest;
+                                cameraCenter = Coordinates(
+                                  latest.target.latitude,
+                                  latest.target.longitude,
+                                );
+                                map.animateCamera(
+                                  CameraUpdate.newCameraPosition(latest),
+                                );
+                              }
                             },
                             onCameraMove: (p) => cameraCenter = p,
                             onTap: saving

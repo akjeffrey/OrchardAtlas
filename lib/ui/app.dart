@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../application/providers.dart';
 import '../domain/models.dart';
@@ -31,11 +32,22 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/layout', builder: (_, _) => const SectionsScreen()),
+      GoRoute(
+        path: '/layout',
+        builder: (_, state) => SectionsScreen(
+          initialCamera: state.extra is CameraPosition
+              ? state.extra as CameraPosition
+              : null,
+        ),
+      ),
       GoRoute(
         path: '/sections/new',
-        builder: (_, state) =>
-            SectionFormScreen(parentId: state.extra as String?),
+        builder: (_, state) => SectionFormScreen(
+          parentId: state.extra is String ? state.extra as String : null,
+          initialCamera: state.extra is CameraPosition
+              ? state.extra as CameraPosition
+              : null,
+        ),
       ),
       GoRoute(
         path: '/sections/:id',
@@ -72,7 +84,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
       GoRoute(
         path: '/',
-        builder: (_, state) => MapScreen(
+        builder: (_, state) => OrchardHome(
           focus: state.extra is Coordinates ? state.extra as Coordinates : null,
         ),
       ),
