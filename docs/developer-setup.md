@@ -55,6 +55,38 @@ Android: append `MAPS_API_KEY=your_local_key` to ignored `android/local.properti
 Keep the SDK/Flutter paths Flutter writes there. The Gradle manifest placeholder
 injects the key. Manifest includes Internet and foreground coarse/fine location.
 
+CI reads the repository Actions secret **GOOGLE_MAPS_ANDROID_KEY** and supplies
+it to Gradle as `GOOGLE_MAPS_ANDROID_API_KEY`. Keep the value out of Git and logs.
+The trial package is `com.orchardatlas.orchard_atlas.trial`, so restrict the trial
+key to that package and its signing-certificate SHA-1. The phone artifact includes
+`SIGNING_CERTIFICATE.txt` with public certificate fingerprints. Enable Maps SDK
+for Android and billing; no Places or Google Geocoding API is used. Address lookup
+uses Android Geocoder / iOS CLGeocoder and may require an internet connection.
+
+The same native Maps configuration now enables satellite imagery in the local
+trial as well as connected mode. With no key the app labels its offline coordinate
+sketch explicitly. A configured key is not proof that billing, SDK activation or
+package/certificate restrictions are correct; verify satellite tiles on a device.
+
+For repeatable trial updates, optionally store a standard Android debug keystore
+as Actions secret `ANDROID_TRIAL_DEBUG_KEYSTORE_BASE64`. It must use alias
+`androiddebugkey`, store/key passwords `android`, and remain private outside Git.
+Base64 is encoding, not encryption: only put it in the secrets UI. Generate a
+dedicated trial key locally with Java's keytool (do not use production signing):
+
+```sh
+keytool -genkeypair -keystore orchard-trial-debug.keystore -alias androiddebugkey \
+  -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=OrchardAtlas Trial"
+keytool -list -v -keystore orchard-trial-debug.keystore -storepass android
+```
+
+Encode that file with your OS's base64 tool and save the result as the keystore
+secret. This keeps the signing fingerprint stable across Actions runners. Without
+it, each runner generates its own debug key; allow that run's fingerprint in the
+Maps key restrictions before trying the APK. Never solve a certificate mismatch
+by uninstalling a phone trial containing records you need to keep.
+
 Android emulator Firebase endpoints use HTTP. For development only, add
 `android:usesCleartextTraffic="true"` to the application in the debug manifest;
 do not enable this in the production manifest. Android's emulator uses host

@@ -1,5 +1,48 @@
 package com.orchardatlas.orchard_atlas
 
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+import android.content.pm.PackageManager
+import android.location.Geocoder
+import java.util.Locale
 
-class MainActivity : FlutterActivity()
+class MainActivity : FlutterActivity() {
+    override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/map_services")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "mapsConfigured" -> {
+                        val info = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
+                        val key = info.metaData?.getString("com.google.android.geo.API_KEY").orEmpty()
+                        result.success(key.isNotBlank() && !key.startsWith("\${"))
+                    }
+                    "searchAddress" -> {
+                        val query = call.argument<String>("query").orEmpty().trim()
+                        if (query.isEmpty() || query.length > 500) {
+                            result.error("invalid_query", "Enter an address", null)
+                        } else if (!Geocoder.isPresent()) {
+                            result.error("unavailable", "Address lookup is unavailable on this device", null)
+                        } else {
+                            // The legacy API also supports pre-Android 13 trial phones.
+                            Thread {
+                                try {
+                                    @Suppress("DEPRECATION")
+                                    val addresses = Geocoder(this, Locale.getDefault()).getFromLocationName(query, 5).orEmpty()
+                                    val matches = addresses.filter { it.hasLatitude() && it.hasLongitude() }.map {
+                                        mapOf("label" to (it.getAddressLine(0) ?: query),
+                                            "latitude" to it.latitude, "longitude" to it.longitude)
+                                    }
+                                    runOnUiThread { result.success(matches) }
+                                } catch (_: Exception) {
+                                    runOnUiThread { result.error("lookup_failed", "Address lookup failed. Check your connection or use coordinates.", null) }
+                                }
+                            }.start()
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+    }
+}

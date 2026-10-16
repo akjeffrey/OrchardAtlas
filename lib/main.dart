@@ -10,16 +10,22 @@ import 'application/providers.dart';
 import 'data/firestore_orchard_repository.dart';
 import 'data/local_trial_repository.dart';
 import 'data/platform_repositories.dart';
+import 'data/map_services.dart';
 import 'ui/app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
+    final mapsConfigured = await DeviceAddressSearchRepository.mapsConfigured();
     if (const bool.fromEnvironment('TRIAL_MODE')) {
       final preferences = await SharedPreferences.getInstance();
       runApp(
         ProviderScope(
           overrides: [
+            mapsConfiguredProvider.overrideWithValue(mapsConfigured),
+            addressSearchRepositoryProvider.overrideWithValue(
+              DeviceAddressSearchRepository(),
+            ),
             trialModeProvider.overrideWithValue(true),
             orchardRepositoryProvider.overrideWithValue(
               LocalTrialRepository.open(preferences),
@@ -65,6 +71,10 @@ Future<void> main() async {
     runApp(
       ProviderScope(
         overrides: [
+          mapsConfiguredProvider.overrideWithValue(mapsConfigured),
+          addressSearchRepositoryProvider.overrideWithValue(
+            DeviceAddressSearchRepository(),
+          ),
           orchardRepositoryProvider.overrideWithValue(
             FirestoreOrchardRepository(firestore, preferences),
           ),

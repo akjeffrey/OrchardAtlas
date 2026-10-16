@@ -43,7 +43,8 @@ extensions.configure<ApplicationExtension> {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        manifestPlaceholders["MAPS_API_KEY"] = orchardLocalProperties.getProperty("MAPS_API_KEY", "")
+        manifestPlaceholders["MAPS_API_KEY"] = System.getenv("GOOGLE_MAPS_ANDROID_API_KEY")
+            ?.takeIf { it.isNotBlank() } ?: orchardLocalProperties.getProperty("MAPS_API_KEY", "")
     }
 
     // Production signing must be configured outside Git before distribution.

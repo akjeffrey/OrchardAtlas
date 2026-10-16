@@ -9,6 +9,8 @@ import '../domain/models.dart';
 import '../domain/landscape.dart';
 import 'common.dart';
 import 'layout_canvas.dart';
+import 'orchard_map.dart';
+import 'location_search.dart';
 import 'tasks_screen.dart';
 
 String sectionPath(OrchardSection section, List<OrchardSection> sections) {
@@ -281,6 +283,23 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
     final data = ref.watch(sectionsProvider);
     return Scaffold(
       appBar: AppBar(
+        actions: [
+          IconButton(
+            tooltip: 'Search map location',
+            icon: const Icon(Icons.search),
+            onPressed: () async {
+              final result = await showLocationSearch(context);
+              if (result == null || !mounted) return;
+              setState(() => center = result.coordinates);
+              map?.animateCamera(
+                CameraUpdate.newLatLngZoom(
+                  LatLng(center!.latitude, center!.longitude),
+                  19,
+                ),
+              );
+            },
+          ),
+        ],
         title: Text(
           widget.sectionId == null ? 'Draw area or row' : 'Edit area or row',
         ),
@@ -369,72 +388,34 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
               ),
               SizedBox(
                 height: 300,
-                child: ref.watch(trialModeProvider)
-                    ? LayoutCanvas(
-                        sections: snapshot.value
-                            .where((s) => s.id != old?.id)
-                            .toList(),
-                        draft: List.of(points),
-                        center: center,
-                        span: span,
-                        onTap: busy
-                            ? null
-                            : (p) => setState(() {
-                                if (points.length < 40) points.add(p);
-                              }),
-                      )
-                    : GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: LatLng(
-                            center?.latitude ?? 0,
-                            center?.longitude ?? 0,
-                          ),
-                          zoom: center == null ? 2 : 19,
+                child: OrchardMap(
+                  sections: snapshot.value
+                      .where((s) => s.id != old?.id)
+                      .toList(),
+                  draft: List.of(points),
+                  draftKind: kind,
+                  center: center,
+                  span: span,
+                  onMapCreated: (c) {
+                    map = c;
+                    if (center != null) {
+                      c.animateCamera(
+                        CameraUpdate.newLatLngZoom(
+                          LatLng(center!.latitude, center!.longitude),
+                          19,
                         ),
-                        mapType: MapType.hybrid,
-                        onMapCreated: (c) {
-                          map = c;
-                          if (center != null) {
-                            c.animateCamera(
-                              CameraUpdate.newLatLngZoom(
-                                LatLng(center!.latitude, center!.longitude),
-                                19,
-                              ),
-                            );
-                          }
-                        },
-                        onTap: busy
-                            ? null
-                            : (p) => setState(() {
-                                if (points.length < 40) {
-                                  points.add(
-                                    Coordinates(p.latitude, p.longitude),
-                                  );
-                                }
-                              }),
-                        polylines: {
-                          if (points.length >= 2)
-                            Polyline(
-                              polylineId: const PolylineId('draft'),
-                              points: points
-                                  .map((p) => LatLng(p.latitude, p.longitude))
-                                  .toList(),
-                              color: Colors.deepOrange,
-                              width: 3,
-                            ),
-                        },
-                        polygons: {
-                          if (kind != SectionKind.row && points.length >= 3)
-                            Polygon(
-                              polygonId: const PolygonId('draft'),
-                              points: points
-                                  .map((p) => LatLng(p.latitude, p.longitude))
-                                  .toList(),
-                              fillColor: Colors.green.withValues(alpha: 0.12),
-                              strokeWidth: 2,
-                            ),
-                        },
-                      ),
+                      );
+                    }
+                  },
+                  onTap: busy
+                      ? null
+                      : (p) => setState(() {
+                          if (points.length < 40) points.add(p);
+                        }),
+                  onMoveVertex: busy
+                      ? null
+                      : (i, p) => setState(() => points[i] = p),
+                ),
               ),
               Wrap(
                 children: [
@@ -444,13 +425,17 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
                     label: const Text('Center on GPS'),
                   ),
                   TextButton(
-                    onPressed: () =>
-                        setState(() => span = (span / 2).clamp(0.00001, 1)),
+                    onPressed: () => setState(() {
+                      span = (span / 2).clamp(0.00001, 1);
+                      map?.animateCamera(CameraUpdate.zoomIn());
+                    }),
                     child: const Text('Zoom in'),
                   ),
                   TextButton(
-                    onPressed: () =>
-                        setState(() => span = (span * 2).clamp(0.00001, 1)),
+                    onPressed: () => setState(() {
+                      span = (span * 2).clamp(0.00001, 1);
+                      map?.animateCamera(CameraUpdate.zoomOut());
+                    }),
                     child: const Text('Zoom out'),
                   ),
                   TextButton(

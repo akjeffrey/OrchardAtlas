@@ -1,9 +1,11 @@
 # Install the Android phone trial
 
 The `Android phone trial` GitHub Actions workflow builds an installable debug APK
-with `--dart-define=TRIAL_MODE=true`. It needs no Firebase account, project keys,
-Maps key, or production signing credential. The workflow generates the standard
-Android debug signing key on its runner; signing keys are not stored in Git.
+with `--dart-define=TRIAL_MODE=true`. It needs no Firebase account or Firebase keys.
+The workflow now reads the repository Actions secret `GOOGLE_MAPS_ANDROID_KEY`
+for Google Maps satellite imagery. See [developer setup](developer-setup.md) for
+SDK activation, billing and package/certificate restrictions. Signing credentials
+stay outside Git; an optional private debug keystore secret stabilizes trial updates.
 
 1. Open the successful **Android phone trial** run on GitHub Actions.
 2. Under **Artifacts**, download **OrchardAtlas-Android-trial** while signed in.
@@ -19,6 +21,27 @@ keep the installed trial if you need its records. **Uninstalling deletes local r
 only replace an installation after preserving the data or deciding it is disposable.
 The artifact includes `SHA256SUMS.txt` for checking that the transferred APK matches.
 Artifacts expire after 14 days; a new branch push builds another trial.
+
+## Trial 0.4: satellite map, drawing and location search
+
+- **Map** defaults to Google satellite imagery in both trial and connected modes.
+  Tiles need internet and a properly configured key. Without a key the app labels
+  its coordinate sketch explicitly; data remains accessible.
+- Tap **Full screen map** to hide status/filter/tab controls. **Data mode** restores
+  them while preserving the camera, selection, filters and any draft drawing.
+- Choose **Add row** or **Add area** on the map. Tap along the row or around the
+  boundary, drag vertex pins to adjust, or undo. **Finish drawing** collects a name
+  and optional parent area/bed. Tap the saved shape for detail, plants and crops.
+  Cancel/Back asks before discarding a nonempty draft. Coordinate editing remains
+  available under **Orchard options → Areas, beds & rows**.
+- The map search button accepts an address or decimal **latitude, longitude**.
+  Choose from address results. Coordinate search works without an address service.
+  While drawing, search/GPS changes the view without adding a point.
+- Download `SIGNING_CERTIFICATE.txt` alongside the APK and allow its SHA-1 for
+  `com.orchardatlas.orchard_atlas.trial` in the Android Maps key restrictions.
+
+The following sections describe earlier trial versions; 0.4 replaces their
+coordinate-sketch-only map behavior when Google Maps is configured.
 
 ## Things to try
 - Open **Add Plant** and grant foreground GPS permission. The form fetches your

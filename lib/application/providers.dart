@@ -5,6 +5,15 @@ import '../domain/models.dart';
 import '../domain/landscape.dart';
 import '../domain/repositories.dart';
 import '../domain/taxonomy.dart';
+import '../domain/map_search.dart';
+
+final addressSearchRepositoryProvider = Provider<AddressSearchRepository>(
+  (ref) => throw UnimplementedError(),
+);
+// Startup overrides this using native configuration, for trial and connected mode.
+final mapsConfiguredProvider = Provider<bool>(
+  (ref) => !ref.watch(trialModeProvider),
+);
 
 final orchardRepositoryProvider = Provider<OrchardRepository>(
   (ref) => throw UnimplementedError(),
