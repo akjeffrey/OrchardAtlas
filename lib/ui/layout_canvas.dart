@@ -41,7 +41,7 @@ class LayoutCanvas extends ConsumerWidget {
     if (points.isEmpty) {
       return const Center(
         child: Text(
-          'Capture GPS or enter a coordinate to start.\nNo basemap in trial mode.',
+          'Capture GPS or enter a coordinate to start.\nGoogle Maps is not configured.',
           textAlign: TextAlign.center,
         ),
       );

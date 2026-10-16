@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:uuid/uuid.dart';
 
 import '../application/providers.dart';
+import '../domain/landscape.dart';
 import '../domain/models.dart';
 import 'common.dart';
-import 'plant_symbols.dart';
+import 'location_search.dart';
+import 'orchard_map.dart';
 import 'plant_filters.dart';
+import 'plant_symbols.dart';
+import 'sections_screen.dart';
 import 'tasks_screen.dart';
-import '../domain/landscape.dart';
-import 'layout_canvas.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key, this.focus});
@@ -23,15 +26,18 @@ class _MapState extends ConsumerState<MapScreen>
     with SingleTickerProviderStateMixin {
   late final TabController tabs;
   GoogleMapController? controller;
-  Coordinates? selected;
+  Coordinates? selected, cameraCenter;
   String? locationMessage;
-  bool locating = false;
+  bool locating = false, fullScreen = false, saving = false;
+  SectionKind? drawing;
+  final draft = <Coordinates>[];
+
   @override
   void initState() {
     super.initState();
     tabs = TabController(length: 3, vsync: this)
       ..addListener(() {
-        if (tabs.index == 2) controller = null;
+        if (tabs.index != 0) controller = null;
         if (mounted) setState(() {});
       });
     if (widget.focus != null) {
@@ -53,13 +59,15 @@ class _MapState extends ConsumerState<MapScreen>
       selected = null;
       locationMessage =
           'Plant saved locally. Tap its marker to open Plant Detail.';
-      controller?.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(widget.focus!.latitude, widget.focus!.longitude),
-          19,
-        ),
-      );
+      moveTo(widget.focus!);
     }
+  }
+
+  void moveTo(Coordinates point) {
+    cameraCenter = point;
+    controller?.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(point.latitude, point.longitude), 19),
+    );
   }
 
   Future<void> locate() async {
@@ -68,20 +76,153 @@ class _MapState extends ConsumerState<MapScreen>
       final fix = await ref.read(locationRepositoryProvider).currentPosition();
       if (!mounted) return;
       setState(() {
-        selected = fix.coordinates;
-        locationMessage =
-            'GPS accuracy ±${fix.accuracyMeters.round()} m. Adjust coordinates if needed.';
+        if (drawing == null) selected = fix.coordinates;
+        locationMessage = 'GPS accuracy ±${fix.accuracyMeters.round()} m.';
+        moveTo(fix.coordinates);
       });
-      await controller?.animateCamera(
-        CameraUpdate.newLatLngZoom(
-          LatLng(fix.coordinates.latitude, fix.coordinates.longitude),
-          19,
-        ),
-      );
     } catch (error) {
       if (mounted) setState(() => locationMessage = '$error');
     } finally {
       if (mounted) setState(() => locating = false);
+    }
+  }
+
+  Future<void> search() async {
+    final result = await showLocationSearch(context);
+    if (!mounted || result == null) return;
+    setState(() {
+      if (drawing == null) selected = result.coordinates;
+      locationMessage = result.label;
+      moveTo(result.coordinates);
+    });
+  }
+
+  void startDrawing(SectionKind kind) => setState(() {
+    cameraCenter ??= selected ?? widget.focus;
+    drawing = kind;
+    fullScreen = true;
+    selected = null;
+    draft.clear();
+    locationMessage = null;
+  });
+
+  Future<bool> discardDrawing() async {
+    if (draft.isNotEmpty) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Discard this drawing?'),
+          content: const Text('The unsaved row or area will be lost.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep drawing'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Discard'),
+            ),
+          ],
+        ),
+      );
+      if (discard != true || !mounted) return false;
+    }
+    if (mounted) {
+      setState(() {
+        drawing = null;
+        draft.clear();
+      });
+    }
+    return true;
+  }
+
+  Future<void> saveDrawing(List<OrchardSection> sections) async {
+    if (saving || drawing == null) return;
+    try {
+      validateGeometry(drawing!, draft);
+    } catch (e) {
+      setState(() => locationMessage = '$e');
+      return;
+    }
+    var name = '', parent = '';
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Save ${drawing!.name}'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                autofocus: true,
+                maxLength: 500,
+                decoration: const InputDecoration(labelText: 'Area / row name'),
+                onChanged: (v) => name = v,
+              ),
+              DropdownButtonFormField<String>(
+                initialValue: '',
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Inside area / bed',
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: '',
+                    child: Text('Whole property'),
+                  ),
+                  for (final s in sections.where(
+                    (s) => s.kind != SectionKind.row,
+                  ))
+                    DropdownMenuItem(
+                      value: s.id,
+                      child: Text(
+                        sectionPath(s, sections),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (v) => parent = v ?? '',
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Keep drawing'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Save shape'),
+          ),
+        ],
+      ),
+    );
+    if (accepted != true || !mounted) return;
+    setState(() => saving = true);
+    try {
+      final place = await ref.read(placeProvider.future);
+      if (!mounted) return;
+      final section = OrchardSection(
+        id: const Uuid().v4(),
+        propertyId: place.id,
+        name: name,
+        kind: drawing!,
+        vertices: List.of(draft),
+        parentId: parent.isEmpty ? null : parent,
+        createdAt: DateTime.now().toUtc(),
+      );
+      validateSectionParent(section, sections);
+      ref.read(orchardRepositoryProvider).saveSection(section);
+      setState(() {
+        drawing = null;
+        draft.clear();
+        locationMessage = '${section.name} saved locally.';
+      });
+    } catch (e) {
+      if (mounted) setState(() => locationMessage = '$e');
+    } finally {
+      if (mounted) setState(() => saving = false);
     }
   }
 
@@ -94,11 +235,6 @@ class _MapState extends ConsumerState<MapScreen>
           'Pending offline changes can be lost. Wait until records sync before signing out. You will need to restart the app afterwards.',
         ),
         actions: [
-          IconButton(
-            tooltip: 'Areas, beds & rows',
-            onPressed: () => context.push('/layout'),
-            icon: const Icon(Icons.polyline),
-          ),
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Keep working'),
@@ -111,7 +247,6 @@ class _MapState extends ConsumerState<MapScreen>
       ),
     );
     if (proceed != true || !mounted) return;
-    // Lock and unmount all screens before terminating/clearing the native cache.
     final orchard = ref.read(orchardRepositoryProvider);
     final auth = ref.read(authRepositoryProvider);
     ref.read(sessionLockedProvider.notifier).state = true;
@@ -119,236 +254,244 @@ class _MapState extends ConsumerState<MapScreen>
       await orchard.clearDeviceCache();
       await auth.signOut();
     } catch (_) {
-      // Keep the session locked; another account must never see a stale cache.
+      /* Keep the session locked if cache clearing fails. */
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final place = ref.watch(placeProvider);
-    final plants = ref.watch(plantsProvider);
+    final place = ref.watch(placeProvider), plants = ref.watch(plantsProvider);
     final taxonomy = ref.watch(taxonomyProvider);
-    final sections =
-        ref.watch(sectionsProvider).valueOrNull?.value ?? <OrchardSection>[];
-    final markerSymbols = ref.watch(trialModeProvider)
-        ? null
-        : ref.watch(markerSymbolsProvider).valueOrNull;
-    PlantSymbol symbolFor(String id) =>
-        taxonomy.taxa.where((t) => t.id == id).firstOrNull?.symbol ??
-        PlantSymbol.tree;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(place.valueOrNull?.name ?? 'OrchardAtlas'),
-        actions: [
-          IconButton(
-            onPressed: signOut,
-            tooltip: 'Sign out and clear device cache',
-            icon: const Icon(Icons.logout),
+    final sectionData = ref.watch(sectionsProvider);
+    final sections = sectionData.valueOrNull?.value ?? <OrchardSection>[];
+    final isMap = tabs.index == 0;
+    return PopScope(
+      canPop: !fullScreen && drawing == null,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop || saving) return;
+        if (drawing != null && !await discardDrawing()) return;
+        if (mounted) setState(() => fullScreen = false);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(
+            fullScreen
+                ? 'Orchard map'
+                : place.valueOrNull?.name ?? 'OrchardAtlas',
           ),
-        ],
-        bottom: TabBar(
-          controller: tabs,
-          tabs: const [
-            Tab(text: 'Map'),
-            Tab(text: 'Plants'),
-            Tab(text: 'Tasks'),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: place.hasValue
-            ? () => tabs.index == 2
-                  ? context.push('/tasks/new')
-                  : context.push('/plants/new', extra: selected)
-            : null,
-        icon: const Icon(Icons.add),
-        label: Text(tabs.index == 2 ? 'Add task' : 'Add Plant'),
-      ),
-      body: tabs.index == 2
-          ? const TasksPane()
-          : plants.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => ErrorPanel(
-                e,
-                retry: () {
-                  ref.invalidate(placeProvider);
-                  ref.invalidate(plantsProvider);
-                },
+          actions: [
+            if (isMap)
+              IconButton(
+                tooltip: 'Search map location',
+                onPressed: search,
+                icon: const Icon(Icons.search),
               ),
-              data: (snapshot) {
-                final items = ref
-                    .watch(plantFilterProvider)
-                    .apply(snapshot.value, taxonomy, sections: sections);
-                final center =
-                    selected ??
-                    widget.focus ??
-                    (items.isNotEmpty
-                        ? items.first.location
-                        : sections.firstOrNull?.vertices.first);
-                return Column(
-                  children: [
-                    SyncStatus(snapshot),
-                    const PlantFilterBar(),
-                    Text(
-                      '${items.length} of ${snapshot.value.length} plants · ${ref.watch(plantFilterProvider).status?.name ?? "all statuses"}',
-                    ),
-                    if (locationMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Text(locationMessage!),
-                      ),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      children: [
-                        TextButton.icon(
-                          onPressed: locating ? null : locate,
-                          icon: const Icon(Icons.my_location),
-                          label: Text(
-                            locating ? 'Locating…' : 'Current GPS location',
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () => ref
-                              .read(locationRepositoryProvider)
-                              .openSettings(),
-                          child: const Text('Settings'),
+            if (isMap)
+              IconButton(
+                tooltip: fullScreen ? 'Data mode' : 'Full screen map',
+                onPressed: () => setState(() => fullScreen = !fullScreen),
+                icon: Icon(
+                  fullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
+                ),
+              ),
+            if (drawing == null)
+              PopupMenuButton<String>(
+                tooltip: 'Orchard options',
+                onSelected: (v) {
+                  if (v == 'layout') context.push('/layout');
+                  if (v == 'logout') signOut();
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'layout',
+                    child: Text('Areas, beds & rows'),
+                  ),
+                  PopupMenuItem(
+                    value: 'logout',
+                    child: Text('Sign out and clear device cache'),
+                  ),
+                ],
+              ),
+          ],
+          bottom: fullScreen || drawing != null
+              ? null
+              : TabBar(
+                  controller: tabs,
+                  tabs: const [
+                    Tab(text: 'Map'),
+                    Tab(text: 'Plants'),
+                    Tab(text: 'Tasks'),
+                  ],
+                ),
+        ),
+        floatingActionButton: drawing != null
+            ? null
+            : FloatingActionButton.extended(
+                onPressed: place.hasValue
+                    ? () => tabs.index == 2
+                          ? context.push('/tasks/new')
+                          : context.push('/plants/new', extra: selected)
+                    : null,
+                icon: const Icon(Icons.add),
+                label: Text(tabs.index == 2 ? 'Add task' : 'Add Plant'),
+              ),
+        body: tabs.index == 2
+            ? const TasksPane()
+            : plants.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => ErrorPanel(
+                  e,
+                  retry: () {
+                    ref.invalidate(placeProvider);
+                    ref.invalidate(plantsProvider);
+                  },
+                ),
+                data: (snapshot) {
+                  final items = ref
+                      .watch(plantFilterProvider)
+                      .apply(snapshot.value, taxonomy, sections: sections);
+                  return Column(
+                    children: [
+                      if (!fullScreen) ...[
+                        SyncStatus(snapshot),
+                        const PlantFilterBar(),
+                        Text(
+                          '${items.length} of ${snapshot.value.length} plants · ${ref.watch(plantFilterProvider).status?.name ?? "all statuses"}',
                         ),
                       ],
-                    ),
-                    Expanded(
-                      child: TabBarView(
-                        controller: tabs,
-                        children: [
-                          if (ref.watch(trialModeProvider))
-                            LayoutCanvas(
-                              sections: sections,
-                              plants: items,
-                              selected: selected,
-                              center: widget.focus,
-                              onTap: (coordinates) => setState(() {
-                                selected = coordinates;
-                                locationMessage = 'Coordinate selected for Add Plant. Adjust coordinates on the plant form if needed.';
-                              }),
-                              onPlant: (id) => context.push('/plants/$id'),
-                              onSection: (id) => context.push('/sections/$id'),
-                            )
-                          else
-                            GoogleMap(
-                              mapType: MapType.hybrid,
-                              initialCameraPosition: CameraPosition(
-                                target: center == null
-                                    ? const LatLng(0, 0)
-                                    : LatLng(center.latitude, center.longitude),
-                                zoom: center == null ? 2 : 18,
+                      if (locationMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.all(6),
+                          child: Text(
+                            locationMessage!,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      if (sectionData.hasError)
+                        const Text(
+                          'Areas unavailable. Retry from Areas, beds & rows.',
+                        ),
+                      if (isMap) ...[
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          children: [
+                            TextButton.icon(
+                              onPressed: locating ? null : locate,
+                              icon: const Icon(Icons.my_location),
+                              label: Text(
+                                locating ? 'Locating…' : 'Current GPS location',
                               ),
-                              onMapCreated: (map) {
-                                controller = map;
-                                // GPS or save focus can arrive while the native view
-                                // is still initializing; initialCameraPosition is not
-                                // reapplied to an existing native map.
-                                final latest = selected ?? widget.focus;
-                                if (latest != null) {
-                                  map.animateCamera(
-                                    CameraUpdate.newLatLngZoom(
-                                      LatLng(latest.latitude, latest.longitude),
-                                      19,
-                                    ),
-                                  );
-                                }
-                              },
-                              onTap: (p) => setState(() {
-                                selected = Coordinates(p.latitude, p.longitude);
-                                locationMessage =
-                                    'Map position selected for Add Plant.';
-                              }),
-                              polylines: {
-                                for (final s in sections.where(
-                                  (s) => s.kind == SectionKind.row,
-                                ))
-                                  Polyline(
-                                    polylineId: PolylineId(s.id),
-                                    points: s.vertices
-                                        .map(
-                                          (p) =>
-                                              LatLng(p.latitude, p.longitude),
-                                        )
-                                        .toList(),
-                                    color: Colors.blue,
-                                    width: 4,
-                                    consumeTapEvents: true,
-                                    onTap: () =>
-                                        context.push('/sections/${s.id}'),
-                                  ),
-                              },
-                              polygons: {
-                                for (final s in sections.where(
-                                  (s) => s.kind != SectionKind.row,
-                                ))
-                                  Polygon(
-                                    polygonId: PolygonId(s.id),
-                                    points: s.vertices
-                                        .map(
-                                          (p) =>
-                                              LatLng(p.latitude, p.longitude),
-                                        )
-                                        .toList(),
-                                    fillColor: Colors.green.withValues(
-                                      alpha: 0.12,
-                                    ),
-                                    strokeColor: Colors.green,
-                                    strokeWidth: 2,
-                                    consumeTapEvents: true,
-                                    onTap: () =>
-                                        context.push('/sections/${s.id}'),
-                                  ),
-                              },
-                              markers: {
-                                for (final p in items)
-                                  Marker(
-                                    markerId: MarkerId(p.id),
-                                    position: LatLng(
-                                      p.location.latitude,
-                                      p.location.longitude,
-                                    ),
-                                    icon:
-                                        markerSymbols?[symbolFor(p.taxonId)] ??
-                                        BitmapDescriptor.defaultMarker,
-                                    infoWindow: InfoWindow(title: p.name),
-                                    onTap: () =>
-                                        context.push('/plants/${p.id}'),
-                                  ),
-                                if (selected != null)
-                                  Marker(
-                                    markerId: const MarkerId(
-                                      'selected-position',
-                                    ),
-                                    position: LatLng(
-                                      selected!.latitude,
-                                      selected!.longitude,
-                                    ),
-                                    icon: BitmapDescriptor.defaultMarkerWithHue(
-                                      BitmapDescriptor.hueAzure,
-                                    ),
-                                    infoWindow: const InfoWindow(
-                                      title: 'Selected add location',
-                                    ),
-                                  ),
-                              },
                             ),
-                          items.isEmpty
+                            if (drawing == null) ...[
+                              TextButton.icon(
+                                onPressed: sectionData.hasValue
+                                    ? () => startDrawing(SectionKind.row)
+                                    : null,
+                                icon: const Icon(Icons.timeline),
+                                label: const Text('Add row'),
+                              ),
+                              TextButton.icon(
+                                onPressed: sectionData.hasValue
+                                    ? () => startDrawing(SectionKind.area)
+                                    : null,
+                                icon: const Icon(Icons.crop_square),
+                                label: const Text('Add area'),
+                              ),
+                            ] else ...[
+                              TextButton(
+                                onPressed: draft.isEmpty || saving
+                                    ? null
+                                    : () => setState(() => draft.removeLast()),
+                                child: const Text('Undo vertex'),
+                              ),
+                              TextButton(
+                                onPressed: saving ? null : discardDrawing,
+                                child: const Text('Cancel drawing'),
+                              ),
+                              FilledButton(
+                                onPressed:
+                                    saving ||
+                                        draft.length <
+                                            (drawing == SectionKind.row ? 2 : 3)
+                                    ? null
+                                    : () => saveDrawing(sections),
+                                child: Text(
+                                  saving ? 'Saving…' : 'Finish drawing',
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (drawing != null)
+                          Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: Text(
+                              'Tap ${drawing == SectionKind.row ? "along the row" : "around the boundary"} · ${draft.length}/40 vertices · Drag pins to adjust',
+                            ),
+                          ),
+                        Expanded(
+                          key: const ValueKey('map-pane'),
+                          child: OrchardMap(
+                            sections: sections,
+                            plants: items,
+                            selected: selected,
+                            draft: List.of(draft),
+                            draftKind: drawing ?? SectionKind.row,
+                            center: cameraCenter ?? selected ?? widget.focus,
+                            onMapCreated: (map) {
+                              controller = map;
+                              final latest =
+                                  cameraCenter ?? selected ?? widget.focus;
+                              if (latest != null) moveTo(latest);
+                            },
+                            onCameraMove: (p) => cameraCenter = p,
+                            onTap: saving
+                                ? null
+                                : (p) => setState(() {
+                                    if (drawing != null) {
+                                      if (draft.length < 40) {
+                                        draft.add(p);
+                                        locationMessage = null;
+                                      } else {
+                                        locationMessage = 'Maximum 40 vertices. Undo a point to replace it.';
+                                      }
+                                    } else {
+                                      selected = p;
+                                      locationMessage = 'Map position selected for Add Plant.';
+                                    }
+                                  }),
+                            onMoveVertex: drawing == null || saving
+                                ? null
+                                : (i, p) => setState(() => draft[i] = p),
+                            onPlant: drawing != null
+                                ? null
+                                : (id) => context.push('/plants/$id'),
+                            onSection: drawing != null
+                                ? null
+                                : (id) => context.push('/sections/$id'),
+                          ),
+                        ),
+                      ] else
+                        Expanded(
+                          child: items.isEmpty
                               ? const Center(
                                   child: Text(
                                     'No plants match. Add a plant or reset filters.',
                                   ),
                                 )
                               : ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 96),
+                                  padding: const EdgeInsets.only(bottom: 90),
                                   itemCount: items.length,
                                   itemBuilder: (context, i) => ListTile(
                                     leading: Text(
-                                      symbolLabels[symbolFor(
-                                        items[i].taxonId,
-                                      )]!,
+                                      symbolLabels[taxonomy.taxa
+                                              .where(
+                                                (t) => t.id == items[i].taxonId,
+                                              )
+                                              .firstOrNull
+                                              ?.symbol ??
+                                          PlantSymbol.tree]!,
                                       style: const TextStyle(fontSize: 28),
                                     ),
                                     title: Text(items[i].name),
@@ -359,14 +502,12 @@ class _MapState extends ConsumerState<MapScreen>
                                         context.push('/plants/${items[i].id}'),
                                   ),
                                 ),
-                          const SizedBox.shrink(),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
+                        ),
+                    ],
+                  );
+                },
+              ),
+      ),
     );
   }
 }
