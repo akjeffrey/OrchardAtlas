@@ -38,7 +38,11 @@ bool taskInWindow(OrchardTask task, TaskWindow window, DateTime now) {
   if (task.dueDate == null) return window == TaskWindow.upcoming;
   final due = parseCalendarDate(task.dueDate!);
   final today = DateTime(now.year, now.month, now.day);
-  final weekEnd = today.add(Duration(days: 7 - today.weekday));
+  final weekEnd = DateTime(
+    today.year,
+    today.month,
+    today.day + 7 - today.weekday,
+  );
   return switch (window) {
     TaskWindow.all => true,
     TaskWindow.today => !due.isAfter(today), // Include overdue work.

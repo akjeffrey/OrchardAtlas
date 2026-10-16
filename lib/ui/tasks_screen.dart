@@ -40,6 +40,7 @@ class _TasksState extends ConsumerState<TasksPane> {
               Expanded(
                 child: DropdownButtonFormField<TaskWindow>(
                   initialValue: window,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Due window'),
                   items: [
                     for (final w in TaskWindow.values)
@@ -60,6 +61,7 @@ class _TasksState extends ConsumerState<TasksPane> {
               Expanded(
                 child: DropdownButtonFormField<String>(
                   initialValue: status?.name ?? 'all',
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Task status'),
                   items: [
                     const DropdownMenuItem(
@@ -194,6 +196,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
   }
 
   Future<void> save() async {
+    if (busy) return;
     setState(() {
       busy = true;
       error = null;

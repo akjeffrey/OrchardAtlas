@@ -10,6 +10,11 @@ import 'package:orchard_atlas/domain/taxonomy.dart';
 import 'package:orchard_atlas/ui/tasks_screen.dart';
 import 'package:orchard_atlas/ui/edit_plant_screen.dart';
 
+void managementWidgetTest(
+  String name,
+  Future<void> Function(WidgetTester) body,
+) => testWidgets(name, body, timeout: const Timeout(Duration(minutes: 1)));
+
 void main() {
   Future<LocalTrialRepository> repository() async {
     SharedPreferences.setMockInitialValues({});
@@ -24,7 +29,7 @@ void main() {
     ],
     child: child,
   );
-  testWidgets(
+  managementWidgetTest(
     'task completion persists and remains visible under completed filter',
     (tester) async {
       final repo = await repository();
@@ -36,9 +41,6 @@ void main() {
           createdAt: DateTime.utc(2026),
         ),
       );
-      await repo
-          .watchTasks(repo.place.id)
-          .firstWhere((s) => !s.hasPendingWrites);
       await tester.pumpWidget(
         wrap(repo, const MaterialApp(home: Scaffold(body: TasksPane()))),
       );
@@ -57,7 +59,7 @@ void main() {
       expect(find.text('Prune orchard'), findsOneWidget);
     },
   );
-  testWidgets('task form saves a targeted task without a due date', (
+  managementWidgetTest('task form saves a targeted task without a due date', (
     tester,
   ) async {
     final repo = await repository();
@@ -67,9 +69,6 @@ void main() {
       taxonId: starterTaxonomy.taxa[2].id,
       location: Coordinates(51, 1),
     );
-    await repo
-        .watchPlants(repo.place.id)
-        .firstWhere((s) => !s.hasPendingWrites);
     final router = GoRouter(
       initialLocation: '/new',
       routes: [
@@ -104,7 +103,7 @@ void main() {
     expect(repo.tasks.single.dueDate, isNull);
     expect(find.text('Task saved'), findsOneWidget);
   });
-  testWidgets(
+  managementWidgetTest(
     'metadata editor preserves planting history and archived status',
     (tester) async {
       final repo = await repository();
@@ -117,9 +116,6 @@ void main() {
         authorId: LocalTrialRepository.userId,
       );
       repo.updatePlant(plant.copyWith(status: ItemStatus.archived));
-      await repo
-          .watchPlants(repo.place.id)
-          .firstWhere((s) => !s.hasPendingWrites);
       final router = GoRouter(
         initialLocation: '/edit',
         routes: [
