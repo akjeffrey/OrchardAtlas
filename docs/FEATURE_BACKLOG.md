@@ -24,6 +24,8 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 
 ## Remaining product features
 
+- [ ] Row and area colors: let users choose and save a color for each row and each area, while continuing to display the complete row line or area shape on the map.
+- [ ] Optional row/area icons: let users choose an optional icon displayed at the center of the row or area, in addition to its full colored line or shape.
 - [ ] Plant location in rows/areas: when adding a plant to a row or area, default its location to that row or area's location.
 - [ ] Map markers for grouped plants: hide individual plant icons on the map when the plant belongs to a row or area; keep the parent row/area visible and the plants accessible through it.
 - [ ] Row endpoints and direction: explicitly track start (first point) and stop/finish point(s).
