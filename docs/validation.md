@@ -66,3 +66,8 @@ debug APK and SHA-256 checksum as **OrchardAtlas-Android-trial**. See
 [phone-trial instructions](phone-trial.md) for installation, data-loss limitations,
 and the distinction from the connected app. Local test execution remains skipped;
 CI and phone installation results must be checked separately.
+
+
+## Plant-entry feedback validation (2026-10-16)
+
+CI on `fc97c5e` passes formatting/static analysis, all 25 Flutter tests and all 8 Firestore rules tests: [Foundation checks](https://github.com/akjeffrey/OrchardAtlas/actions/runs/38921810584). This supersedes the earlier test counts and skipped-test notes above. Coverage includes selection-driven names and custom-name preservation, creating a taxonomy option with an icon, fresh GPS for bulk entry, the post-save dialog and map navigation, custom taxonomy mapping, backwards-compatible trial saves, dated planting persistence across repository restart, and atomic Firestore plant/planting-event authorization. Native builds and the refreshed APK are tracked in GitHub Actions; physical-phone acceptance remains a manual check.

@@ -14,19 +14,23 @@ Android debug signing key on its runner; signing keys are not stored in Git.
 
 The trial has a separate Android application ID (`com.orchardatlas.orchard_atlas.trial`)
 so it does not share app storage with a connected OrchardAtlas installation.
-A later debug build may have a different signing key; if Android refuses an update,
-uninstall the previous trial first. **Uninstalling deletes its local records.**
+A later debug build may have a different signing key. If Android refuses an update,
+keep the installed trial if you need its records. **Uninstalling deletes local records**;
+only replace an installation after preserving the data or deciding it is disposable.
 The artifact includes `SHA256SUMS.txt` for checking that the transferred APK matches.
 Artifacts expire after 14 days; a new branch push builds another trial.
 
 ## Things to try
-- Tap **Current GPS location** and grant foreground location permission, or use
-  **Add Plant** to enter known coordinates manually.
-- Select group → genus → species → optional cultivar, name the plant, confirm its
-  position and save it. The coordinate preview shows a tappable plant marker.
+- Open **Add Plant** and grant foreground GPS permission. The form fetches your
+  location automatically; coordinates can also be entered or corrected manually.
+- Select group → genus → species → optional cultivar. Use **Add new option** to
+  extend a dropdown and select its icon. The plant name follows selections until
+  you customize it. Optionally enter a planting date, check the coordinates, and
+  save. Choose **Back to map** to see the tappable plant marker.
 - Open the marker or use the **Plants** tab, record care and harvest activities,
   and inspect annual mass/count totals.
-- Use **Add Another Like This**; verify it requires a new confirmed position.
+- Choose **Add another** after saving, or **Add Another Like This** from detail.
+  Verify the taxonomy/name carry over and a fresh GPS position is fetched.
 - Wait for **Saved on this phone**, close/reopen the app and verify your records.
   Airplane mode does not prevent local recording; GPS still depends on signal.
 
