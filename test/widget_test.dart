@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:orchard_atlas/data/firestore_orchard_repository.dart';
+import 'package:orchard_atlas/data/local_trial_repository.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orchard_atlas/application/providers.dart';
@@ -12,54 +11,127 @@ import 'package:orchard_atlas/domain/taxonomy.dart';
 import 'package:orchard_atlas/ui/add_plant_screen.dart';
 import 'package:orchard_atlas/ui/plant_detail_screen.dart';
 
+class TrialLocation implements LocationRepository {
+  int calls = 0;
+  @override
+  Future<LocationFix> currentPosition() async =>
+      LocationFix(Coordinates(51 + (++calls) / 100, 1), 4);
+  @override
+  Future<void> openSettings() async {}
+}
+
 void main() {
+  Future<LocalTrialRepository> repository() async {
+    SharedPreferences.setMockInitialValues({});
+    return LocalTrialRepository.open(await SharedPreferences.getInstance());
+  }
+
+  Widget wrap(LocalTrialRepository repo, TrialLocation gps, Widget child) =>
+      ProviderScope(
+        overrides: [
+          orchardRepositoryProvider.overrideWithValue(repo),
+          locationRepositoryProvider.overrideWithValue(gps),
+          userProvider.overrideWith(
+            (ref) =>
+                Stream.value(const OrchardUser(LocalTrialRepository.userId)),
+          ),
+          placeProvider.overrideWith((ref) async => repo.place),
+        ],
+        child: child,
+      );
+  Future<void> select(WidgetTester tester, String current, String next) async {
+    await tester.ensureVisible(find.text(current).first);
+    await tester.tap(find.text(current).first);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(next).last);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> save(WidgetTester tester) async {
+    await tester.scrollUntilVisible(
+      find.text('Save plant locally'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.text('Save plant locally'));
+    await tester.pumpAndSettle();
+  }
+
   testWidgets(
-    'add another preselects taxonomy but requires a new confirmed location',
+    'name follows taxonomy until customized and clearing restores defaults',
     (tester) async {
-      final cultivar = starterTaxonomy.taxa.firstWhere(
-        (t) => t.name == 'Honeycrisp',
+      final repo = await repository();
+      await tester.pumpWidget(
+        wrap(repo, TrialLocation(), const MaterialApp(home: AddPlantScreen())),
+      );
+      await tester.pumpAndSettle();
+      await select(tester, 'Group', '🌳 Fruit trees');
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        'Fruit trees',
+      );
+      await select(tester, 'Genus', '🍐 Pear (Pyrus)');
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        'Pear (Pyrus)',
+      );
+      await tester.enterText(find.byType(TextField).first, 'My pear');
+      await select(tester, 'Species', '🍐 European pear');
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        'My pear',
+      );
+      await tester.enterText(find.byType(TextField).first, '');
+      await select(tester, '🍐 Pear (Pyrus)', '🍎 Apple (Malus)');
+      expect(
+        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+        'Apple (Malus)',
+      );
+      expect(find.text('🍐 European pear'), findsNothing);
+    },
+  );
+  testWidgets(
+    'bulk entry uses fresh GPS, asks after saving, and preserves taxonomy',
+    (tester) async {
+      final repo = await repository();
+      final gps = TrialLocation();
+      final species = starterTaxonomy.taxa.firstWhere(
+        (t) => t.rank == TaxonRank.species,
       );
       await tester.pumpWidget(
-        ProviderScope(
-          child: MaterialApp(
+        wrap(
+          repo,
+          gps,
+          MaterialApp(
             home: AddPlantScreen(
-              template: PlantTemplate(name: 'Row A', taxonId: cultivar.id),
+              template: PlantTemplate(name: 'Row A', taxonId: species.id),
             ),
           ),
         ),
       );
-      expect(find.text('Row A'), findsOneWidget);
-      expect(find.text('Honeycrisp'), findsOneWidget);
-      final textFields = tester
-          .widgetList<TextField>(find.byType(TextField))
-          .toList();
-      expect(textFields[1].controller!.text, isEmpty);
-      expect(textFields[2].controller!.text, isEmpty);
-      await tester.scrollUntilVisible(
-        find.text('Save plant locally'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('Save plant locally'));
-      await tester.pump();
-      expect(find.textContaining('Confirm this plant'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(gps.calls, 1);
+      expect(find.byType(CheckboxListTile), findsNothing);
+      expect(find.text('Planting date (optional)'), findsOneWidget);
+      await save(tester);
+      expect(find.text('Plant added'), findsOneWidget);
+      expect(repo.plants.single.location.latitude, 51.01);
+      await tester.tap(find.text('Add another'));
+      await tester.pumpAndSettle();
+      expect(gps.calls, 2);
+      expect(repo.plants.length, 1);
+      await save(tester);
+      expect(repo.plants.length, 2);
+      expect(repo.plants.last.location.latitude, 51.02);
+      expect(repo.plants.last.taxonId, species.id);
+      expect(repo.plants.last.id, isNot(repo.plants.first.id));
     },
   );
   testWidgets(
-    'saving a confirmed plant returns to a map focus and persists its new identity',
+    'explicit map location is retained and back to map focuses the saved plant',
     (tester) async {
-      SharedPreferences.setMockInitialValues({});
-      final store = FakeFirebaseFirestore();
-      final repo = FirestoreOrchardRepository(
-        store,
-        await SharedPreferences.getInstance(),
-      );
-      final place = Place(
-        id: 'place',
-        name: 'Orchard',
-        ownerId: 'u',
-        createdAt: DateTime.now(),
-      );
+      final repo = await repository();
+      final gps = TrialLocation();
       final species = starterTaxonomy.taxa.firstWhere(
         (t) => t.rank == TaxonRank.species,
       );
@@ -75,67 +147,47 @@ void main() {
           ),
           GoRoute(
             path: '/',
-            builder: (_, state) {
-              final focus = state.extra as Coordinates;
-              return Scaffold(
-                body: Text('Map focus: ${focus.latitude}, ${focus.longitude}'),
-              );
-            },
+            builder: (_, state) => Scaffold(
+              body: Text('Map focus: ${(state.extra as Coordinates).latitude}'),
+            ),
           ),
         ],
       );
       addTearDown(router.dispose);
       await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            orchardRepositoryProvider.overrideWithValue(repo),
-            placeProvider.overrideWith((ref) async => place),
-          ],
-          child: MaterialApp.router(routerConfig: router),
-        ),
+        wrap(repo, gps, MaterialApp.router(routerConfig: router)),
       );
       await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(
-        find.text('I confirm this plant’s position'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('I confirm this plant’s position'));
-      await tester.pump();
-      await tester.scrollUntilVisible(
-        find.text('Save plant locally'),
-        250,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.tap(find.text('Save plant locally'));
+      expect(gps.calls, 0);
+      await save(tester);
+      await tester.tap(find.text('Back to map'));
       await tester.pumpAndSettle();
-      expect(find.text('Map focus: 51.25, 1.25'), findsOneWidget);
-      final saved = (await repo.watchPlants('place').first).value.single;
-      expect(saved.name, 'Next apple');
-      expect(saved.taxonId, species.id);
-      expect(saved.id, matches(RegExp(r'^[0-9a-f-]{36}$')));
+      expect(find.text('Map focus: 51.25'), findsOneWidget);
     },
   );
-  testWidgets('changing taxonomy parent clears descendants', (tester) async {
-    final cultivar = starterTaxonomy.taxa.firstWhere(
-      (t) => t.name == 'Honeycrisp',
-    );
+  testWidgets('dropdown can create and select an option with a chosen icon', (
+    tester,
+  ) async {
+    final repo = await repository();
     await tester.pumpWidget(
-      ProviderScope(
-        child: MaterialApp(
-          home: AddPlantScreen(
-            template: PlantTemplate(name: 'Row A', taxonId: cultivar.id),
-          ),
-        ),
-      ),
+      wrap(repo, TrialLocation(), const MaterialApp(home: AddPlantScreen())),
     );
-    await tester.tap(find.text('Fruit trees'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Berries').last);
+    await select(tester, 'Group', '+ Add new option…');
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Option name'),
+      'Nut trees',
+    );
+    await select(tester, '🌳 tree', '🌰 nut');
+    await tester.tap(find.text('Add option'));
     await tester.pumpAndSettle();
-    expect(find.text('Honeycrisp'), findsNothing);
-    expect(find.text('Domestic apple'), findsNothing);
-    expect(find.text('Species'), findsNothing);
+    expect(repo.taxa.single.name, 'Nut trees');
+    expect(repo.taxa.single.symbol, PlantSymbol.nut);
+    expect(find.text('🌰 Nut trees'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      'Nut trees',
+    );
   });
   testWidgets(
     'detail renders pending status, derived harvest totals and history',

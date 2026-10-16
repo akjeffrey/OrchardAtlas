@@ -1,5 +1,7 @@
 enum TaxonRank { group, genus, species, cultivar }
 
+enum PlantSymbol { tree, apple, pear, berry, flower, citrus, nut, vine }
+
 enum ItemKind { managedPlant, foragingResource }
 
 enum PermissionRole { owner, editor, viewer }
@@ -63,12 +65,14 @@ class Taxon {
     required this.rank,
     this.parentId,
     this.scientificName,
+    this.symbol = PlantSymbol.tree,
   });
   final String id;
   final String name;
   final TaxonRank rank;
   final String? parentId;
   final String? scientificName;
+  final PlantSymbol symbol;
 }
 
 abstract class TrackedItem {

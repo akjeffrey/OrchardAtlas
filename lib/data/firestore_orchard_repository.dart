@@ -139,11 +139,43 @@ class FirestoreOrchardRepository implements OrchardRepository {
         );
       });
   @override
-  void savePlant(ManagedPlant plant) => _observe(
-    plant.id,
-    _items(plant.propertyId)
-        .doc(plant.id)
-        .set(FirestoreMapping.plantToMap(plant)),
+  void savePlant(ManagedPlant plant, {PlantEvent? plantingEvent}) {
+    final batch = firestore.batch();
+    final item = _items(plant.propertyId).doc(plant.id);
+    batch.set(item, FirestoreMapping.plantToMap(plant));
+    if (plantingEvent != null) {
+      if (plantingEvent.itemId != plant.id ||
+          plantingEvent.propertyId != plant.propertyId) {
+        throw ArgumentError('Planting activity must belong to this plant');
+      }
+      batch.set(
+        item.collection('events').doc(plantingEvent.id),
+        FirestoreMapping.eventToMap(plantingEvent),
+      );
+    }
+    _observe(plant.id, batch.commit());
+  }
+
+  @override
+  Stream<List<Taxon>> watchTaxa(String propertyId) => firestore
+      .collection('properties')
+      .doc(propertyId)
+      .collection('taxa')
+      .snapshots(includeMetadataChanges: true)
+      .map(
+        (s) => s.docs
+            .map((d) => FirestoreMapping.taxonFromMap(d.id, d.data()))
+            .toList(),
+      );
+  @override
+  void saveTaxon(String propertyId, Taxon taxon) => _observe(
+    taxon.id,
+    firestore
+        .collection('properties')
+        .doc(propertyId)
+        .collection('taxa')
+        .doc(taxon.id)
+        .set(FirestoreMapping.taxonToMap(taxon)),
   );
   @override
   void appendEvent(PlantEvent event) => _observe(

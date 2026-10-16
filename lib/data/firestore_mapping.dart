@@ -3,6 +3,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../domain/models.dart';
 
 class FirestoreMapping {
+  static Map<String, dynamic> taxonToMap(Taxon t) => {
+    'schemaVersion': 1,
+    'name': t.name,
+    'rank': t.rank.name,
+    'parentId': t.parentId,
+    'symbol': t.symbol.name,
+  };
+  static Taxon taxonFromMap(String id, Map<String, dynamic> d) {
+    version(d);
+    return Taxon(
+      id: id,
+      name: d['name'] as String,
+      rank: TaxonRank.values.byName(d['rank'] as String),
+      parentId: d['parentId'] as String?,
+      symbol: PlantSymbol.values.byName(d['symbol'] as String),
+    );
+  }
+
   static void version(Map<String, dynamic> data) {
     if (data['schemaVersion'] != 1) {
       throw const FormatException(

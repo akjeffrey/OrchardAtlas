@@ -47,3 +47,5 @@ only; unit tests use tolerances. Out-of-year events, notes and removals do not
 change totals. Validate quantity > 0, finite, at most 10^12 per event (also enforced in rules),
 and count quantities integral. Multiple
 harvests on one day are legitimate independent events.
+
+Custom `Taxon` records carry a platform-independent `PlantSymbol` identifier. Flutter widgets render that identifier and the Google Maps adapter draws marker bitmaps; domain types contain no Flutter, Firebase, or image-upload APIs. An optional planting date creates a `planting` event, preserving the append-oriented activity model. The plant creation timestamp continues to mean record creation, and yearly harvest totals continue to consider harvest events only.

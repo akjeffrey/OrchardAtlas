@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
 import '../domain/repositories.dart';
+import '../domain/taxonomy.dart';
+import 'firestore_mapping.dart';
 
 /// Explicit phone-trial storage; never connects to a Firebase project.
 class LocalTrialRepository implements OrchardRepository {
@@ -13,11 +15,13 @@ class LocalTrialRepository implements OrchardRepository {
     this.place,
     this.plants,
     this.events,
+    this.taxa,
   );
   final SharedPreferences preferences;
   final Place place;
   final List<ManagedPlant> plants;
   final List<PlantEvent> events;
+  final List<Taxon> taxa;
   final _changes = StreamController<void>.broadcast();
   final _failures = StreamController<WriteFailure>.broadcast();
   Future<void> _writes = Future.value();
@@ -70,7 +74,14 @@ class LocalTrialRepository implements OrchardRepository {
                 ),
         ),
     ];
-    return LocalTrialRepository._(preferences, place, plants, events);
+    final taxa = <Taxon>[
+      for (final t in data?['taxa'] as List? ?? [])
+        FirestoreMapping.taxonFromMap(
+          t['id'] as String,
+          Map<String, dynamic>.from(t as Map),
+        ),
+    ];
+    return LocalTrialRepository._(preferences, place, plants, events, taxa);
   }
 
   @override
@@ -113,6 +124,9 @@ class LocalTrialRepository implements OrchardRepository {
   void _persist(String recordId) {
     final json = jsonEncode({
       'createdAt': place.createdAt.toIso8601String(),
+      'taxa': [
+        for (final t in taxa) {'id': t.id, ...FirestoreMapping.taxonToMap(t)},
+      ],
       'plants': [
         for (final p in plants)
           {
@@ -164,15 +178,32 @@ class LocalTrialRepository implements OrchardRepository {
   }
 
   @override
-  void savePlant(ManagedPlant plant) {
+  void savePlant(ManagedPlant plant, {PlantEvent? plantingEvent}) {
     if (plant.propertyId != place.id) {
       throw ArgumentError('Unknown trial property');
     }
     if (plants.any((p) => p.id == plant.id)) {
       throw StateError('Plant already exists');
     }
+    if (plantingEvent != null &&
+        (plantingEvent.itemId != plant.id ||
+            plantingEvent.propertyId != plant.propertyId)) {
+      throw ArgumentError('Planting activity must belong to this plant');
+    }
     plants.add(plant);
+    if (plantingEvent != null) events.add(plantingEvent);
     _persist(plant.id);
+  }
+
+  @override
+  Stream<List<Taxon>> watchTaxa(String propertyId) =>
+      _watch(() => List<Taxon>.of(taxa)).map((s) => s.value);
+  @override
+  void saveTaxon(String propertyId, Taxon taxon) {
+    if (propertyId != place.id) throw ArgumentError('Unknown property');
+    Taxonomy([...starterTaxonomy.taxa, ...taxa, taxon]);
+    taxa.add(taxon);
+    _persist(taxon.id);
   }
 
   @override
@@ -195,6 +226,7 @@ class LocalTrialRepository implements OrchardRepository {
     await preferences.remove(storageKey);
     plants.clear();
     events.clear();
+    taxa.clear();
     _changes.add(null);
   }
 }

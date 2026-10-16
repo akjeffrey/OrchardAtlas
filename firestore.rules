@@ -43,6 +43,18 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && text(request.resource.data.name) && request.resource.data.createdAt is timestamp;
       allow update, delete: if false;
+      match /taxa/{taxonId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(taxonId)
+          && request.resource.data.keys().hasAll(['schemaVersion', 'name', 'rank', 'parentId', 'symbol'])
+          && request.resource.data.keys().hasOnly(['schemaVersion', 'name', 'rank', 'parentId', 'symbol'])
+          && request.resource.data.schemaVersion == 1 && text(request.resource.data.name)
+          && request.resource.data.rank in ['group', 'genus', 'species', 'cultivar']
+          && ((request.resource.data.rank == 'group' && request.resource.data.parentId == null)
+            || (request.resource.data.rank != 'group' && request.resource.data.parentId is string && uuid(request.resource.data.parentId)))
+          && request.resource.data.symbol in ['tree', 'apple', 'pear', 'berry', 'flower', 'citrus', 'nut', 'vine'];
+        allow update, delete: if false;
+      }
       match /items/{itemId} {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data);
@@ -53,7 +65,7 @@ service cloud.firestore {
         match /events/{eventId} {
           allow read: if owner(propertyId);
           allow create: if owner(propertyId) && uuid(eventId)
-            && exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(itemId))
+            && getAfter(/databases/$(database)/documents/properties/$(propertyId)/items/$(itemId)).data.kind == 'managedPlant'
             && validEvent(request.resource.data);
           allow update, delete: if false;
         }

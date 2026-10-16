@@ -48,3 +48,7 @@ mass/count totals; force-stop/restart offline; verify records persist. Reconnect
 and check pending clears and a second device sees records. Also revoke access
 while disconnected and observe rejection on reconnection. Sign out and verify a
 second account cannot see the first account's cached records.
+
+## Custom taxonomy and planting dates
+
+Property taxonomy uses a repository stream, including Firestore's persistent local cache. Newly submitted taxa are immediately available to the form; asynchronous cloud rejection appears through the existing write-failure banner. Trial mode stores custom taxa and their symbol IDs in the same JSON document as plants and events. The optional `taxa` array defaults to empty when reading older trial saves, preserving existing plants and harvest records. Plant plus planting activity is one serialized trial write or one Firestore batch. Dates remain calendar dates rather than being re-derived from UTC timestamps.

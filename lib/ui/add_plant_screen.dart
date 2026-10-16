@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 
 import '../application/providers.dart';
 import '../domain/models.dart';
+import '../domain/taxonomy.dart';
+import 'plant_symbols.dart';
 
 class AddPlantScreen extends ConsumerStatefulWidget {
   const AddPlantScreen({super.key, this.template, this.location});
@@ -18,26 +21,59 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   final latitude = TextEditingController();
   final longitude = TextEditingController();
   final selected = <String?>[null, null, null, null];
-  bool confirmed = false, busy = false, locating = false;
+  bool customName = false, busy = false, locating = false;
+  int locationRevision = 0;
+  int dropdownRevision = 0;
+  DateTime? plantingDate;
+  bool templateApplied = false;
   String? message;
   @override
   void initState() {
     super.initState();
-    final template = widget.template;
-    if (template != null) {
-      name.text = template.name;
-      final path = ref.read(taxonomyProvider).ancestry(template.taxonId);
-      for (var i = 0; i < path.length; i++) {
-        selected[i] = path[i].id;
-      }
+    applyTemplate(ref.read(taxonomyProvider));
+    if (widget.location != null) {
+      setCoordinates(widget.location!);
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) locate();
+      });
     }
-    if (widget.location != null) setCoordinates(widget.location!);
   }
 
-  void setCoordinates(Coordinates coordinates) {
-    latitude.text = coordinates.latitude.toStringAsFixed(7);
-    longitude.text = coordinates.longitude.toStringAsFixed(7);
-    confirmed = false;
+  void applyTemplate(Taxonomy taxonomy) {
+    final template = widget.template;
+    if (template == null ||
+        templateApplied ||
+        !taxonomy.taxa.any((t) => t.id == template.taxonId))
+      return;
+    final path = taxonomy.ancestry(template.taxonId);
+    name.text = template.name;
+    customName = template.name != path.last.name;
+    for (var i = 0; i < path.length; i++) {
+      selected[i] = path[i].id;
+    }
+    templateApplied = true;
+  }
+
+  void setCoordinates(Coordinates p) {
+    latitude.text = p.latitude.toStringAsFixed(7);
+    longitude.text = p.longitude.toStringAsFixed(7);
+  }
+
+  void choose(int rank, String? id) {
+    setState(() {
+      selected[rank] = id;
+      for (var j = rank + 1; j < 4; j++) {
+        selected[j] = null;
+      }
+      if (!customName || name.text.trim().isEmpty) {
+        customName = false;
+        final last = selected.whereType<String>().lastOrNull;
+        name.text = last == null
+            ? ''
+            : ref.read(taxonomyProvider).byId(last).name;
+      }
+    });
   }
 
   @override
@@ -49,19 +85,118 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   }
 
   Future<void> locate() async {
+    if (locating) return;
+    final revision = locationRevision;
     setState(() => locating = true);
     try {
       final fix = await ref.read(locationRepositoryProvider).currentPosition();
-      if (!mounted) return;
+      if (!mounted || revision != locationRevision) return;
       setState(() {
         setCoordinates(fix.coordinates);
         message =
-            'GPS accuracy ±${fix.accuracyMeters.round()} m. Check coordinates and confirm the plant position.';
+            'GPS accuracy ±${fix.accuracyMeters.round()} m. Adjust coordinates if needed.';
       });
-    } catch (e) {
-      if (mounted) setState(() => message = '$e');
+    } catch (_) {
+      if (mounted && revision == locationRevision) {
+        setState(
+          () => message = 'GPS unavailable. Enable location access or enter coordinates below.',
+        );
+      }
     } finally {
       if (mounted) setState(() => locating = false);
+    }
+  }
+
+  Future<void> addOption(int rank) async {
+    final parent = rank == 0 ? null : selected[rank - 1];
+    var optionName = '';
+    var symbol = parent == null
+        ? PlantSymbol.tree
+        : ref.read(taxonomyProvider).byId(parent).symbol;
+    String? error;
+    final result = await showDialog<Taxon>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: Text('Add ${TaxonRank.values[rank].name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  onChanged: (value) => optionName = value,
+                  autofocus: true,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    labelText: 'Option name',
+                    errorText: error,
+                  ),
+                ),
+                DropdownButtonFormField<PlantSymbol>(
+                  initialValue: symbol,
+                  decoration: const InputDecoration(labelText: 'Map icon'),
+                  items: [
+                    for (final s in PlantSymbol.values)
+                      DropdownMenuItem(
+                        value: s,
+                        child: Text('${symbolLabels[s]} ${s.name}'),
+                      ),
+                  ],
+                  onChanged: (s) => symbol = s!,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final value = optionName.trim();
+                if (value.isEmpty) {
+                  update(() => error = 'Enter a name');
+                  return;
+                }
+                if (ref
+                    .read(taxonomyProvider)
+                    .children(parent)
+                    .any((t) => t.name.toLowerCase() == value.toLowerCase())) {
+                  update(() => error = 'This option already exists');
+                  return;
+                }
+                Navigator.pop(
+                  dialogContext,
+                  Taxon(
+                    id: const Uuid().v4(),
+                    name: value,
+                    rank: TaxonRank.values[rank],
+                    parentId: parent,
+                    symbol: symbol,
+                  ),
+                );
+              },
+              child: const Text('Add option'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (mounted) setState(() => dropdownRevision++);
+    if (result == null || !mounted) return;
+    try {
+      final place = await ref.read(placeProvider.future);
+      if (!mounted) return;
+      Taxonomy([...ref.read(taxonomyProvider).taxa, result]);
+      ref.read(orchardRepositoryProvider).saveTaxon(place.id, result);
+      ref.read(submittedTaxaProvider.notifier).state = {
+        ...ref.read(submittedTaxaProvider),
+        result.id: result,
+      };
+      choose(rank, result.id);
+    } catch (e) {
+      if (mounted) setState(() => message = 'Could not add option: $e');
     }
   }
 
@@ -72,7 +207,6 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
       message = null;
     });
     try {
-      if (!confirmed) throw ArgumentError('Confirm this plant’s position');
       final taxonId = selected[3] ?? selected[2];
       if (taxonId == null) {
         throw ArgumentError('Select group, genus and species');
@@ -90,8 +224,40 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             name: name.text,
             taxonId: taxonId,
             location: position,
+            plantingDate: plantingDate,
+            authorId: ref.read(userProvider).valueOrNull?.id,
           );
-      context.go('/', extra: plant.location);
+      final another = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: const Text('Plant added'),
+          content: Text('${plant.name} added. Add another like this?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Back to map'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Add another'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (another == true) {
+        setState(() {
+          latitude.clear();
+          longitude.clear();
+          plantingDate = null;
+          locationRevision++;
+          message = null;
+        });
+        await locate();
+      } else {
+        context.go('/', extra: plant.location);
+      }
     } catch (e) {
       if (mounted) setState(() => message = '$e');
     } finally {
@@ -102,6 +268,8 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   @override
   Widget build(BuildContext context) {
     final taxonomy = ref.watch(taxonomyProvider);
+    final catalog = ref.watch(customTaxaProvider);
+    applyTemplate(taxonomy);
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -113,18 +281,26 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
         children: [
           if (widget.template != null)
             const Text(
-              'Taxonomy and name copied. Confirm a new position for this plant.',
+              'Name and taxonomy copied. Fetching a fresh position for this plant.',
             ),
           TextField(
             controller: name,
-            decoration: const InputDecoration(labelText: 'Plant name'),
             maxLength: 500,
+            decoration: const InputDecoration(
+              labelText: 'Plant name',
+              helperText: 'Defaults to your latest taxonomy choice',
+            ),
+            onChanged: (value) => customName = value.trim().isNotEmpty,
           ),
+          if (catalog.hasError)
+            const Text(
+              'Saved taxonomy could not be loaded. Reconnect and retry before adding custom options.',
+            ),
           for (var i = 0; i < 4; i++)
             if (i == 0 || selected[i - 1] != null)
               DropdownButtonFormField<String>(
                 key: ValueKey(
-                  'taxon-$i-${selected[i]}-${i == 0 ? '' : selected[i - 1]}',
+                  'taxon-$dropdownRevision-$i-${selected[i]}-${i == 0 ? "" : selected[i - 1]}',
                 ),
                 initialValue: selected[i],
                 isExpanded: true,
@@ -145,18 +321,58 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                   for (final t in taxonomy.children(
                     i == 0 ? null : selected[i - 1],
                   ))
-                    DropdownMenuItem(value: t.id, child: Text(t.name)),
+                    DropdownMenuItem(
+                      value: t.id,
+                      child: Text('${symbolLabels[t.symbol]} ${t.name}'),
+                    ),
+                  const DropdownMenuItem(
+                    value: '__add__',
+                    child: Text('+ Add new option…'),
+                  ),
                 ],
                 onChanged: busy
                     ? null
-                    : (value) => setState(() {
-                        selected[i] = value == '' ? null : value;
-                        for (var j = i + 1; j < 4; j++) {
-                          selected[j] = null;
+                    : (value) {
+                        if (value == '__add__') {
+                          addOption(i);
+                        } else {
+                          choose(i, value == '' ? null : value);
                         }
-                      }),
+                      },
               ),
           const SizedBox(height: 16),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.calendar_today),
+            title: const Text('Planting date (optional)'),
+            subtitle: Text(
+              plantingDate == null
+                  ? 'Not recorded'
+                  : calendarDate(plantingDate!),
+            ),
+            onTap: busy
+                ? null
+                : () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: plantingDate ?? DateTime.now(),
+                      firstDate: DateTime(1800),
+                      lastDate: DateTime.now(),
+                    );
+                    if (date != null && mounted) {
+                      setState(() => plantingDate = date);
+                    }
+                  },
+            trailing: plantingDate == null
+                ? null
+                : IconButton(
+                    tooltip: 'Clear planting date',
+                    icon: const Icon(Icons.clear),
+                    onPressed: busy
+                        ? null
+                        : () => setState(() => plantingDate = null),
+                  ),
+          ),
           OutlinedButton.icon(
             onPressed: locating || busy ? null : locate,
             icon: const Icon(Icons.my_location),
@@ -176,7 +392,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
               decimal: true,
               signed: true,
             ),
-            onChanged: (_) => setState(() => confirmed = false),
+            onChanged: (_) => locationRevision++,
           ),
           TextField(
             controller: longitude,
@@ -187,12 +403,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
               decimal: true,
               signed: true,
             ),
-            onChanged: (_) => setState(() => confirmed = false),
-          ),
-          CheckboxListTile(
-            value: confirmed,
-            title: const Text('I confirm this plant’s position'),
-            onChanged: (value) => setState(() => confirmed = value ?? false),
+            onChanged: (_) => locationRevision++,
           ),
           if (message != null)
             Padding(padding: const EdgeInsets.all(8), child: Text(message!)),

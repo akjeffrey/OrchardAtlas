@@ -25,6 +25,23 @@ void main() {
     expect(read.location.longitude, plant.location.longitude);
     expect(read.createdAt, now);
   });
+  test('custom taxonomy round trips hierarchy and selected icon', () {
+    const taxon = Taxon(
+      id: 'custom',
+      name: 'Conference',
+      rank: TaxonRank.cultivar,
+      parentId: 'pear',
+      symbol: PlantSymbol.pear,
+    );
+    final read = FirestoreMapping.taxonFromMap(
+      taxon.id,
+      FirestoreMapping.taxonToMap(taxon),
+    );
+    expect(read.parentId, 'pear');
+    expect(read.rank, TaxonRank.cultivar);
+    expect(read.symbol, PlantSymbol.pear);
+    expect(read.name, 'Conference');
+  });
   test('place and all activity types round trip', () {
     final place = Place(
       id: 'place',

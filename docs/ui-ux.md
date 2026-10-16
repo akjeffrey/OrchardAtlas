@@ -40,3 +40,15 @@ text scaling, keyboard types, and list alternative support nonvisual use.
 Property chooser, role invitations, tasks, foraging patches, photos, and correction
 history have no exposed unfinished buttons in V1. Test on small screens, at 200%
 text scale, with TalkBack/VoiceOver, and outdoors before release.
+
+## Phone trial feedback: plant entry
+
+Each taxonomy dropdown includes **Add new option**. The dialog requires a name and a map icon from tree, apple, pear, berry, flower, citrus, nut, and vine symbols; it suggests the parent icon. The new UUID option belongs to this property and becomes selected immediately. Duplicate sibling names are rejected without regard to case. Icon selection is supported; custom image uploads are outside this iteration.
+
+The plant name follows the deepest selected taxonomy label until the user enters a custom name. Changing an ancestor clears descendant selections and updates an automatic name. Clearing a custom name re-enables automatic naming; saving an empty name uses the selected species/cultivar label.
+
+Planting date is optional, can be entered on Add Plant, and creates a dated planting activity in the same local submission as the plant. It is not inferred from the record creation timestamp. Leaving the date empty records no planting activity.
+
+Add Plant requests foreground GPS automatically unless opened with an explicitly selected map position. It displays accuracy and editable coordinates. The former confirmation checkbox has been removed. A late GPS response never overwrites manual coordinate edits. Permission denial or unavailable GPS leaves manual entry available.
+
+Saving opens **Plant added: Add another like this?**. Back to map focuses the saved plant. Add another keeps name and taxonomy, clears the planting date and coordinates, and fetches a fresh GPS position. It never silently reuses the prior plant's position or activity history. Google Maps markers, trial coordinate markers, and the Plants list use the taxonomy icon.

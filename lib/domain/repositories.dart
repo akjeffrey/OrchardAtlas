@@ -26,7 +26,9 @@ abstract interface class OrchardRepository {
     String itemId,
   );
   // Completes on local submission, never waits for server acknowledgement.
-  void savePlant(ManagedPlant plant);
+  void savePlant(ManagedPlant plant, {PlantEvent? plantingEvent});
+  Stream<List<Taxon>> watchTaxa(String propertyId);
+  void saveTaxon(String propertyId, Taxon taxon);
   void appendEvent(PlantEvent event);
   Stream<WriteFailure> get writeFailures;
   Future<void> clearDeviceCache();

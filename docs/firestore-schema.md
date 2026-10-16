@@ -50,3 +50,9 @@ Events allow create/read only; author must match authenticated UID. Rules enforc
 harvest payload structure, positivity and unit even if a client is compromised.
 V1 denies member administration and all reserved collections. Sharing roles are
 specified for future work; no invitation UI or public rule is shipped.
+
+## Property-specific taxonomy additions
+
+`properties/{propertyId}/taxa/{taxonId}` stores append-only custom catalog options: `schemaVersion: 1`, `name: string (1–500 characters)`, `rank: group|genus|species|cultivar`, `parentId: UUID|null`, and `symbol: tree|apple|pear|berry|flower|citrus|nut|vine`. Group parents are null; other ranks require a parent UUID. IDs of curated starter taxa remain stable. The application merges starter and property taxa and validates complete, consecutive ancestry before accepting an addition. Rules enforce ownership, UUID paths, field types, supported ranks/icons, and immutability; hierarchy integrity against the bundled starter catalog is an application validation.
+
+A plant and its optional planting event are committed in one Firestore write batch. Event rules use `getAfter` to accept a parent plant created by the same batch, while rejecting events without a plant. Existing event author, quantity, and append-only protections continue to apply. No plant schema migration is required.

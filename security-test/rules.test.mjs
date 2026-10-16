@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { after, before, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { collection, doc, getDoc, getDocs, query, where, setDoc, updateDoc, deleteDoc, Timestamp, GeoPoint } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, query, where, setDoc, updateDoc, deleteDoc, writeBatch, Timestamp, GeoPoint } from 'firebase/firestore';
 
 const property = '00000000-0000-4000-8000-000000000001';
 const item = '00000000-0000-4000-8000-000000000002';
@@ -69,4 +69,27 @@ test('note without harvest is accepted; event needs an existing plant', async ()
   const { harvest: ignored, ...note } = harvest;
   await assertSucceeds(setDoc(doc(db('alice'), eventPath), { ...note, type: 'note' }));
   await assertFails(setDoc(doc(db('alice'), `${propertyPath}/items/${event}/events/${item}`), harvest));
+});
+
+test('plant and dated planting activity can be created atomically', async () => {
+  const store = db('alice');
+  const newItem = `${propertyPath}/items/${event}`;
+  const { harvest: ignored, ...base } = harvest;
+  const batch = writeBatch(store);
+  batch.set(doc(store, newItem), plant);
+  batch.set(doc(store, `${newItem}/events/${item}`), { ...base, type: 'planting', activityDate: '2020-04-10' });
+  await assertSucceeds(batch.commit());
+});
+test('custom taxonomy is owner scoped, append only and requires a supported icon', async () => {
+  const path = `${propertyPath}/taxa/${event}`;
+  const option = { schemaVersion: 1, name: 'Conference', rank: 'cultivar', parentId: taxon, symbol: 'pear' };
+  await assertFails(setDoc(doc(db('bob'), path), option));
+  await assertFails(setDoc(doc(db(), path), option));
+  await assertFails(setDoc(doc(db('alice'), path), { ...option, symbol: 'unknown' }));
+  await assertFails(setDoc(doc(db('alice'), path), { ...option, parentId: 'bad' }));
+  await assertSucceeds(setDoc(doc(db('alice'), path), option));
+  await assertSucceeds(getDoc(doc(db('alice'), path)));
+  await assertFails(getDoc(doc(db('bob'), path)));
+  await assertFails(updateDoc(doc(db('alice'), path), { name: 'Changed' }));
+  await assertFails(deleteDoc(doc(db('alice'), path)));
 });

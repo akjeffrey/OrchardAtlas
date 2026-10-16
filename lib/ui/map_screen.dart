@@ -7,6 +7,7 @@ import '../application/providers.dart';
 import '../domain/models.dart';
 import 'common.dart';
 import 'coordinate_preview.dart';
+import 'plant_symbols.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key, this.focus});
@@ -53,7 +54,7 @@ class _MapState extends ConsumerState<MapScreen> {
       setState(() {
         selected = fix.coordinates;
         locationMessage =
-            'GPS accuracy ±${fix.accuracyMeters.round()} m. Confirm or adjust before saving.';
+            'GPS accuracy ±${fix.accuracyMeters.round()} m. Adjust coordinates if needed.';
       });
       await controller?.animateCamera(
         CameraUpdate.newLatLngZoom(
@@ -105,6 +106,11 @@ class _MapState extends ConsumerState<MapScreen> {
   Widget build(BuildContext context) {
     final place = ref.watch(placeProvider);
     final plants = ref.watch(plantsProvider);
+    final taxonomy = ref.watch(taxonomyProvider);
+    final markerSymbols = ref.watch(markerSymbolsProvider).valueOrNull;
+    PlantSymbol symbolFor(String id) =>
+        taxonomy.taxa.where((t) => t.id == id).firstOrNull?.symbol ??
+        PlantSymbol.tree;
     return DefaultTabController(
       length: 2,
       child: Scaffold(
@@ -181,7 +187,7 @@ class _MapState extends ConsumerState<MapScreen> {
                           focus: widget.focus,
                           onSelect: (coordinates) => setState(() {
                             selected = coordinates;
-                            locationMessage = 'Coordinate selected for Add Plant. Confirm the exact position before saving.';
+                            locationMessage = 'Coordinate selected for Add Plant. Adjust coordinates on the plant form if needed.';
                           }),
                           onOpen: (id) => context.push('/plants/$id'),
                         )
@@ -221,6 +227,9 @@ class _MapState extends ConsumerState<MapScreen> {
                                   p.location.latitude,
                                   p.location.longitude,
                                 ),
+                                icon:
+                                    markerSymbols?[symbolFor(p.taxonId)] ??
+                                    BitmapDescriptor.defaultMarker,
                                 infoWindow: InfoWindow(title: p.name),
                                 onTap: () => context.push('/plants/${p.id}'),
                               ),
@@ -250,7 +259,10 @@ class _MapState extends ConsumerState<MapScreen> {
                               padding: const EdgeInsets.only(bottom: 96),
                               itemCount: items.length,
                               itemBuilder: (context, i) => ListTile(
-                                leading: const Icon(Icons.park),
+                                leading: Text(
+                                  symbolLabels[symbolFor(items[i].taxonId)]!,
+                                  style: const TextStyle(fontSize: 28),
+                                ),
                                 title: Text(items[i].name),
                                 subtitle: Text(
                                   '${items[i].location.latitude.toStringAsFixed(6)}, ${items[i].location.longitude.toStringAsFixed(6)}',

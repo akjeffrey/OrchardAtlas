@@ -18,7 +18,22 @@ final photoRepositoryProvider = Provider<PhotoRepository>(
   (ref) => throw UnimplementedError(),
 );
 final trialModeProvider = Provider<bool>((ref) => false);
-final taxonomyProvider = Provider<Taxonomy>((ref) => starterTaxonomy);
+final customTaxaProvider = StreamProvider<List<Taxon>>((ref) async* {
+  final repository = ref.watch(orchardRepositoryProvider);
+  final place = await ref.watch(placeProvider.future);
+  yield* repository.watchTaxa(place.id);
+});
+final submittedTaxaProvider = StateProvider<Map<String, Taxon>>((ref) => {});
+final taxonomyProvider = Provider<Taxonomy>(
+  (ref) => Taxonomy(
+    {
+      for (final t in starterTaxonomy.taxa) t.id: t,
+      ...ref.watch(submittedTaxaProvider),
+      for (final t in ref.watch(customTaxaProvider).valueOrNull ?? <Taxon>[])
+        t.id: t,
+    }.values.toList(),
+  ),
+);
 final userProvider = StreamProvider(
   (ref) => ref.watch(authRepositoryProvider).userChanges,
 );
@@ -63,6 +78,8 @@ class OrchardCommands {
     required String name,
     required String taxonId,
     required Coordinates location,
+    DateTime? plantingDate,
+    String? authorId,
   }) {
     if (!taxonomy.isPlantIdentity(taxonId)) {
       throw ArgumentError('Select a species or cultivar');
@@ -70,12 +87,27 @@ class OrchardCommands {
     final plant = ManagedPlant(
       id: newId(),
       propertyId: place.id,
-      name: name,
+      name: name.trim().isEmpty ? taxonomy.byId(taxonId).name : name,
       taxonId: taxonId,
       location: location,
       createdAt: DateTime.now().toUtc(),
     );
-    repository.savePlant(plant);
+    if (plantingDate != null && authorId == null) {
+      throw ArgumentError('Planting author required');
+    }
+    final plantingEvent = plantingDate == null
+        ? null
+        : PlantEvent(
+            id: newId(),
+            propertyId: place.id,
+            itemId: plant.id,
+            authorId: authorId!,
+            type: ActivityType.planting,
+            occurredAt: plantingDate.toUtc(),
+            activityDate: calendarDate(plantingDate),
+            recordedAt: DateTime.now().toUtc(),
+          );
+    repository.savePlant(plant, plantingEvent: plantingEvent);
     return plant;
   }
 

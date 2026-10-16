@@ -44,3 +44,9 @@ Maps and security-rule setup is unchanged. See [developer setup](developer-setup
 An iPhone install requires a separate iOS device build and Apple signing/provisioning;
 the Android APK cannot be installed on iPhone. CI simulator builds are not iPhone
 installation packages.
+
+### Updated plant entry
+
+Taxonomy dropdowns now allow property-specific additions with a required built-in map symbol. Names follow selections unless customized. Add Plant fetches GPS automatically, offers an optional planting date, and asks whether to add another after each save. An explicit map-selected position takes precedence over automatic GPS. Existing saved trial JSON remains readable; new taxonomy options and planting events persist on the phone.
+
+Android updates must have the same signing certificate as the installed app. The existing trial workflow uses temporary debug signing, so another build may be rejected as an update. If that happens, keep the installed version and its records; uninstalling deletes local trial data. A stable private signing key is required for reliable future in-place updates. No signing credentials are checked into this repository.

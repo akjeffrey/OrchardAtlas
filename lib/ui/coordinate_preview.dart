@@ -1,11 +1,15 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../application/providers.dart';
+import 'plant_symbols.dart';
 
 import '../domain/models.dart';
 
 /// A local coordinate sketch for credential-free trials, not a basemap.
-class CoordinatePreview extends StatelessWidget {
+class CoordinatePreview extends ConsumerWidget {
   const CoordinatePreview({
     super.key,
     required this.plants,
@@ -19,7 +23,7 @@ class CoordinatePreview extends StatelessWidget {
   final ValueChanged<Coordinates> onSelect;
   final ValueChanged<String> onOpen;
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final anchor =
         selected ?? focus ?? (plants.isEmpty ? null : plants.first.location);
     if (anchor == null) {
@@ -101,7 +105,13 @@ class CoordinatePreview extends StatelessWidget {
                           child: IconButton.filledTonal(
                             tooltip: p.name,
                             onPressed: () => onOpen(p.id),
-                            icon: const Icon(Icons.park),
+                            icon: Text(
+                              symbolLabels[ref
+                                  .watch(taxonomyProvider)
+                                  .byId(p.taxonId)
+                                  .symbol]!,
+                              style: const TextStyle(fontSize: 26),
+                            ),
                           ),
                         ),
                       ),
