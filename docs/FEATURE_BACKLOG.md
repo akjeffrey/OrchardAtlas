@@ -24,6 +24,35 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 
 ## Remaining product features
 
+### Plant records, archives and deletion
+
+- [ ] Archived plants never appear on the map, including when other filters change. Add a dedicated **Archived Plants** list page, without a map, where archived plants can be viewed, fully edited and unarchived.
+- [ ] Permanent deletion for a plant, area/bed or row, including its associated data. Plan the cascade for child sections, contained plants/crops, activities, harvests, tasks/completions, photos and stored files; show what will be removed before deletion. Remove orphaned references without deleting unrelated orchards, other plants' records or shared classification definitions.
+- [ ] Full plant editing: allow changes to all user-facing plant fields, including **Group, Type and Variety**, location, planting date, row/bed assignment and other metadata. Preserve plant identity and history, and keep linked planting activities, classification views and matching tasks consistent with edits.
+
+### Tasks, recurrence and linked activities
+
+- [ ] Task sorting: default to **tasks without dates first**, followed by dated tasks with the closest next due date at the top. Let users change the sort order and automatically save/restore their choice across app restarts. Specify placement of overdue/completed tasks during design while preserving the requested undated/upcoming order.
+- [ ] Dynamic group/matching-plant tasks: save the target criteria (including matching fruit/type), rather than only a creation-time snapshot. Automatically apply the task to plants added or becoming matches later, with completion still tracked per plant and existing completion records preserved. Allow creating and retaining a valid task even when **no plants currently match**.
+- [ ] Repeating tasks: support yearly, monthly, weekly and other repeat schedules. Each occurrence starts with fresh per-plant completion state; retain all previous occurrences and their completion records instead of overwriting history.
+- [ ] Optional task-to-activity link: when defining a plant task, optionally choose an activity/event type such as pruning. Completing that task also creates a linked event on the affected plant, visible in its activity history. Reopening the task removes its generated event. For group/repeating tasks, link completion and event per plant and occurrence; avoid duplicate events or removing unrelated/manual events. Reconcile these edit/removal requirements with the current append-oriented event model.
+- [ ] Task and event/activity table filters: add filtering to both lists, with appropriate date, target and classification filters, task status and event type.
+- [ ] Task editing, reminders and notifications beyond the sorting, matching, recurrence and activity-link features above.
+
+### Activity editing and classification views
+
+- [ ] Open an activity to edit its fields or delete it. Apply changes to plant history and derived harvest totals, including date/year and unit changes. Define how edits/deletion interact with a task-generated event and maintain consistent task/event links.
+- [ ] Classification overview pages for **Group, Type and Variety**: view the matching plants' tasks, events/activities, harvests and totals together within the selected orchard. For example, **Type = Apple** includes tasks, events and harvests for all apple varieties. Keep harvest units separate and support the same classification hierarchy in list filters.
+
+### Area versus Bed proposal — confirmation required before implementation
+
+- [ ] Review removing the separate **Area** type and keeping only **Bed** and **Row**. **Do not implement this specific change until the user explicitly confirms the proposal.**
+- Recommendation: use one polygon category labelled **Bed / Patch**, alongside **Row** for lines. Beds, raspberry patches and larger planting areas can share the same shape/nesting features, without two equivalent polygon types.
+- If approved, migrate existing Area records into the retained polygon category while preserving IDs, names, geometry, nesting, contained plants/crops, tasks, activities, colors/icons and other references. Do not delete existing areas or their records as part of this consolidation.
+- Confirmation still needed: approve this consolidation and the proposed **Bed / Patch** label, or choose **Bed** as the sole label instead. Existing Area/Bed behavior remains in place until that confirmation and a later implementation request.
+
+### Other planned features
+
 - [ ] Filter row/area visibility by plant type: when a plant-type filter is active, hide a row's line or an area's shape (and any associated icon) if it contains no plants matching that type. Keep rows/areas containing matching plants visible, including matches within nested sections, and restore normal visibility when the filter is cleared.
 - [ ] Android immersive display: hide the bottom Android system navigation buttons/bar while OrchardAtlas is open, where supported by the Android version and navigation mode. Preserve the system gesture to temporarily reveal navigation controls and restore normal system navigation when leaving the app.
 - [ ] Simplify plant classification selectors to **Group → Type → Variety**: keep Group, rename Genus to Type and Species to Variety, and remove the Cultivar selector entirely. Plan how existing cultivar selections and custom taxonomy remain usable when moving to the three-level selection flow.
@@ -40,9 +69,7 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 - [ ] Sharing: invitations, owner/editor/viewer permissions and collaboration UI.
 - [ ] Foraging-resource entry, seasonality, observations and private/public visibility controls.
 - [ ] Photo capture/gallery/upload, thumbnails and a durable offline upload queue.
-- [ ] Task editing, recurring work, reminders, notifications and optional completion activities.
-- [ ] Re-scope existing group checklists, add members explicitly and compare planned/completed work.
-- [ ] Activity correction/voiding with an audit trail; richer harvest/yield reports.
+- [ ] Richer harvest/yield reports and activity audit/recovery design.
 - [ ] Uploaded/custom map icons and a consistent accessible symbol catalog.
 - [ ] More map editing tools: move plants, split/join rows, vertex insertion and measurements.
 - [ ] Export/import/backup and recovery of local trial records before installation changes.
