@@ -163,9 +163,7 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
                 ? taxonId
                 : null,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Crop species / variety',
-            ),
+            decoration: const InputDecoration(labelText: 'Crop Variety'),
             items: [
               for (final t in identities)
                 DropdownMenuItem(
@@ -347,7 +345,7 @@ class CropDetailScreen extends ConsumerWidget {
                   children: [
                     TextButton(
                       onPressed: () => context.go('/sections/${c.sectionId}'),
-                      child: const Text('View bed / row'),
+                      child: const Text('View Area / Row'),
                     ),
                     TextButton(
                       onPressed: () => context.push('/crops/new', extra: c),

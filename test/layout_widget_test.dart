@@ -261,7 +261,7 @@ void main() {
           id: 'bed',
           propertyId: repo.place.id,
           name: 'Garlic bed',
-          kind: SectionKind.bed,
+          kind: SectionKind.area,
           vertices: [
             Coordinates(51, 1),
             Coordinates(51.001, 1),
@@ -304,7 +304,7 @@ void main() {
       );
       await tester.tap(find.text('Whole property').first);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Group: areas / beds / rows').last);
+      await tester.tap(find.text('Group: areas / rows').last);
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
         find.text('Create group checklist'),

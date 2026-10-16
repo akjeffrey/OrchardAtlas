@@ -8,6 +8,8 @@ import '../domain/orchards.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
+import '../domain/work.dart';
+import 'work_mapping.dart';
 import '../domain/landscape.dart';
 import 'landscape_mapping.dart';
 import '../domain/repositories.dart';
@@ -34,7 +36,8 @@ class LocalTrialRepository
   final _children = <String, LocalTrialRepository>{};
   final _childFailures = <StreamSubscription<WriteFailure>>[];
   static const catalogKey = "orchard-atlas-trial-orchards";
-  final Place place;
+  Place place;
+  final _plans = <TaskPlan>[];
   final List<ManagedPlant> plants;
   final List<PlantEvent> events;
   final List<Taxon> taxa;
@@ -62,7 +65,9 @@ class LocalTrialRepository
         orchard ??
         Place(
           id: '38a0fbb0-6a36-4a48-8d17-000000000101',
-          name: 'Trial orchard',
+          name:
+              data?['name'] as String? ??
+              (data == null ? 'Home Orchard' : 'Trial orchard'),
           ownerId: userId,
           createdAt: data == null
               ? DateTime.now().toUtc()
@@ -74,6 +79,7 @@ class LocalTrialRepository
           id: p['id'] as String,
           propertyId: place.id,
           sectionId: p['sectionId'] as String?,
+          rowOrder: (p['rowOrder'] as num?)?.toDouble(),
           plantedOn: _readPlantedOn(p as Map, data),
           rootstock: p['rootstock'] as String? ?? '',
           nursery: p['nursery'] as String? ?? '',
@@ -96,6 +102,7 @@ class LocalTrialRepository
           propertyId: place.id,
           itemId: e['itemId'] as String,
           authorId: userId,
+          taskId: e['taskId'] as String?,
           type: ActivityType.values.byName(e['type'] as String),
           occurredAt: DateTime.parse(e['occurredAt'] as String),
           activityDate: e['activityDate'] as String,
@@ -126,6 +133,19 @@ class LocalTrialRepository
           groupId: t['groupId'] as String?,
           groupScope: t['groupScope'] as String? ?? '',
           completedOn: t['completedOn'] as String?,
+          planId: t['planId'] as String?,
+          occurrenceOn: t['occurrenceOn'] as String?,
+          eventType: t['eventType'] == null
+              ? null
+              : ActivityType.values.byName(t['eventType'] as String),
+          eventHarvest: t['eventHarvest'] == null
+              ? null
+              : Harvest(
+                  (t['eventHarvest']['quantity'] as num).toDouble(),
+                  HarvestUnit.values.byName(
+                    t['eventHarvest']['unit'] as String,
+                  ),
+                ),
           title: t['title'] as String,
           notes: t['notes'] as String,
           itemId: t['itemId'] as String?,
@@ -134,7 +154,7 @@ class LocalTrialRepository
           createdAt: DateTime.parse(t['createdAt'] as String),
         ),
     ];
-    return LocalTrialRepository._(
+    final repo = LocalTrialRepository._(
       preferences,
       recordKey,
       place,
@@ -167,6 +187,15 @@ class LocalTrialRepository
           ),
       ],
     );
+    repo._plans.addAll([
+      for (final p in data?['taskPlans'] as List? ?? [])
+        WorkMapping.readPlan(
+          place.id,
+          p['id'] as String,
+          Map<String, dynamic>.from(p as Map),
+        ),
+    ]);
+    return repo;
   }
 
   static String? _readPlantedOn(Map p, Map<String, dynamic>? data) {
@@ -252,6 +281,43 @@ class LocalTrialRepository
   }
 
   @override
+  Future<Place> renamePlace(String userId, String placeId, String name) async {
+    _owner(userId);
+    final old = _places.firstWhere((p) => p.id == placeId);
+    final renamed = Place(
+      id: old.id,
+      name: name,
+      ownerId: old.ownerId,
+      createdAt: old.createdAt,
+    );
+    if (placeId == place.id) {
+      place = renamed;
+      _persist(placeId);
+      await _writes;
+    } else {
+      final all = [
+        for (final p in _places.skip(1)) p.id == placeId ? renamed : p,
+      ];
+      if (!await preferences.setString(
+        catalogKey,
+        jsonEncode([
+          for (final p in all)
+            {
+              'id': p.id,
+              'name': p.name,
+              'createdAt': p.createdAt.toIso8601String(),
+            },
+        ]),
+      )) {
+        throw StateError('Could not save name');
+      }
+      _children[placeId]?.place = renamed;
+    }
+    _changes.add(null);
+    return renamed;
+  }
+
+  @override
   Future<void> selectPlace(String userId, String placeId) async {
     _owner(userId);
     _for(placeId);
@@ -304,6 +370,10 @@ class LocalTrialRepository
   void _persist(String recordId) {
     final json = jsonEncode({
       'createdAt': place.createdAt.toIso8601String(),
+      'name': place.name,
+      'taskPlans': [
+        for (final p in _plans) {'id': p.id, ...WorkMapping.plan(p)},
+      ],
       'sections': [
         for (final s in sections) {'id': s.id, ...LandscapeMapping.section(s)},
       ],
@@ -347,6 +417,7 @@ class LocalTrialRepository
           {
             'id': e.id,
             'itemId': e.itemId,
+            'taskId': e.taskId,
             'type': e.type.name,
             'notes': e.notes,
             'occurredAt': e.occurredAt.toIso8601String(),
@@ -449,21 +520,55 @@ class LocalTrialRepository
     );
     if (index < 0) throw StateError('Plant not found');
     final old = plants[index];
-    if (old.createdAt != plant.createdAt ||
-        old.taxonId != plant.taxonId ||
-        old.plantedOn != plant.plantedOn ||
-        old.location.latitude != plant.location.latitude ||
-        old.location.longitude != plant.location.longitude ||
-        old.accuracyMeters != plant.accuracyMeters) {
-      throw ArgumentError(
-        'Plant identity and capture fields cannot be changed',
-      );
+    if (old.createdAt != plant.createdAt) {
+      throw ArgumentError('Plant creation identity is immutable');
     }
     if (plant.sectionId != null &&
         !sections.any((s) => s.id == plant.sectionId)) {
       throw ArgumentError('Unknown section');
     }
     plants[index] = plant;
+    if (old.plantedOn != plant.plantedOn) {
+      final planting = events
+          .where(
+            (e) =>
+                e.itemId == plant.id &&
+                e.type == ActivityType.planting &&
+                e.taskId == null,
+          )
+          .firstOrNull;
+      if (planting != null) {
+        events.remove(planting);
+        if (plant.plantedOn != null) {
+          events.add(
+            PlantEvent(
+              id: planting.id,
+              propertyId: plant.propertyId,
+              itemId: plant.id,
+              authorId: planting.authorId,
+              type: ActivityType.planting,
+              occurredAt: parseCalendarDate(plant.plantedOn!).toUtc(),
+              activityDate: plant.plantedOn!,
+              recordedAt: planting.recordedAt,
+              notes: planting.notes,
+            ),
+          );
+        }
+      } else if (plant.plantedOn != null) {
+        events.add(
+          PlantEvent(
+            id: const Uuid().v4(),
+            propertyId: plant.propertyId,
+            itemId: plant.id,
+            authorId: userId,
+            type: ActivityType.planting,
+            occurredAt: parseCalendarDate(plant.plantedOn!).toUtc(),
+            activityDate: plant.plantedOn!,
+            recordedAt: DateTime.now().toUtc(),
+          ),
+        );
+      }
+    }
     _persist(plant.id);
   }
 
@@ -638,6 +743,143 @@ class LocalTrialRepository
   }
 
   @override
+  Stream<List<TaskPlan>> watchTaskPlans(String propertyId) =>
+      propertyId != place.id
+      ? _for(propertyId).watchTaskPlans(propertyId)
+      : _watch(() => List<TaskPlan>.of(_plans)).map((s) => s.value);
+  @override
+  void saveTaskPlan(TaskPlan plan) {
+    if (plan.propertyId != place.id) {
+      return _for(plan.propertyId).saveTaskPlan(plan);
+    }
+    _plans.removeWhere((p) => p.id == plan.id);
+    _plans.add(plan);
+    _persist(plan.id);
+  }
+
+  @override
+  void saveTaskWithEvent(OrchardTask task, PlantEvent? event) {
+    if (task.propertyId != place.id) {
+      return _for(task.propertyId).saveTaskWithEvent(task, event);
+    }
+    _validateTask(task);
+    if (event != null &&
+        (event.taskId != task.id ||
+            event.itemId != task.itemId ||
+            event.propertyId != task.propertyId)) {
+      throw ArgumentError('Invalid completion event');
+    }
+    final index = tasks.indexWhere((t) => t.id == task.id);
+    if (index < 0) {
+      tasks.add(task);
+    } else {
+      tasks[index] = task;
+    }
+    events.removeWhere((e) => e.taskId == task.id);
+    if (event != null) events.add(event);
+    _persist(task.id);
+  }
+
+  @override
+  void updateEvent(PlantEvent event) {
+    if (event.propertyId != place.id) {
+      return _for(event.propertyId).updateEvent(event);
+    }
+    final index = events.indexWhere(
+      (e) => e.id == event.id && e.itemId == event.itemId,
+    );
+    if (index < 0) throw StateError('Activity unavailable');
+    if (events[index].taskId != event.taskId ||
+        events[index].authorId != event.authorId) {
+      throw ArgumentError('Event identity is immutable');
+    }
+    events[index] = event;
+    _persist(event.id);
+  }
+
+  @override
+  void deleteEvent(PlantEvent event) {
+    if (event.propertyId != place.id) {
+      return _for(event.propertyId).deleteEvent(event);
+    }
+    events.removeWhere((e) => e.id == event.id && e.itemId == event.itemId);
+    if (event.taskId != null) {
+      final i = tasks.indexWhere((t) => t.id == event.taskId);
+      if (i >= 0) tasks[i] = tasks[i].withStatus(TaskStatus.open);
+    }
+    _persist(event.id);
+  }
+
+  @override
+  Future<void> deletePlant(String propertyId, String id) async {
+    if (propertyId != place.id) {
+      return _for(propertyId).deletePlant(propertyId, id);
+    }
+    plants.removeWhere((p) => p.id == id);
+    events.removeWhere((e) => e.itemId == id);
+    tasks.removeWhere((t) => t.itemId == id);
+    _plans.removeWhere((p) => p.itemId == id);
+    _persist(id);
+    await _writes;
+  }
+
+  @override
+  Future<void> deleteSection(String propertyId, String id) async {
+    if (propertyId != place.id) {
+      return _for(propertyId).deleteSection(propertyId, id);
+    }
+    final ids = sectionDescendants(id, sections);
+    final plantIds = plants
+        .where((p) => ids.contains(p.sectionId))
+        .map((p) => p.id)
+        .toSet();
+    final cropIds = crops
+        .where((c) => ids.contains(c.sectionId))
+        .map((c) => c.id)
+        .toSet();
+    plants.removeWhere((p) => plantIds.contains(p.id));
+    events.removeWhere((e) => plantIds.contains(e.itemId));
+    tasks.removeWhere(
+      (t) =>
+          plantIds.contains(t.itemId) ||
+          ids.contains(t.sectionId) ||
+          cropIds.contains(t.cropId),
+    );
+    _plans.removeWhere(
+      (p) =>
+          plantIds.contains(p.itemId) ||
+          ids.contains(p.sectionId) ||
+          cropIds.contains(p.cropId),
+    );
+    sections.removeWhere((s) => ids.contains(s.id));
+    crops.removeWhere((c) => cropIds.contains(c.id));
+    cropHarvests.removeWhere((h) => cropIds.contains(h.cropId));
+    _persist(id);
+    await _writes;
+  }
+
+  @override
+  void saveRowOrder(String propertyId, String sectionId, List<String> ids) {
+    if (propertyId != place.id) {
+      return _for(propertyId).saveRowOrder(propertyId, sectionId, ids);
+    }
+    final members = plants
+        .where((p) => p.sectionId == sectionId)
+        .map((p) => p.id)
+        .toSet();
+    if (ids.toSet().length != ids.length ||
+        !members.containsAll(ids) ||
+        ids.length != members.length) {
+      throw ArgumentError('Order must include every row plant');
+    }
+    for (var i = 0; i < ids.length; i++) {
+      final index = plants.indexWhere((p) => p.id == ids[i]);
+      plants[index] = plants[index].copyWith(rowOrder: i.toDouble());
+    }
+    _persist(sectionId);
+  }
+
+  @override
   Future<void> clearDeviceCache() async {
     await _writes;
     for (final p in _places.skip(1)) {
@@ -656,6 +898,7 @@ class LocalTrialRepository
     events.clear();
     taxa.clear();
     tasks.clear();
+    _plans.clear();
     sections.clear();
     crops.clear();
     cropHarvests.clear();

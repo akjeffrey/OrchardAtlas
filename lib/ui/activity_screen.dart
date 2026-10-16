@@ -7,7 +7,8 @@ import '../domain/models.dart';
 import 'common.dart';
 
 class ActivityScreen extends ConsumerStatefulWidget {
-  const ActivityScreen(this.itemId, {super.key});
+  const ActivityScreen(this.itemId, {super.key, this.event});
+  final PlantEvent? event;
   final String itemId;
   @override
   ConsumerState<ActivityScreen> createState() => _ActivityState();
@@ -21,6 +22,19 @@ class _ActivityState extends ConsumerState<ActivityScreen> {
   final quantity = TextEditingController();
   bool busy = false;
   String? error;
+  @override
+  void initState() {
+    super.initState();
+    final e = widget.event;
+    if (e != null) {
+      type = e.type;
+      unit = e.harvest?.unit ?? HarvestUnit.kg;
+      date = parseCalendarDate(e.activityDate);
+      notes.text = e.notes;
+      quantity.text = e.harvest?.quantity.toString() ?? '';
+    }
+  }
+
   @override
   void dispose() {
     notes.dispose();
@@ -43,19 +57,42 @@ class _ActivityState extends ConsumerState<ActivityScreen> {
         throw StateError('Plant unavailable');
       }
       if (!mounted) return;
-      ref
-          .read(commandsProvider)
-          .record(
-            place: place,
-            itemId: widget.itemId,
-            authorId: user.id,
-            type: type,
-            date: date,
-            notes: notes.text,
-            harvest: type == ActivityType.harvest
-                ? Harvest(double.parse(quantity.text), unit)
-                : null,
-          );
+      if (widget.event != null) {
+        final old = widget.event!;
+        ref
+            .read(orchardRepositoryProvider)
+            .updateEvent(
+              PlantEvent(
+                id: old.id,
+                propertyId: old.propertyId,
+                itemId: old.itemId,
+                authorId: old.authorId,
+                type: type,
+                occurredAt: date.toUtc(),
+                activityDate: calendarDate(date),
+                recordedAt: old.recordedAt,
+                notes: notes.text,
+                harvest: type == ActivityType.harvest
+                    ? Harvest(double.parse(quantity.text), unit)
+                    : null,
+                taskId: old.taskId,
+              ),
+            );
+      } else {
+        ref
+            .read(commandsProvider)
+            .record(
+              place: place,
+              itemId: widget.itemId,
+              authorId: user.id,
+              type: type,
+              date: date,
+              notes: notes.text,
+              harvest: type == ActivityType.harvest
+                  ? Harvest(double.parse(quantity.text), unit)
+                  : null,
+            );
+      }
       context.go('/plants/${widget.itemId}');
     } catch (e) {
       if (mounted) setState(() => error = '$e');
@@ -66,7 +103,11 @@ class _ActivityState extends ConsumerState<ActivityScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Record Activity / Harvest')),
+    appBar: AppBar(
+      title: Text(
+        widget.event == null ? 'Record Activity / Harvest' : 'Edit activity',
+      ),
+    ),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -118,6 +159,39 @@ class _ActivityState extends ConsumerState<ActivityScreen> {
           maxLength: 10000,
           decoration: const InputDecoration(labelText: 'Notes'),
         ),
+        if (widget.event != null)
+          TextButton.icon(
+            icon: const Icon(Icons.delete_forever),
+            label: const Text('Delete activity'),
+            onPressed: busy
+                ? null
+                : () async {
+                    final yes = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete activity?'),
+                        content: const Text(
+                          'Removes this event and recalculates harvest totals. A linked completed task will reopen.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (yes != true || !context.mounted) return;
+                    ref
+                        .read(orchardRepositoryProvider)
+                        .deleteEvent(widget.event!);
+                    context.go('/plants/${widget.itemId}');
+                  },
+          ),
         if (error != null) Text(error!),
         FilledButton(
           onPressed: busy ? null : save,

@@ -1,7 +1,7 @@
 import 'models.dart';
 import 'taxonomy.dart';
 
-enum SectionKind { area, bed, row }
+enum SectionKind { area, row }
 
 enum CropStatus { growing, harvested, ended }
 
@@ -14,6 +14,8 @@ class OrchardSection {
     required List<Coordinates> vertices,
     required this.createdAt,
     this.parentId,
+    this.color = 0xff4caf50,
+    this.symbol,
     String notes = '',
   }) : name = requiredText(name, 'Section name'),
        vertices = List.unmodifiable(vertices),
@@ -21,6 +23,8 @@ class OrchardSection {
     validateGeometry(kind, vertices);
     if (parentId == id) throw ArgumentError('A section cannot contain itself');
   }
+  final int color;
+  final PlantSymbol? symbol;
   final String id, propertyId, name, notes;
   final String? parentId;
   final SectionKind kind;
@@ -30,6 +34,9 @@ class OrchardSection {
     required String name,
     required String notes,
     required List<Coordinates> vertices,
+    int? color,
+    PlantSymbol? symbol,
+    bool clearSymbol = false,
   }) => OrchardSection(
     id: id,
     propertyId: propertyId,
@@ -37,6 +44,8 @@ class OrchardSection {
     notes: notes,
     kind: kind,
     parentId: parentId,
+    color: color ?? this.color,
+    symbol: clearSymbol ? null : symbol ?? this.symbol,
     vertices: vertices,
     createdAt: createdAt,
   );
@@ -121,7 +130,7 @@ void validateSectionParent(
         .where((s) => s.id == parent && s.propertyId == section.propertyId)
         .firstOrNull;
     if (found == null || found.kind == SectionKind.row) {
-      throw ArgumentError('Parent must be an area or bed in this property');
+      throw ArgumentError('Parent must be an Area in this property');
     }
     parent = found.parentId;
   }

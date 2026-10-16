@@ -14,6 +14,8 @@ import 'edit_plant_screen.dart';
 import 'tasks_screen.dart';
 import 'sections_screen.dart';
 import 'crops_screen.dart';
+import 'archived_plants.dart';
+import 'classification_screen.dart';
 import '../domain/landscape.dart';
 
 final dismissedFailureProvider = StateProvider<String?>((ref) => null);
@@ -32,6 +34,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(
+        path: '/archived',
+        builder: (_, _) => const ArchivedPlantsScreen(),
+      ),
+      GoRoute(
+        path: '/classifications',
+        builder: (_, _) => const ClassificationScreen(),
+      ),
       GoRoute(
         path: '/layout',
         builder: (_, state) => SectionsScreen(
@@ -128,7 +138,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/plants/:id/activity',
-        builder: (_, state) => ActivityScreen(state.pathParameters['id']!),
+        builder: (_, state) => ActivityScreen(
+          state.pathParameters['id']!,
+          event: state.extra is PlantEvent ? state.extra as PlantEvent : null,
+        ),
       ),
     ],
   );
@@ -167,6 +180,7 @@ class OrchardAtlasApp extends ConsumerWidget {
         home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
+    ref.watch(taskMaterializerProvider);
     final failure = ref.watch(failuresProvider).valueOrNull;
     final dismissedFailure = ref.watch(dismissedFailureProvider);
     return MaterialApp.router(

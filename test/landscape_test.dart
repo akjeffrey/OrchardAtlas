@@ -24,7 +24,7 @@ void main() {
     String id,
     String property, {
     String? parent,
-    SectionKind kind = SectionKind.bed,
+    SectionKind kind = SectionKind.area,
   }) => OrchardSection(
     id: id,
     propertyId: property,

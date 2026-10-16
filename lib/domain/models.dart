@@ -119,6 +119,7 @@ class ManagedPlant extends TrackedItem {
     required super.createdAt,
     this.plantedOn,
     this.sectionId,
+    this.rowOrder,
     String rootstock = '',
     String nursery = '',
     String notes = '',
@@ -127,6 +128,9 @@ class ManagedPlant extends TrackedItem {
   }) : rootstock = optionalText(rootstock, 500),
        nursery = optionalText(nursery, 500),
        notes = optionalText(notes, 10000) {
+    if (rowOrder != null && (!rowOrder!.isFinite || rowOrder! < 0)) {
+      throw ArgumentError('Invalid row order');
+    }
     if (plantedOn != null) parseCalendarDate(plantedOn!);
     if (accuracyMeters != null &&
         (!accuracyMeters!.isFinite ||
@@ -135,6 +139,7 @@ class ManagedPlant extends TrackedItem {
       throw ArgumentError('Invalid GPS accuracy');
     }
   }
+  final double? rowOrder;
   final String? plantedOn;
   final String? sectionId;
   final String rootstock, nursery, notes;
@@ -180,19 +185,30 @@ class ManagedPlant extends TrackedItem {
     ItemStatus? status,
     String? sectionId,
     bool clearSection = false,
+    String? taxonId,
+    Coordinates? location,
+    String? plantedOn,
+    bool clearPlantedOn = false,
+    double? rowOrder,
+    bool clearRowOrder = false,
+    double? accuracyMeters,
+    bool clearAccuracy = false,
   }) => ManagedPlant(
     id: id,
     propertyId: propertyId,
     name: name ?? this.name,
-    taxonId: taxonId,
-    location: location,
+    taxonId: taxonId ?? this.taxonId,
+    location: location ?? this.location,
     createdAt: createdAt,
-    plantedOn: plantedOn,
+    plantedOn: clearPlantedOn ? null : plantedOn ?? this.plantedOn,
+    rowOrder: clearRowOrder ? null : rowOrder ?? this.rowOrder,
     rootstock: rootstock ?? this.rootstock,
     nursery: nursery ?? this.nursery,
     notes: notes ?? this.notes,
     status: status ?? this.status,
-    accuracyMeters: accuracyMeters,
+    accuracyMeters: clearAccuracy
+        ? null
+        : accuracyMeters ?? this.accuracyMeters,
     sectionId: clearSection ? null : sectionId ?? this.sectionId,
   );
 }
@@ -278,6 +294,7 @@ class PlantEvent {
     required this.recordedAt,
     this.notes = '',
     this.harvest,
+    this.taskId,
   }) {
     parseCalendarDate(activityDate);
     if ((type == ActivityType.harvest) != (harvest != null)) {
@@ -294,6 +311,7 @@ class PlantEvent {
   final String activityDate;
   final DateTime recordedAt;
   final String notes;
+  final String? taskId;
   final Harvest? harvest;
 }
 
@@ -330,6 +348,10 @@ class OrchardTask {
     String groupScope = '',
     this.dueDate,
     this.completedOn,
+    this.planId,
+    this.occurrenceOn,
+    this.eventType,
+    this.eventHarvest,
     String notes = '',
     this.status = TaskStatus.open,
   }) : title = requiredText(title, 'Task title'),
@@ -348,6 +370,9 @@ class OrchardTask {
       throw ArgumentError('Completion date requires completed status');
     }
   }
+  final String? planId, occurrenceOn;
+  final ActivityType? eventType;
+  final Harvest? eventHarvest;
   final String id, propertyId, title, notes, groupScope;
   final String? itemId, sectionId, cropId, groupId, dueDate, completedOn;
   final DateTime createdAt;
@@ -356,6 +381,10 @@ class OrchardTask {
     id: id,
     propertyId: propertyId,
     title: title,
+    planId: planId,
+    occurrenceOn: occurrenceOn,
+    eventType: eventType,
+    eventHarvest: eventHarvest,
     createdAt: createdAt,
     itemId: itemId,
     sectionId: sectionId,

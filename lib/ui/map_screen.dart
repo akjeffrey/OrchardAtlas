@@ -9,6 +9,7 @@ import '../domain/landscape.dart';
 import '../domain/models.dart';
 import '../domain/orchards.dart';
 import '../domain/filters.dart';
+import 'section_style.dart';
 import 'common.dart';
 import 'location_search.dart';
 import 'orchard_map.dart';
@@ -202,6 +203,8 @@ class _MapState extends ConsumerState<MapScreen>
       return;
     }
     var name = '', parent = '';
+    var color = 0xff4caf50;
+    PlantSymbol? symbol;
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -215,6 +218,12 @@ class _MapState extends ConsumerState<MapScreen>
                 maxLength: 500,
                 decoration: const InputDecoration(labelText: 'Area / row name'),
                 onChanged: (v) => name = v,
+              ),
+              SectionStyleFields(
+                color: color,
+                symbol: symbol,
+                onColor: (v) => color = v,
+                onSymbol: (v) => symbol = v,
               ),
               DropdownButtonFormField<String>(
                 initialValue: '',
@@ -265,6 +274,8 @@ class _MapState extends ConsumerState<MapScreen>
         propertyId: place.id,
         name: name,
         kind: drawing!,
+        color: color,
+        symbol: symbol,
         vertices: List.of(draft),
         parentId: parent.isEmpty ? null : parent,
         createdAt: DateTime.now().toUtc(),
@@ -442,6 +453,8 @@ class _MapState extends ConsumerState<MapScreen>
                   }
                   if (v == 'orchards') switchOrchard();
                   if (v == 'settings') mapSettings();
+                  if (v == 'archived') context.push('/archived');
+                  if (v == 'classifications') context.push('/classifications');
                   if (v == 'logout') signOut();
                 },
                 itemBuilder: (_) => const [
@@ -451,9 +464,14 @@ class _MapState extends ConsumerState<MapScreen>
                   ),
                   PopupMenuItem(value: 'settings', child: Text('Map settings')),
                   PopupMenuItem(
-                    value: 'layout',
-                    child: Text('Areas, beds & rows'),
+                    value: 'archived',
+                    child: Text('Archived Plants'),
                   ),
+                  PopupMenuItem(
+                    value: 'classifications',
+                    child: Text('Group / Type / Variety'),
+                  ),
+                  PopupMenuItem(value: 'layout', child: Text('Areas & Rows')),
                   PopupMenuItem(
                     value: 'logout',
                     child: Text('Sign out and clear device cache'),
@@ -535,7 +553,7 @@ class _MapState extends ConsumerState<MapScreen>
                         ),
                       if (sectionData.hasError)
                         const Text(
-                          'Areas unavailable. Retry from Areas, beds & rows.',
+                          'Areas unavailable. Retry from Areas & Rows.',
                         ),
                       if (isMap) ...[
                         Wrap(
@@ -598,7 +616,20 @@ class _MapState extends ConsumerState<MapScreen>
                         Expanded(
                           key: const ValueKey('map-pane'),
                           child: OrchardMap(
-                            sections: sections,
+                            sections:
+                                ref.watch(plantFilterProvider).taxonId == null
+                                ? sections
+                                : sections.where((s) {
+                                    final contained = sectionDescendants(
+                                      s.id,
+                                      sections,
+                                    );
+                                    return items.any(
+                                      (p) =>
+                                          p.status == ItemStatus.active &&
+                                          contained.contains(p.sectionId),
+                                    );
+                                  }).toList(),
                             plants: items,
                             selected: selected,
                             draft: List.of(draft),

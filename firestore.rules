@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function uuid(id) {
-      return id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
+      return id.matches('^[0-9a-f]{8}-[0-9a-f]{4}-[45][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$');
     }
     function owner(propertyId) {
       return signedIn() && get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
@@ -11,7 +11,7 @@ service cloud.firestore {
     function text(value) { return value is string && value.size() > 0 && value.size() <= 500; }
     function validItem(d, propertyId) {
       return d.keys().hasAll(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
-        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt', 'plantedOn', 'rootstock', 'nursery', 'notes', 'status', 'accuracyMeters', 'sectionId'])
+        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt', 'plantedOn', 'rootstock', 'nursery', 'notes', 'status', 'accuracyMeters', 'sectionId', 'rowOrder'])
         && d.schemaVersion == 1 && d.kind == 'managedPlant'
         && text(d.name) && d.taxonId is string && uuid(d.taxonId)
         && d.location is latlng && d.createdAt is timestamp
@@ -21,6 +21,7 @@ service cloud.firestore {
         && d.get('notes', '') is string && d.get('notes', '').size() <= 10000
         && d.get('status', 'active') in ['active', 'archived']
         && (d.get('sectionId', null) == null || (d.sectionId is string && uuid(d.sectionId) && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.sectionId))))
+        && (d.get('rowOrder',null)==null || (d.rowOrder is number && d.rowOrder >= 0 && d.rowOrder <= 1000000000))
         && (d.get('accuracyMeters', null) == null || (d.accuracyMeters is number && d.accuracyMeters >= 0 && d.accuracyMeters <= 100000));
     }
     function date(value) {
@@ -28,13 +29,17 @@ service cloud.firestore {
     }
     function validTask(d, propertyId) {
       return d.keys().hasAll(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt'])
-        && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt', 'sectionId', 'cropId', 'groupId', 'groupScope', 'completedOn'])
+        && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt', 'sectionId', 'cropId', 'groupId', 'groupScope', 'completedOn', 'planId', 'occurrenceOn', 'eventType', 'eventHarvest'])
         && d.schemaVersion == 1 && text(d.title) && d.notes is string && d.notes.size() <= 10000
         && d.createdAt is timestamp && d.status in ['open', 'completed', 'cancelled', 'skipped']
         && (d.dueDate == null || date(d.dueDate))
         && (d.get('completedOn', null) == null || (d.status == 'completed' && date(d.completedOn)))
         && d.get('groupScope', '') is string && d.get('groupScope', '').size() <= 500
         && (d.get('groupId', null) == null || (d.groupId is string && uuid(d.groupId) && (d.itemId != null || d.get('sectionId', null) != null || d.get('cropId', null) != null)))
+        && (d.get('planId',null)==null || (d.planId is string && uuid(d.planId) && exists(/databases/$(database)/documents/properties/$(propertyId)/taskPlans/$(d.planId))))
+        && (d.get('occurrenceOn',null)==null || date(d.occurrenceOn))
+        && (d.get('eventType',null)==null || activityType(d.eventType))
+        && (d.get('eventType',null)!='harvest' || validHarvest({'harvest':d.get('eventHarvest',null)}))
         && validTaskTarget(d, propertyId);
     }
     function validTaskTarget(d, propertyId) {
@@ -49,9 +54,11 @@ service cloud.firestore {
     function pointAt(points, index) { return points.size() <= index || points[index] is latlng; }
     function validSection(d, propertyId) {
       return d.keys().hasAll(['schemaVersion','name','kind','parentId','notes','createdAt','vertices'])
-        && d.keys().hasOnly(['schemaVersion','name','kind','parentId','notes','createdAt','vertices'])
+        && d.keys().hasOnly(['schemaVersion','name','kind','parentId','notes','createdAt','vertices','color','symbol'])
         && d.schemaVersion == 1 && text(d.name) && d.notes is string && d.notes.size() <= 10000 && d.createdAt is timestamp
-        && d.kind in ['area','bed','row'] && d.vertices is list && d.vertices.size() <= 40
+        && (d.get('color',null)==null || (d.color is int && d.color >= 0 && d.color <= 4294967295))
+        && (d.get('symbol',null)==null || d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine'])
+        && d.kind in ['area','row'] && d.vertices is list && d.vertices.size() <= 40
         && d.vertices.size() >= (d.kind == 'row' ? 2 : 3)
         && (d.parentId == null || (d.parentId is string && uuid(d.parentId)
           && get(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.parentId)).data.kind in ['area','bed']))
@@ -115,13 +122,32 @@ service cloud.firestore {
     }
     function validEvent(d) {
       return d.keys().hasAll(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes'])
-        && d.keys().hasOnly(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes', 'harvest'])
+        && d.keys().hasOnly(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes', 'harvest','taskId'])
         && d.schemaVersion == 1 && d.authorId == request.auth.uid
         && d.type in ['planting', 'bloom', 'pruning', 'fertilizing', 'spraying', 'pestsDisease', 'watering', 'harvest', 'removal', 'note', 'photo', 'budBreak', 'firstBloom', 'fullBloom', 'petalFall', 'fruitSet', 'pest', 'disease', 'damage', 'harvestStart', 'harvestEnd', 'died', 'observation']
         && d.occurredAt is timestamp && d.recordedAt is timestamp
         && d.activityDate is string && d.activityDate.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
+        && (d.get('taskId',null)==null || (d.taskId is string && uuid(d.taskId)))
         && d.notes is string && d.notes.size() <= 10000
         && ((d.type == 'harvest' && validHarvest(d)) || (d.type != 'harvest' && !('harvest' in d)));
+    }
+    function activityType(value) {
+      return value in ['planting','bloom','pruning','fertilizing','spraying','pestsDisease','watering','harvest','removal','note','photo','budBreak','firstBloom','fullBloom','petalFall','fruitSet','pest','disease','damage','harvestStart','harvestEnd','died','observation'];
+    }
+    function validPlan(d,propertyId) {
+      return d.keys().hasAll(['schemaVersion','title','target','createdAt','notes','repeat'])
+        && d.keys().hasOnly(['schemaVersion','title','target','createdAt','notes','repeat','itemId','sectionId','cropId','taxonId','sectionKind','dueDate','eventType','eventHarvest'])
+        && d.schemaVersion==1 && text(d.title) && d.notes is string && d.notes.size()<=10000 && d.createdAt is timestamp
+        && d.target in ['plant','plants','section','sections','crop','crops','property']
+        && d.repeat in ['none','daily','weekly','monthly','yearly']
+        && (d.get('sectionKind','row') in ['area','row'])
+        && (d.get('dueDate',null)==null || date(d.dueDate))
+        && (d.get('taxonId',null)==null || (d.taxonId is string && uuid(d.taxonId)))
+        && (d.get('itemId',null)==null || (d.itemId is string && uuid(d.itemId) && exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(d.itemId))))
+        && (d.get('sectionId',null)==null || (d.sectionId is string && uuid(d.sectionId) && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.sectionId))))
+        && (d.get('cropId',null)==null || (d.cropId is string && uuid(d.cropId) && exists(/databases/$(database)/documents/properties/$(propertyId)/crops/$(d.cropId))))
+        && (d.get('eventType',null)==null || activityType(d.eventType))
+        && (d.get('eventType',null)!='harvest' || validHarvest({'harvest':d.get('eventHarvest',null)}));
     }
     match /properties/{propertyId} {
       allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
@@ -131,20 +157,22 @@ service cloud.firestore {
         && request.resource.data.schemaVersion == 1
         && request.resource.data.ownerId == request.auth.uid
         && text(request.resource.data.name) && request.resource.data.createdAt is timestamp;
-      allow update, delete: if false;
+      allow update: if owner(propertyId) && text(request.resource.data.name) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
+      allow delete: if false;
       match /sections/{sectionId} {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(sectionId) && request.resource.data.parentId != sectionId && validSection(request.resource.data, propertyId);
         allow update: if owner(propertyId) && validSection(request.resource.data, propertyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','notes','vertices']);
-        allow delete: if false;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','notes','vertices','color','symbol','kind'])
+          && (request.resource.data.kind == resource.data.kind || (resource.data.kind=='bed' && request.resource.data.kind=='area'));
+        allow delete: if owner(propertyId);
       }
       match /crops/{cropId} {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(cropId) && validCrop(request.resource.data, propertyId) && request.resource.data.status == 'growing';
         allow update: if owner(propertyId) && validCrop(request.resource.data, propertyId) && resource.data.status != 'ended'
           && request.resource.data.status != 'growing' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','harvestedOn']);
-        allow delete: if false;
+        allow delete: if owner(propertyId);
       }
       match /cropHarvests/{harvestId} {
         allow read: if owner(propertyId);
@@ -155,14 +183,21 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/properties/$(propertyId)/crops/$(request.resource.data.cropId))
           && date(request.resource.data.activityDate) && request.resource.data.recordedAt is timestamp
           && request.resource.data.notes is string && request.resource.data.notes.size() <= 10000 && validHarvest(request.resource.data);
-        allow update, delete: if false;
+        allow update: if false;
+        allow delete: if owner(propertyId);
+      }
+      match /taskPlans/{planId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(planId) && validPlan(request.resource.data,propertyId);
+        allow update: if owner(propertyId) && validPlan(request.resource.data,propertyId) && request.resource.data.createdAt==resource.data.createdAt;
+        allow delete: if owner(propertyId);
       }
       match /tasks/{taskId} {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(taskId) && validTask(request.resource.data, propertyId);
         allow update: if owner(propertyId) && validTask(request.resource.data, propertyId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedOn']);
-        allow delete: if false;
+        allow delete: if owner(propertyId);
       }
       match /taxa/{taxonId} {
         allow read: if owner(propertyId);
@@ -180,14 +215,18 @@ service cloud.firestore {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data, propertyId);
         allow update: if owner(propertyId) && validItem(request.resource.data, propertyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'rootstock', 'nursery', 'notes', 'status', 'sectionId']);
-        allow delete: if false;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','taxonId','location','plantedOn','accuracyMeters','rowOrder','rootstock','nursery','notes','status','sectionId']);
+        allow delete: if owner(propertyId);
+        match /photos/{photoId} { allow read, delete: if owner(propertyId); allow create, update: if false; }
         match /events/{eventId} {
           allow read: if owner(propertyId);
           allow create: if owner(propertyId) && uuid(eventId)
             && getAfter(/databases/$(database)/documents/properties/$(propertyId)/items/$(itemId)).data.kind == 'managedPlant'
             && validEvent(request.resource.data);
-          allow update, delete: if false;
+          allow update: if owner(propertyId) && validEvent(request.resource.data)
+            && request.resource.data.authorId==resource.data.authorId && request.resource.data.recordedAt==resource.data.recordedAt
+            && request.resource.data.get('taskId',null)==resource.data.get('taskId',null);
+          allow delete: if owner(propertyId);
         }
       }
     }

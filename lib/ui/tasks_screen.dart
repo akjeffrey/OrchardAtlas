@@ -7,6 +7,7 @@ import '../application/providers.dart';
 import '../domain/models.dart';
 import '../domain/landscape.dart';
 import '../domain/filters.dart';
+import '../domain/work.dart';
 import 'common.dart';
 import 'sections_screen.dart';
 
@@ -73,8 +74,13 @@ class TaskMemberTile extends ConsumerWidget {
         onSelected: (status) {
           try {
             ref
-                .read(orchardRepositoryProvider)
-                .saveTask(task.withStatus(status));
+                .read(commandsProvider)
+                .changeTaskStatus(
+                  task,
+                  status,
+                  ref.read(userProvider).valueOrNull?.id ??
+                      ref.read(placeProvider).value!.ownerId,
+                );
           } catch (e) {
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text('$e')));
@@ -103,48 +109,134 @@ String groupProgress(List<OrchardTask> members) {
   return '$done of ${members.length} completed · $open remaining · ${members.length - done - open} skipped/cancelled';
 }
 
-class TaskGroupScreen extends ConsumerWidget {
+class TaskGroupScreen extends ConsumerStatefulWidget {
   const TaskGroupScreen(this.id, {super.key});
   final String id;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Group task checklist')),
-    body: ref
-        .watch(tasksProvider)
-        .when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => ErrorPanel(e),
-          data: (snapshot) {
-            final members = snapshot.value
-                .where((t) => t.groupId == id)
-                .toList();
-            if (members.isEmpty) {
-              return const ErrorPanel('Task group unavailable');
-            }
-            return ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Text(
-                  members.first.title,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                Text(members.first.groupScope),
-                Text(groupProgress(members)),
-                const Text(
-                  'Membership was captured when this task was created. Complete each target on the day you work on it. Tap a target for its details and activity/harvest controls.',
-                ),
-                SyncStatus(snapshot),
-                for (final task in members)
-                  TaskMemberTile(task, showTitle: false),
-              ],
-            );
-          },
-        ),
-  );
+  ConsumerState<TaskGroupScreen> createState() => _TaskGroupState();
+}
+
+class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
+  String? selected;
+  String query = '';
+  TaskStatus? status;
+  @override
+  Widget build(BuildContext context) {
+    final plan = ref
+        .watch(taskPlansProvider)
+        .valueOrNull
+        ?.where((p) => p.id == widget.id)
+        .firstOrNull;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Group task checklist')),
+      body: ref
+          .watch(tasksProvider)
+          .when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => ErrorPanel(e),
+            data: (snapshot) {
+              final all = snapshot.value
+                  .where((t) => t.groupId == widget.id || t.planId == widget.id)
+                  .toList();
+              if (all.isEmpty && plan == null) {
+                return const ErrorPanel('Task group unavailable');
+              }
+              final dates =
+                  all
+                      .map((t) => t.occurrenceOn)
+                      .whereType<String>()
+                      .toSet()
+                      .toList()
+                    ..sort((a, b) => b.compareTo(a));
+              final current = plan == null
+                  ? dates.firstOrNull
+                  : occurrenceDates(plan, DateTime.now()).last;
+              if (current != null && !dates.contains(current)) {
+                dates.insert(0, current);
+              }
+              final date = selected != null && dates.contains(selected)
+                  ? selected
+                  : current;
+              final members = all
+                  .where((t) => date == null || t.occurrenceOn == date)
+                  .toList();
+              final plants =
+                  ref.watch(plantsProvider).valueOrNull?.value ??
+                  <ManagedPlant>[];
+              return ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Text(
+                    plan?.title ?? all.first.title,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  Text(groupProgress(members)),
+                  Text(
+                    plan == null
+                        ? 'Legacy checklist: existing membership retained.'
+                        : 'New matching plants join automatically. Each occurrence retains its own completion history.',
+                  ),
+                  if (dates.isNotEmpty)
+                    DropdownButtonFormField<String>(
+                      key: ValueKey('occurrence-$date'),
+                      initialValue: date,
+                      decoration: const InputDecoration(
+                        labelText: 'Occurrence / history',
+                      ),
+                      items: [
+                        for (final d in dates)
+                          DropdownMenuItem(value: d, child: Text(d)),
+                      ],
+                      onChanged: (v) => setState(() => selected = v),
+                    ),
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: 'Filter checklist',
+                    ),
+                    onChanged: (v) => setState(() => query = v),
+                  ),
+                  DropdownButtonFormField<String>(
+                    initialValue: '',
+                    decoration: const InputDecoration(
+                      labelText: 'Completion filter',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('All statuses'),
+                      ),
+                      for (final s in TaskStatus.values)
+                        DropdownMenuItem(value: s.name, child: Text(s.name)),
+                    ],
+                    onChanged: (v) => setState(
+                      () => status = v == ''
+                          ? null
+                          : TaskStatus.values.byName(v!),
+                    ),
+                  ),
+                  if (members.isEmpty)
+                    const Text(
+                      'No matching targets yet. This task remains valid.',
+                    ),
+                  for (final t in members.where(
+                    (t) =>
+                        (status == null || t.status == status) &&
+                        '${plants.where((p) => p.id == t.itemId).firstOrNull?.name ?? ''} ${t.title}'
+                            .toLowerCase()
+                            .contains(query.toLowerCase()),
+                  ))
+                    TaskMemberTile(t, showTitle: false),
+                ],
+              );
+            },
+          ),
+    );
+  }
 }
 
 class TasksPane extends ConsumerStatefulWidget {
-  const TasksPane({super.key, this.itemId});
+  const TasksPane({super.key, this.itemId, this.taxonId});
+  final String? taxonId;
   final String? itemId;
   @override
   ConsumerState<TasksPane> createState() => _TasksState();
@@ -152,6 +244,24 @@ class TasksPane extends ConsumerStatefulWidget {
 
 class _TasksState extends ConsumerState<TasksPane> {
   TaskWindow window = TaskWindow.all;
+  TaskSort sort = TaskSort.dueDate;
+  String query = '', classification = '';
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() async {
+      try {
+        final place = await ref.read(placeProvider.future);
+        final saved = await ref
+            .read(mapViewRepositoryProvider)
+            .loadTaskSort(place.ownerId);
+        if (mounted) {
+          setState(() => sort = TaskSort.values.byName(saved ?? 'dueDate'));
+        }
+      } catch (_) {}
+    });
+  }
+
   TaskStatus? status = TaskStatus.open;
   @override
   Widget build(BuildContext context) => Column(
@@ -203,6 +313,77 @@ class _TasksState extends ConsumerState<TasksPane> {
           ],
         ),
       ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          children: [
+            TextField(
+              decoration: const InputDecoration(labelText: 'Filter tasks'),
+              onChanged: (q) => setState(() => query = q),
+            ),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<TaskSort>(
+                    key: ValueKey(sort),
+                    initialValue: sort,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Sort tasks'),
+                    items: [
+                      for (final s in TaskSort.values)
+                        DropdownMenuItem(
+                          value: s,
+                          child: Text(
+                            s == TaskSort.dueDate
+                                ? 'Undated, next due, overdue'
+                                : s.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (v) async {
+                      setState(() => sort = v!);
+                      try {
+                        final place = await ref.read(placeProvider.future);
+                        await ref
+                            .read(mapViewRepositoryProvider)
+                            .saveTaskSort(place.ownerId, v!.name);
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text('$e')));
+                        }
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    initialValue: '',
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Classification',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('All types'),
+                      ),
+                      for (final t in ref.watch(taxonomyProvider).taxa)
+                        DropdownMenuItem(
+                          value: t.id,
+                          child: Text(t.name, overflow: TextOverflow.ellipsis),
+                        ),
+                    ],
+                    onChanged: (v) => setState(() => classification = v!),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
       TextButton.icon(
         onPressed: () => context.push('/tasks/new', extra: widget.itemId),
         icon: const Icon(Icons.add_task),
@@ -219,13 +400,72 @@ class _TasksState extends ConsumerState<TasksPane> {
               error: (e, _) =>
                   ErrorPanel(e, retry: () => ref.invalidate(tasksProvider)),
               data: (snapshot) {
-                final filtered = snapshot.value
+                final plans =
+                    ref.watch(taskPlansProvider).valueOrNull ?? <TaskPlan>[];
+                final taxonomy = ref.watch(taxonomyProvider);
+                final selectedTaxon =
+                    widget.taxonId ??
+                    (classification.isEmpty ? null : classification);
+                final taxa = selectedTaxon == null
+                    ? null
+                    : taxonomy.descendants(selectedTaxon);
+                final plants =
+                    ref.watch(plantsProvider).valueOrNull?.value ??
+                    <ManagedPlant>[];
+                final crops =
+                    ref.watch(cropsProvider).valueOrNull?.value ??
+                    <CropPlanting>[];
+                final filtered =
+                    snapshot.value
+                        .where(
+                          (t) =>
+                              (widget.itemId == null ||
+                                  t.itemId == widget.itemId) &&
+                              (status == null || t.status == status) &&
+                              taskInWindow(t, window, DateTime.now()) &&
+                              '${t.title} ${t.notes} ${plants.where((p) => p.id == t.itemId).firstOrNull?.name ?? ''}'
+                                  .toLowerCase()
+                                  .contains(query.toLowerCase()) &&
+                              (taxa == null ||
+                                  plants.any(
+                                    (p) =>
+                                        p.id == t.itemId &&
+                                        taxa.contains(p.taxonId),
+                                  ) ||
+                                  crops.any(
+                                    (c) =>
+                                        c.id == t.cropId &&
+                                        taxa.contains(c.taxonId),
+                                  )) &&
+                              (t.planId == null ||
+                                  plans
+                                          .where((p) => p.id == t.planId)
+                                          .firstOrNull ==
+                                      null ||
+                                  t.occurrenceOn ==
+                                      occurrenceDates(
+                                        plans.firstWhere(
+                                          (p) => p.id == t.planId,
+                                        ),
+                                        DateTime.now(),
+                                      ).last),
+                        )
+                        .toList()
+                      ..sort(
+                        (a, b) => compareTasks(a, b, sort, DateTime.now()),
+                      );
+                final emptyPlans = plans
                     .where(
-                      (t) =>
-                          (widget.itemId == null ||
-                              t.itemId == widget.itemId) &&
-                          (status == null || t.status == status) &&
-                          taskInWindow(t, window, DateTime.now()),
+                      (p) =>
+                          !snapshot.value.any((t) => t.planId == p.id) &&
+                          widget.itemId == null &&
+                          (taxa == null ||
+                              p.taxonId == null ||
+                              taxonomy
+                                  .descendants(p.taxonId!)
+                                  .contains(selectedTaxon) ||
+                              taxa.contains(p.taxonId)) &&
+                          p.title.toLowerCase().contains(query.toLowerCase()),
                     )
                     .toList();
                 final seen = <String>{};
@@ -241,13 +481,22 @@ class _TasksState extends ConsumerState<TasksPane> {
                   children: [
                     SyncStatus(snapshot),
                     Expanded(
-                      child: entries.isEmpty
+                      child: entries.isEmpty && emptyPlans.isEmpty
                           ? const Center(
                               child: Text('No tasks match these filters.'),
                             )
                           : ListView(
                               padding: const EdgeInsets.only(bottom: 96),
                               children: [
+                                for (final plan in emptyPlans)
+                                  ListTile(
+                                    title: Text(plan.title),
+                                    subtitle: const Text(
+                                      'No matching targets yet · task saved',
+                                    ),
+                                    onTap: () =>
+                                        context.push('/task-groups/${plan.id}'),
+                                  ),
                                 for (final task in entries)
                                   if (task.groupId != null &&
                                       widget.itemId == null)
@@ -255,7 +504,7 @@ class _TasksState extends ConsumerState<TasksPane> {
                                       leading: const Icon(Icons.checklist),
                                       title: Text(task.title),
                                       subtitle: Text(
-                                        '${task.groupScope}\n${groupProgress(snapshot.value.where((t) => t.groupId == task.groupId).toList())}',
+                                        '${task.groupScope}\n${groupProgress(snapshot.value.where((t) => t.groupId == task.groupId && t.occurrenceOn == task.occurrenceOn).toList())}',
                                       ),
                                       trailing: const Icon(Icons.chevron_right),
                                       onTap: () => context.push(
@@ -290,6 +539,10 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
   DateTime? dueDate;
   String? error;
   bool busy = false;
+  RepeatSchedule repeat = RepeatSchedule.none;
+  ActivityType? eventType;
+  HarvestUnit eventUnit = HarvestUnit.kg;
+  final eventQuantity = TextEditingController();
   @override
   void initState() {
     super.initState();
@@ -306,6 +559,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
   void dispose() {
     title.dispose();
     notes.dispose();
+    eventQuantity.dispose();
     super.dispose();
   }
 
@@ -318,40 +572,61 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
       final sections = await ref.read(sectionsProvider.future);
       if (!mounted) return;
       final repo = ref.read(orchardRepositoryProvider);
-      if (target == '__group__') {
-        repo.saveTaskGroup(
-          groupPlantTasks(
-            propertyId: place.id,
-            title: title.text,
-            plants: plants.value,
-            taxonomy: ref.read(taxonomyProvider),
-            sections: sections.value,
-            newId: const Uuid().v4,
-            taxonId: scopeTaxon.isEmpty ? null : scopeTaxon,
-            sectionId: scopeSection.isEmpty ? null : scopeSection,
-            dueDate: dueDate == null ? null : calendarDate(dueDate!),
-            notes: notes.text,
-          ),
-        );
-      } else if (target == '__sections__' || target == '__crops__') {
+      if (target.startsWith('__') ||
+          repeat != RepeatSchedule.none ||
+          eventType != null) {
         final crops = await ref.read(cropsProvider.future);
-        if (!mounted) return;
-        repo.saveTaskGroup(
-          groupLayoutTasks(
-            propertyId: place.id,
-            title: title.text,
-            sections: sections.value,
-            crops: crops.value,
-            taxonomy: ref.read(taxonomyProvider),
-            newId: const Uuid().v4,
-            targetCrops: target == '__crops__',
-            kind: scopeKind,
-            sectionId: scopeSection.isEmpty ? null : scopeSection,
-            taxonId: scopeTaxon.isEmpty ? null : scopeTaxon,
-            dueDate: dueDate == null ? null : calendarDate(dueDate!),
-            notes: notes.text,
-          ),
+        final plan = TaskPlan(
+          id: const Uuid().v4(),
+          propertyId: place.id,
+          title: title.text,
+          createdAt: DateTime.now().toUtc(),
+          target: target == '__group__'
+              ? 'plants'
+              : target == '__sections__'
+              ? 'sections'
+              : target == '__crops__'
+              ? 'crops'
+              : target.startsWith('section:')
+              ? 'section'
+              : target.startsWith('crop:')
+              ? 'crop'
+              : target.isEmpty
+              ? 'property'
+              : 'plant',
+          itemId:
+              target.isEmpty || target.startsWith('__') || target.contains(':')
+              ? null
+              : target,
+          sectionId: target.startsWith('section:')
+              ? target.substring(8)
+              : scopeSection.isEmpty
+              ? null
+              : scopeSection,
+          cropId: target.startsWith('crop:') ? target.substring(5) : null,
+          taxonId: scopeTaxon.isEmpty ? null : scopeTaxon,
+          sectionKind: scopeKind,
+          dueDate: dueDate == null ? null : calendarDate(dueDate!),
+          repeat: repeat,
+          eventType: eventType,
+          eventHarvest: eventType == ActivityType.harvest
+              ? Harvest(double.parse(eventQuantity.text), eventUnit)
+              : null,
+          notes: notes.text,
         );
+        repo.saveTaskPlan(plan);
+        final existing = await ref.read(tasksProvider.future);
+        for (final task in expandPlans(
+          plans: [plan],
+          existing: existing.value,
+          plants: plants.value,
+          sections: sections.value,
+          crops: crops.value,
+          taxonomy: ref.read(taxonomyProvider),
+          now: DateTime.now(),
+        )) {
+          repo.saveTask(task);
+        }
       } else {
         repo.saveTask(
           OrchardTask(
@@ -369,6 +644,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
           ),
         );
       }
+      if (!mounted) return;
       if (context.canPop()) {
         context.pop();
       } else {
@@ -412,7 +688,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
           final choices = <String, String>{
             '': 'Whole property',
             '__group__': 'Group: all matching plants',
-            '__sections__': 'Group: areas / beds / rows',
+            '__sections__': 'Group: areas / rows',
             '__crops__': 'Group: seasonal crops',
             for (final p in snapshot.value)
               p.id:
@@ -493,8 +769,54 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                 ),
                 Text(
                   target == '__group__'
-                      ? '$count active plants will be included. New plants added later are not included automatically.'
-                      : '${target == '__sections__' ? sections.where((s) => s.kind == scopeKind && (sectionIds == null || sectionIds.contains(s.id))).length : crops.where((c) => c.status == CropStatus.growing && (taxonIds == null || taxonIds.contains(c.taxonId)) && (sectionIds == null || sectionIds.contains(c.sectionId))).length} targets will be included. Newly added targets are not included automatically.',
+                      ? '$count active plants will be included. New matching plants will be included automatically. Zero matches is valid.'
+                      : '${target == '__sections__' ? sections.where((s) => s.kind == scopeKind && (sectionIds == null || sectionIds.contains(s.id))).length : crops.where((c) => c.status == CropStatus.growing && (taxonIds == null || taxonIds.contains(c.taxonId)) && (sectionIds == null || sectionIds.contains(c.sectionId))).length} targets will be included. New matching targets will be included automatically. Zero matches is valid.',
+                ),
+              ],
+              DropdownButtonFormField<RepeatSchedule>(
+                initialValue: repeat,
+                decoration: const InputDecoration(labelText: 'Repeat'),
+                items: [
+                  for (final r in RepeatSchedule.values)
+                    DropdownMenuItem(value: r, child: Text(r.name)),
+                ],
+                onChanged: (r) => setState(() => repeat = r!),
+              ),
+              DropdownButtonFormField<String>(
+                initialValue: eventType?.name ?? '',
+                decoration: const InputDecoration(
+                  labelText: 'Create plant activity on completion (optional)',
+                ),
+                items: [
+                  const DropdownMenuItem(value: '', child: Text('No activity')),
+                  for (final t in ActivityType.values.where(
+                    (t) => t != ActivityType.photo,
+                  ))
+                    DropdownMenuItem(
+                      value: t.name,
+                      child: Text(activityLabel(t.name)),
+                    ),
+                ],
+                onChanged: (t) => setState(
+                  () => eventType = t == ''
+                      ? null
+                      : ActivityType.values.byName(t!),
+                ),
+              ),
+              if (eventType == ActivityType.harvest) ...[
+                TextField(
+                  controller: eventQuantity,
+                  decoration: const InputDecoration(
+                    labelText: 'Harvest quantity per completed plant',
+                  ),
+                ),
+                DropdownButtonFormField<HarvestUnit>(
+                  initialValue: eventUnit,
+                  items: [
+                    for (final u in HarvestUnit.values)
+                      DropdownMenuItem(value: u, child: Text(u.name)),
+                  ],
+                  onChanged: (u) => eventUnit = u!,
                 ),
               ],
               ListTile(

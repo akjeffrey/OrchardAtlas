@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../application/providers.dart';
 import 'common.dart';
 import 'sections_screen.dart';
+import '../domain/models.dart';
+import 'classification_picker.dart';
 
 class EditPlantScreen extends ConsumerStatefulWidget {
   const EditPlantScreen(this.itemId, {super.key});
@@ -19,7 +21,9 @@ class _EditState extends ConsumerState<EditPlantScreen> {
       nursery = TextEditingController(),
       notes = TextEditingController();
   bool initialized = false;
-  String? sectionId;
+  String? sectionId, taxonId;
+  final latitude = TextEditingController(), longitude = TextEditingController();
+  String? plantedOn;
   String? error;
   @override
   void dispose() {
@@ -27,6 +31,8 @@ class _EditState extends ConsumerState<EditPlantScreen> {
     rootstock.dispose();
     nursery.dispose();
     notes.dispose();
+    latitude.dispose();
+    longitude.dispose();
     super.dispose();
   }
 
@@ -45,6 +51,10 @@ class _EditState extends ConsumerState<EditPlantScreen> {
             if (plant == null) return const ErrorPanel('Plant unavailable');
             if (!initialized) {
               sectionId = plant.sectionId;
+              taxonId = plant.taxonId;
+              plantedOn = plant.plantedOn;
+              latitude.text = plant.location.latitude.toString();
+              longitude.text = plant.location.longitude.toString();
               name.text = plant.name;
               rootstock.text = plant.rootstock;
               nursery.text = plant.nursery;
@@ -54,13 +64,45 @@ class _EditState extends ConsumerState<EditPlantScreen> {
             return ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text(
-                  'Edit plant metadata. Recorded activities, planting date and captured position are preserved.',
-                ),
+                const Text('Edit plant details, classification and location.'),
                 TextField(
                   controller: name,
                   maxLength: 500,
                   decoration: const InputDecoration(labelText: 'Plant name'),
+                ),
+                ClassificationPicker(
+                  value: taxonId,
+                  onChanged: (id) => setState(() => taxonId = id),
+                ),
+                TextField(
+                  controller: latitude,
+                  decoration: const InputDecoration(labelText: 'Latitude'),
+                ),
+                TextField(
+                  controller: longitude,
+                  decoration: const InputDecoration(labelText: 'Longitude'),
+                ),
+                ListTile(
+                  title: const Text('Planting date'),
+                  subtitle: Text(plantedOn ?? 'Not recorded'),
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: plantedOn == null
+                          ? DateTime.now()
+                          : parseCalendarDate(plantedOn!),
+                      firstDate: DateTime(1800),
+                      lastDate: DateTime(2100),
+                    );
+                    if (date != null && mounted) {
+                      setState(() => plantedOn = calendarDate(date));
+                    }
+                  },
+                  trailing: IconButton(
+                    tooltip: 'Clear planting date',
+                    icon: const Icon(Icons.clear),
+                    onPressed: () => setState(() => plantedOn = null),
+                  ),
                 ),
                 SectionPicker(
                   value: sectionId,
@@ -88,12 +130,30 @@ class _EditState extends ConsumerState<EditPlantScreen> {
                 FilledButton(
                   onPressed: () {
                     try {
-                      // Use the latest stream value so a simultaneous archive is preserved.
+                      if (taxonId == null ||
+                          !ref
+                              .read(taxonomyProvider)
+                              .isPlantIdentity(taxonId!)) {
+                        throw ArgumentError('Select a Variety');
+                      }
                       ref
                           .read(orchardRepositoryProvider)
                           .updatePlant(
                             plant.copyWith(
                               name: name.text,
+                              taxonId: taxonId,
+                              location: Coordinates(
+                                double.parse(latitude.text),
+                                double.parse(longitude.text),
+                              ),
+                              plantedOn: plantedOn,
+                              clearPlantedOn: plantedOn == null,
+                              clearAccuracy:
+                                  latitude.text !=
+                                      plant.location.latitude.toString() ||
+                                  longitude.text !=
+                                      plant.location.longitude.toString(),
+                              clearRowOrder: sectionId != plant.sectionId,
                               rootstock: rootstock.text,
                               nursery: nursery.text,
                               notes: notes.text,

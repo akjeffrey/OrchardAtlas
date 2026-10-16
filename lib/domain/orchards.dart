@@ -3,6 +3,7 @@ import 'models.dart';
 abstract interface class OrchardDirectoryRepository {
   Stream<List<Place>> watchPlaces(String userId);
   Future<Place> createPlace(String userId, String name);
+  Future<Place> renamePlace(String userId, String placeId, String name);
   Future<void> selectPlace(String userId, String placeId);
 }
 
@@ -32,6 +33,8 @@ class OrchardMapView {
 }
 
 abstract interface class MapViewRepository {
+  Future<String?> loadTaskSort(String userId);
+  Future<void> saveTaskSort(String userId, String value);
   Future<OrchardMapView?> load(String userId, String orchardId);
   Future<void> save(String userId, String orchardId, OrchardMapView view);
 }

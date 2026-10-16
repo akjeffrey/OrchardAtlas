@@ -1,6 +1,11 @@
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
+import '../domain/work.dart';
+import 'work_mapping.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -13,7 +18,8 @@ import 'firestore_mapping.dart';
 
 class FirestoreOrchardRepository
     implements OrchardRepository, OrchardDirectoryRepository {
-  FirestoreOrchardRepository(this.firestore, this.preferences);
+  FirestoreOrchardRepository(this.firestore, this.preferences, {this.storage});
+  final FirebaseStorage? storage;
   final FirebaseFirestore firestore;
   final SharedPreferences preferences;
   final _pendingPlaces = <String, Place>{};
@@ -82,7 +88,7 @@ class FirestoreOrchardRepository
     } else {
       place = Place(
         id: const Uuid().v4(),
-        name: 'My orchard',
+        name: 'Home Orchard',
         ownerId: userId,
         createdAt: DateTime.now().toUtc(),
       );
@@ -132,6 +138,25 @@ class FirestoreOrchardRepository
           .whenComplete(() => _pendingPlaces.remove(place.id)),
     );
     return place;
+  }
+
+  @override
+  Future<Place> renamePlace(String userId, String placeId, String name) async {
+    final doc = await _cachedProperty(
+      firestore.collection('properties').doc(placeId),
+    );
+    final old = FirestoreMapping.placeFromMap(doc.id, doc.data()!);
+    if (old.ownerId != userId) {
+      throw StateError('Orchard belongs to another user');
+    }
+    final renamed = Place(
+      id: old.id,
+      name: name,
+      ownerId: old.ownerId,
+      createdAt: old.createdAt,
+    );
+    _observe(placeId, doc.reference.update({'name': renamed.name}));
+    return renamed;
   }
 
   @override
@@ -250,12 +275,50 @@ class FirestoreOrchardRepository
         .set(FirestoreMapping.eventToMap(event)),
   );
   @override
-  void updatePlant(ManagedPlant plant) => _observe(
-    plant.id,
-    _items(plant.propertyId)
-        .doc(plant.id)
-        .update(FirestoreMapping.editablePlantToMap(plant)),
-  );
+  void updatePlant(ManagedPlant plant) =>
+      _observe(plant.id, _updatePlant(plant));
+  Future<void> _updatePlant(ManagedPlant plant) async {
+    final item = _items(plant.propertyId).doc(plant.id);
+    final old = await item.get();
+    final batch = firestore.batch();
+    batch.update(item, FirestoreMapping.editablePlantToMap(plant));
+    if (old.data()?['plantedOn'] != plant.plantedOn) {
+      final history = await item
+          .collection('events')
+          .where('type', isEqualTo: 'planting')
+          .get();
+      final events = history.docs
+          .where((e) => e.data()['taskId'] == null)
+          .toList();
+      for (final e in events) {
+        batch.delete(e.reference);
+      }
+      if (plant.plantedOn != null) {
+        final owner = await _cachedProperty(
+          firestore.collection('properties').doc(plant.propertyId),
+        );
+        final id = events.firstOrNull?.id ?? const Uuid().v4();
+        final event = PlantEvent(
+          id: id,
+          propertyId: plant.propertyId,
+          itemId: plant.id,
+          authorId: owner.data()!['ownerId'] as String,
+          type: ActivityType.planting,
+          occurredAt: parseCalendarDate(plant.plantedOn!).toUtc(),
+          activityDate: plant.plantedOn!,
+          recordedAt: events.isEmpty
+              ? DateTime.now().toUtc()
+              : (events.first.data()['recordedAt'] as Timestamp).toDate(),
+        );
+        batch.set(
+          item.collection('events').doc(id),
+          FirestoreMapping.eventToMap(event),
+        );
+      }
+    }
+    await batch.commit();
+  }
+
   @override
   Stream<RepositorySnapshot<List<OrchardTask>>> watchTasks(String propertyId) =>
       firestore
@@ -387,6 +450,200 @@ class FirestoreOrchardRepository
       'cropHarvests',
     ).doc(harvest.id).set(LandscapeMapping.harvest(harvest, native: true)),
   );
+
+  @override
+  Stream<List<TaskPlan>> watchTaskPlans(String propertyId) =>
+      _collection(propertyId, 'taskPlans')
+          .snapshots(includeMetadataChanges: true)
+          .map(
+            (s) => [
+              for (final d in s.docs)
+                WorkMapping.readPlan(propertyId, d.id, d.data()),
+            ],
+          );
+  @override
+  void saveTaskPlan(TaskPlan plan) => _observe(
+    plan.id,
+    _collection(
+      plan.propertyId,
+      'taskPlans',
+    ).doc(plan.id).set(WorkMapping.plan(plan, native: true)),
+  );
+  @override
+  void saveTaskWithEvent(OrchardTask task, PlantEvent? event) {
+    if (event != null &&
+        (event.taskId != task.id ||
+            event.itemId != task.itemId ||
+            event.propertyId != task.propertyId)) {
+      throw ArgumentError('Invalid completion event');
+    }
+    final batch = firestore.batch();
+    batch.set(
+      _collection(task.propertyId, 'tasks').doc(task.id),
+      FirestoreMapping.taskToMap(task),
+    );
+    if (task.itemId != null) {
+      final reference = _items(task.propertyId)
+          .doc(task.itemId)
+          .collection('events')
+          .doc(linkedEventId(task.id));
+      if (event == null) {
+        batch.delete(reference);
+      } else {
+        batch.set(reference, FirestoreMapping.eventToMap(event));
+      }
+    }
+    _observe(task.id, batch.commit());
+  }
+
+  @override
+  void updateEvent(PlantEvent event) => _observe(
+    event.id,
+    _items(event.propertyId)
+        .doc(event.itemId)
+        .collection('events')
+        .doc(event.id)
+        .update(FirestoreMapping.eventToMap(event)),
+  );
+  @override
+  void deleteEvent(PlantEvent event) {
+    final batch = firestore.batch();
+    batch.delete(
+      _items(event.propertyId)
+          .doc(event.itemId)
+          .collection('events')
+          .doc(event.id),
+    );
+    if (event.taskId != null) {
+      batch.update(_collection(event.propertyId, 'tasks').doc(event.taskId), {
+        'status': 'open',
+        'completedOn': null,
+      });
+    }
+    _observe(event.id, batch.commit());
+  }
+
+  @override
+  void saveRowOrder(String propertyId, String sectionId, List<String> ids) {
+    if (ids.length > 400 || ids.toSet().length != ids.length) {
+      throw ArgumentError('Reorder at most 400 plants at once');
+    }
+    final batch = firestore.batch();
+    for (var i = 0; i < ids.length; i++) {
+      batch.update(_items(propertyId).doc(ids[i]), {'rowOrder': i.toDouble()});
+    }
+    _observe(sectionId, batch.commit());
+  }
+
+  Future<void> _removePlantFiles(
+    String propertyId,
+    DocumentSnapshot<Map<String, dynamic>> plant,
+  ) async {
+    final reference = plant.reference;
+    for (final child in ['events', 'photos']) {
+      final records = await reference
+          .collection(child)
+          .get(const GetOptions(source: Source.server));
+      for (final doc in records.docs) {
+        final path = doc.data()['storagePath'];
+        if (path is String) {
+          if (!path.startsWith('properties/$propertyId/')) {
+            throw StateError('Photo path does not belong to orchard');
+          }
+          if (storage == null) {
+            throw StateError('Photo storage is not configured');
+          }
+          try {
+            await storage!.ref(path).delete();
+          } on FirebaseException catch (e) {
+            if (e.code != 'object-not-found') rethrow;
+          }
+        }
+        await doc.reference.delete();
+      }
+    }
+    await reference.delete();
+  }
+
+  Future<void> _deleteTargets(
+    String propertyId,
+    Set<String> sectionIds,
+    Set<String> plantIds,
+    Set<String> cropIds,
+  ) async {
+    for (final collection in ['tasks', 'taskPlans', 'cropHarvests']) {
+      final records = await _collection(
+        propertyId,
+        collection,
+      ).get(const GetOptions(source: Source.server));
+      for (final d in records.docs) {
+        final v = d.data();
+        if (plantIds.contains(v['itemId']) ||
+            sectionIds.contains(v['sectionId']) ||
+            cropIds.contains(v['cropId'])) {
+          await d.reference.delete();
+        }
+      }
+    }
+    for (final id in plantIds) {
+      final plant = await _items(propertyId)
+          .doc(id)
+          .get(const GetOptions(source: Source.server));
+      if (plant.exists) await _removePlantFiles(propertyId, plant);
+    }
+    for (final id in cropIds) {
+      await _collection(propertyId, 'crops').doc(id).delete();
+    }
+    for (final id in sectionIds.toList().reversed) {
+      await _collection(propertyId, 'sections').doc(id).delete();
+    }
+    final remaining = await _collection(
+      propertyId,
+      'tasks',
+    ).get(const GetOptions(source: Source.server));
+    for (final d in remaining.docs) {
+      final v = d.data();
+      if (plantIds.contains(v['itemId']) ||
+          sectionIds.contains(v['sectionId']) ||
+          cropIds.contains(v['cropId'])) {
+        await d.reference.delete();
+      }
+    }
+  }
+
+  @override
+  Future<void> deletePlant(String propertyId, String id) =>
+      _deleteTargets(propertyId, {}, {id}, {});
+  @override
+  Future<void> deleteSection(String propertyId, String id) async {
+    final records = await _collection(
+      propertyId,
+      'sections',
+    ).get(const GetOptions(source: Source.server));
+    final sections = [
+      for (final d in records.docs)
+        LandscapeMapping.readSection(propertyId, d.id, d.data()),
+    ];
+    final ids = sectionDescendants(id, sections);
+    final plants = await _items(propertyId)
+        .get(const GetOptions(source: Source.server));
+    final crops = await _collection(
+      propertyId,
+      'crops',
+    ).get(const GetOptions(source: Source.server));
+    await _deleteTargets(
+      propertyId,
+      ids,
+      plants.docs
+          .where((p) => ids.contains(p.data()['sectionId']))
+          .map((p) => p.id)
+          .toSet(),
+      crops.docs
+          .where((c) => ids.contains(c.data()['sectionId']))
+          .map((c) => c.id)
+          .toSet(),
+    );
+  }
 
   @override
   Future<void> clearDeviceCache() async {

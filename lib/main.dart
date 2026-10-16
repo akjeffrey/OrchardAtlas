@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +18,9 @@ import 'ui/app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (defaultTargetPlatform == TargetPlatform.android) {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
   try {
     final mapsConfigured = await DeviceAddressSearchRepository.mapsConfigured();
     if (const bool.fromEnvironment('TRIAL_MODE')) {
@@ -83,7 +88,11 @@ Future<void> main() async {
             DeviceAddressSearchRepository(),
           ),
           orchardRepositoryProvider.overrideWithValue(
-            FirestoreOrchardRepository(firestore, preferences),
+            FirestoreOrchardRepository(
+              firestore,
+              preferences,
+              storage: FirebaseStorage.instance,
+            ),
           ),
           authRepositoryProvider.overrideWithValue(
             FirebaseAuthRepository(FirebaseAuth.instance),

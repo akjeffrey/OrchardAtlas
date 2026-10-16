@@ -8,10 +8,12 @@ import '../application/providers.dart';
 import '../domain/models.dart';
 import '../domain/landscape.dart';
 import 'common.dart';
-import 'layout_canvas.dart';
 import 'orchard_map.dart';
 import 'location_search.dart';
 import 'tasks_screen.dart';
+import 'section_style.dart';
+import '../domain/work.dart';
+import 'delete_actions.dart';
 
 String sectionPath(OrchardSection section, List<OrchardSection> sections) {
   final names = <String>[section.name], seen = <String>{section.id};
@@ -30,7 +32,7 @@ class SectionPicker extends ConsumerWidget {
     super.key,
     required this.value,
     required this.onChanged,
-    this.label = 'Area / bed / row',
+    this.label = 'Area / row',
     this.empty = 'Unassigned',
   });
   final String? value;
@@ -70,7 +72,7 @@ class SectionsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(
-      title: const Text('Areas, beds & rows'),
+      title: const Text('Areas & Rows'),
       leading: IconButton(
         tooltip: 'Back to map',
         icon: const Icon(Icons.arrow_back),
@@ -95,7 +97,7 @@ class SectionsScreen extends ConsumerWidget {
                 child: snapshot.value.isEmpty
                     ? const Center(
                         child: Text(
-                          'Add a bed, patch or row.\nThen assign plants and seasonal varieties.',
+                          'Add an Area or Row.\nThen assign plants and seasonal varieties.',
                           textAlign: TextAlign.center,
                         ),
                       )
@@ -104,7 +106,7 @@ class SectionsScreen extends ConsumerWidget {
                         children: [
                           SizedBox(
                             height: 240,
-                            child: LayoutCanvas(
+                            child: OrchardMap(
                               sections: snapshot.value,
                               onSection: (id) => context.push('/sections/$id'),
                             ),
@@ -146,6 +148,8 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
   final name = TextEditingController(), notes = TextEditingController();
   final points = <Coordinates>[];
   SectionKind kind = SectionKind.area;
+  int color = 0xff4caf50;
+  PlantSymbol? symbol;
   String? parentId, error;
   Coordinates? center;
   double span = 0.0005;
@@ -283,6 +287,8 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
         propertyId: place.id,
         name: name.text,
         kind: kind,
+        color: color,
+        symbol: symbol,
         parentId: parentId,
         notes: notes.text,
         vertices: points,
@@ -369,6 +375,8 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
               name.text = old.name;
               notes.text = old.notes;
               kind = old.kind;
+              color = old.color;
+              symbol = old.symbol;
               parentId = old.parentId;
               points.addAll(old.vertices);
               center = points.first;
@@ -410,9 +418,7 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
               DropdownButtonFormField<String>(
                 initialValue: parentId ?? '',
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Inside area / bed',
-                ),
+                decoration: const InputDecoration(labelText: 'Inside Area'),
                 items: [
                   const DropdownMenuItem(
                     value: '',
@@ -432,6 +438,12 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
                 onChanged: old != null
                     ? null
                     : (id) => setState(() => parentId = id == '' ? null : id),
+              ),
+              SectionStyleFields(
+                color: color,
+                symbol: symbol,
+                onColor: (v) => setState(() => color = v),
+                onSymbol: (v) => setState(() => symbol = v),
               ),
               const Text(
                 'Tap to add vertices in order. Areas close automatically. Edit a numbered vertex below to reposition it.',
@@ -510,7 +522,11 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
               for (var i = 0; i < points.length; i++)
                 ListTile(
                   title: Text(
-                    '${i + 1}: ${points[i].latitude.toStringAsFixed(7)}, ${points[i].longitude.toStringAsFixed(7)}',
+                    '${i + 1}${kind == SectionKind.row && i == 0
+                        ? ' (Start)'
+                        : kind == SectionKind.row && i == points.length - 1
+                        ? ' (Finish)'
+                        : ''}: ${points[i].latitude.toStringAsFixed(7)}, ${points[i].longitude.toStringAsFixed(7)}',
                   ),
                   onTap: () => point(i),
                   trailing: IconButton(
@@ -570,6 +586,11 @@ class SectionDetailScreen extends ConsumerWidget {
             final plants = (ref.watch(plantsProvider).valueOrNull?.value ?? [])
                 .where((p) => descendants.contains(p.sectionId))
                 .toList();
+            if (s.kind == SectionKind.row) {
+              plants.sort(
+                (a, b) => rowPosition(a, s).compareTo(rowPosition(b, s)),
+              );
+            }
             final crops = ref.watch(cropsProvider);
             return ListView(
               padding: const EdgeInsets.all(16),
@@ -579,11 +600,15 @@ class SectionDetailScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 Text(s.kind.name),
+                if (s.kind == SectionKind.row)
+                  Text(
+                    'Start: ${s.vertices.first.latitude}, ${s.vertices.first.longitude} → Finish: ${s.vertices.last.latitude}, ${s.vertices.last.longitude}',
+                  ),
                 Text(s.notes),
                 SyncStatus(snapshot),
                 SizedBox(
                   height: 220,
-                  child: LayoutCanvas(
+                  child: OrchardMap(
                     sections: snapshot.value
                         .where((x) => descendants.contains(x.id))
                         .toList(),
@@ -598,6 +623,11 @@ class SectionDetailScreen extends ConsumerWidget {
                     TextButton(
                       onPressed: () => context.push('/sections/$id/edit'),
                       child: const Text('Edit shape'),
+                    ),
+                    TextButton(
+                      onPressed: () =>
+                          deleteSectionWithConfirmation(context, ref, s),
+                      child: const Text('Delete permanently'),
                     ),
                     if (s.kind != SectionKind.row)
                       TextButton(
@@ -638,6 +668,56 @@ class SectionDetailScreen extends ConsumerWidget {
                 for (final p in plants)
                   ListTile(
                     title: Text(p.name),
+                    trailing: s.kind != SectionKind.row
+                        ? null
+                        : Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Move plant earlier',
+                                icon: const Icon(Icons.arrow_upward),
+                                onPressed: plants.indexOf(p) == 0
+                                    ? null
+                                    : () {
+                                        final ids = plants
+                                            .map((p) => p.id)
+                                            .toList();
+                                        final i = ids.indexOf(p.id);
+                                        ids.removeAt(i);
+                                        ids.insert(i - 1, p.id);
+                                        ref
+                                            .read(orchardRepositoryProvider)
+                                            .saveRowOrder(
+                                              s.propertyId,
+                                              s.id,
+                                              ids,
+                                            );
+                                      },
+                              ),
+                              IconButton(
+                                tooltip: 'Move plant later',
+                                icon: const Icon(Icons.arrow_downward),
+                                onPressed:
+                                    plants.indexOf(p) == plants.length - 1
+                                    ? null
+                                    : () {
+                                        final ids = plants
+                                            .map((p) => p.id)
+                                            .toList();
+                                        final i = ids.indexOf(p.id);
+                                        ids.removeAt(i);
+                                        ids.insert(i + 1, p.id);
+                                        ref
+                                            .read(orchardRepositoryProvider)
+                                            .saveRowOrder(
+                                              s.propertyId,
+                                              s.id,
+                                              ids,
+                                            );
+                                      },
+                              ),
+                            ],
+                          ),
                     subtitle: Text(
                       '${ref.watch(taxonomyProvider).taxa.where((t) => t.id == p.taxonId).firstOrNull?.name ?? 'Unknown classification'} · ${p.status.name}',
                     ),
