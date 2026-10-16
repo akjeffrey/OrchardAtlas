@@ -24,6 +24,8 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 
 ## Remaining product features
 
+- [ ] Plant location in rows/areas: when adding a plant to a row or area, default its location to that row or area's location.
+- [ ] Map markers for grouped plants: hide individual plant icons on the map when the plant belongs to a row or area; keep the parent row/area visible and the plants accessible through it.
 - [ ] Row endpoints and direction: explicitly track start (first point) and stop/finish point(s).
 - [ ] Default plant ordering within a row: sequence newly added row plants from the start toward the finish.
 - [ ] Manual row plant ordering: let users rearrange plants while viewing a row (for example, drag-and-drop or move up/down), and persist the revised order.
