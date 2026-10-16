@@ -6,10 +6,20 @@ import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platf
 
 /// Records native map commands while allowing native initialization to be delayed.
 class RecordingMapPlatform extends GoogleMapsFlutterPlatform {
-  final initialize = Completer<void>();
+  // Create the future inside the widget test zone, not its outer setUp zone.
+  late final initialize = Completer<void>();
   final cameras = <Object>[];
   final disposed = <int>[];
   final created = <int>{};
+  final pendingViews = <int, PlatformViewCreatedCallback>{};
+  void attachPendingViews() {
+    final views = Map<int, PlatformViewCreatedCallback>.of(pendingViews);
+    pendingViews.clear();
+    for (final entry in views.entries) {
+      entry.value(entry.key);
+    }
+  }
+
   @override
   Future<void> init(int mapId) => initialize.future;
   @override
@@ -21,9 +31,7 @@ class RecordingMapPlatform extends GoogleMapsFlutterPlatform {
     MapObjects mapObjects = const MapObjects(),
   }) {
     if (created.add(creationId)) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => onPlatformViewCreated(creationId),
-      );
+      pendingViews[creationId] = onPlatformViewCreated;
     }
     return const SizedBox.expand();
   }

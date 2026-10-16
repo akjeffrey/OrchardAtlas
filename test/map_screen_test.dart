@@ -54,6 +54,8 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    platform.attachPendingViews();
+    await tester.pumpAndSettle();
   }
 
   testWidgets(
