@@ -12,6 +12,7 @@ import 'package:orchard_atlas/domain/models.dart';
 import 'package:orchard_atlas/ui/map_screen.dart';
 import 'package:orchard_atlas/ui/plant_filters.dart';
 import 'package:orchard_atlas/ui/plant_symbols.dart';
+
 import 'support/recording_map_platform.dart';
 
 class _Addresses implements AddressSearchRepository {

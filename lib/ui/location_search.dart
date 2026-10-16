@@ -61,8 +61,7 @@ class _SearchState extends ConsumerState<_Search> {
     } catch (_) {
       if (mounted) {
         setState(
-          () => message =
-              'Address lookup is unavailable. Check your connection or enter latitude, longitude.',
+          () => message = 'Address lookup is unavailable. Check your connection or enter latitude, longitude.',
         );
       }
     } finally {

@@ -454,13 +454,11 @@ class _MapState extends ConsumerState<MapScreen>
                                         draft.add(p);
                                         locationMessage = null;
                                       } else {
-                                        locationMessage =
-                                            'Maximum 40 vertices. Undo a point to replace it.';
+                                        locationMessage = 'Maximum 40 vertices. Undo a point to replace it.';
                                       }
                                     } else {
                                       selected = p;
-                                      locationMessage =
-                                          'Map position selected for Add Plant.';
+                                      locationMessage = 'Map position selected for Add Plant.';
                                     }
                                   }),
                             onMoveVertex: drawing == null || saving
