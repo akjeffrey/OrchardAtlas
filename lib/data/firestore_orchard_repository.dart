@@ -5,15 +5,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/models.dart';
+import '../domain/orchards.dart';
 import '../domain/landscape.dart';
 import 'landscape_mapping.dart';
 import '../domain/repositories.dart';
 import 'firestore_mapping.dart';
 
-class FirestoreOrchardRepository implements OrchardRepository {
+class FirestoreOrchardRepository
+    implements OrchardRepository, OrchardDirectoryRepository {
   FirestoreOrchardRepository(this.firestore, this.preferences);
   final FirebaseFirestore firestore;
   final SharedPreferences preferences;
+  final _pendingPlaces = <String, Place>{};
   final _failures = StreamController<WriteFailure>.broadcast();
   @override
   Stream<WriteFailure> get writeFailures => _failures.stream;
@@ -54,6 +57,8 @@ class FirestoreOrchardRepository implements OrchardRepository {
     final key = 'default-place:$userId';
     final knownId = preferences.getString(key);
     if (knownId != null) {
+      final pending = _pendingPlaces[knownId];
+      if (pending != null && pending.ownerId == userId) return pending;
       final reference = firestore.collection('properties').doc(knownId);
       final doc = await _cachedProperty(reference);
       if (!doc.exists) {
@@ -91,6 +96,62 @@ class FirestoreOrchardRepository implements OrchardRepository {
     }
     await preferences.setString(key, place.id);
     return place;
+  }
+
+  @override
+  Stream<List<Place>> watchPlaces(String userId) => firestore
+      .collection('properties')
+      .where('ownerId', isEqualTo: userId)
+      .snapshots(includeMetadataChanges: true)
+      .map((snapshot) {
+        final places = <String, Place>{
+          for (final p in _pendingPlaces.values.where(
+            (p) => p.ownerId == userId,
+          ))
+            p.id: p,
+          for (final d in snapshot.docs)
+            d.id: FirestoreMapping.placeFromMap(d.id, d.data()),
+        }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
+        return places;
+      });
+  @override
+  Future<Place> createPlace(String userId, String name) async {
+    final place = Place(
+      id: const Uuid().v4(),
+      name: requiredText(name, 'Orchard name'),
+      ownerId: userId,
+      createdAt: DateTime.now().toUtc(),
+    );
+    _pendingPlaces[place.id] = place;
+    _observe(
+      place.id,
+      firestore
+          .collection('properties')
+          .doc(place.id)
+          .set(FirestoreMapping.placeToMap(place))
+          .whenComplete(() => _pendingPlaces.remove(place.id)),
+    );
+    return place;
+  }
+
+  @override
+  Future<void> selectPlace(String userId, String placeId) async {
+    final pending = _pendingPlaces[placeId];
+    final place =
+        pending ??
+        await () async {
+          final doc = await _cachedProperty(
+            firestore.collection('properties').doc(placeId),
+          );
+          if (!doc.exists) throw StateError('Orchard unavailable');
+          return FirestoreMapping.placeFromMap(doc.id, doc.data()!);
+        }();
+    if (place.ownerId != userId) {
+      throw StateError('Orchard belongs to another account');
+    }
+    if (!await preferences.setString('default-place:$userId', place.id)) {
+      throw StateError('Could not save orchard selection');
+    }
   }
 
   @override

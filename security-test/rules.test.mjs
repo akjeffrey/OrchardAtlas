@@ -234,3 +234,21 @@ test('section and crop group members complete independently and retain private s
   await assertFails(updateDoc(doc(db('alice'),rowTask), {sectionId:rowId}));
   await assertFails(setDoc(doc(db('alice'),`${propertyPath}/tasks/${harvestId}`), base));
 });
+
+test('multiple orchards remain owner scoped and records stay under their orchard', async () => {
+  const second = '00000000-0000-4000-8000-000000000090';
+  const foreign = '00000000-0000-4000-8000-000000000091';
+  const secondPath = `properties/${second}`;
+  const foreignPath = `properties/${foreign}`;
+  await assertSucceeds(setDoc(doc(db('alice'), secondPath), { schemaVersion: 1, ownerId: 'alice', name: 'North orchard', createdAt: now }));
+  await assertSucceeds(setDoc(doc(db('bob'), foreignPath), { schemaVersion: 1, ownerId: 'bob', name: 'Private orchard', createdAt: now }));
+  await assertSucceeds(setDoc(doc(db('alice'), `${secondPath}/items/${item}`), { ...plant, name: 'North apple' }));
+  const owned = await assertSucceeds(getDocs(query(collection(db('alice'), 'properties'), where('ownerId', '==', 'alice'))));
+  if (owned.size !== 2) throw new Error('Owner query must return only the two owned orchards');
+  const firstPlant = await assertSucceeds(getDoc(doc(db('alice'), itemPath)));
+  const secondPlant = await assertSucceeds(getDoc(doc(db('alice'), `${secondPath}/items/${item}`)));
+  if (firstPlant.data().name === secondPlant.data().name) throw new Error('Records at different orchard paths must remain independent');
+  await assertFails(getDoc(doc(db('alice'), foreignPath)));
+  await assertFails(getDocs(collection(db('bob'), `${secondPath}/items`)));
+  await assertFails(setDoc(doc(db('alice'), `${foreignPath}/items/${event}`), plant));
+});

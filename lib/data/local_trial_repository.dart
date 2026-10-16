@@ -1,6 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:uuid/uuid.dart';
+
+import '../domain/orchards.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
@@ -11,9 +15,11 @@ import '../domain/taxonomy.dart';
 import 'firestore_mapping.dart';
 
 /// Explicit phone-trial storage; never connects to a Firebase project.
-class LocalTrialRepository implements OrchardRepository {
+class LocalTrialRepository
+    implements OrchardRepository, OrchardDirectoryRepository {
   LocalTrialRepository._(
     this.preferences,
+    this.recordKey,
     this.place,
     this.plants,
     this.events,
@@ -24,6 +30,10 @@ class LocalTrialRepository implements OrchardRepository {
     this.cropHarvests,
   );
   final SharedPreferences preferences;
+  final String recordKey;
+  final _children = <String, LocalTrialRepository>{};
+  final _childFailures = <StreamSubscription<WriteFailure>>[];
+  static const catalogKey = "orchard-atlas-trial-orchards";
   final Place place;
   final List<ManagedPlant> plants;
   final List<PlantEvent> events;
@@ -39,17 +49,25 @@ class LocalTrialRepository implements OrchardRepository {
   static const storageKey = 'orchard-atlas-phone-trial-v1';
   static const userId = 'local-phone-trial';
 
-  static LocalTrialRepository open(SharedPreferences preferences) {
-    final raw = preferences.getString(storageKey);
+  static LocalTrialRepository open(
+    SharedPreferences preferences, {
+    Place? orchard,
+  }) {
+    final recordKey = orchard == null
+        ? storageKey
+        : "$storageKey:orchard:${orchard.id}";
+    final raw = preferences.getString(recordKey);
     final data = raw == null ? null : jsonDecode(raw) as Map<String, dynamic>;
-    final place = Place(
-      id: '38a0fbb0-6a36-4a48-8d17-000000000101',
-      name: 'Trial orchard',
-      ownerId: userId,
-      createdAt: data == null
-          ? DateTime.now().toUtc()
-          : DateTime.parse(data['createdAt'] as String),
-    );
+    final place =
+        orchard ??
+        Place(
+          id: '38a0fbb0-6a36-4a48-8d17-000000000101',
+          name: 'Trial orchard',
+          ownerId: userId,
+          createdAt: data == null
+              ? DateTime.now().toUtc()
+              : DateTime.parse(data['createdAt'] as String),
+        );
     final plants = <ManagedPlant>[
       for (final p in data?['plants'] as List? ?? [])
         ManagedPlant(
@@ -118,6 +136,7 @@ class LocalTrialRepository implements OrchardRepository {
     ];
     return LocalTrialRepository._(
       preferences,
+      recordKey,
       place,
       plants,
       events,
@@ -165,7 +184,82 @@ class LocalTrialRepository implements OrchardRepository {
   }
 
   @override
-  Future<Place> openDefaultPlace(String userId) async => place;
+  Future<Place> openDefaultPlace(String userId) async {
+    _owner(userId);
+    final selected = preferences.getString('trial-selected:$userId');
+    return _places.where((p) => p.id == selected).firstOrNull ?? place;
+  }
+
+  void _owner(String userId) {
+    if (userId != LocalTrialRepository.userId) {
+      throw StateError('Wrong trial user');
+    }
+  }
+
+  List<Place> get _places => [
+    place,
+    for (final p
+        in jsonDecode(preferences.getString(catalogKey) ?? '[]') as List)
+      Place(
+        id: p['id'] as String,
+        name: p['name'] as String,
+        ownerId: userId,
+        createdAt: DateTime.parse(p['createdAt'] as String),
+      ),
+  ];
+  LocalTrialRepository _for(String id) {
+    if (id == place.id) return this;
+    return _children.putIfAbsent(id, () {
+      final target = _places.where((p) => p.id == id).firstOrNull;
+      if (target == null) throw ArgumentError('Unknown orchard');
+      final child = LocalTrialRepository.open(preferences, orchard: target);
+      _childFailures.add(child.writeFailures.listen(_failures.add));
+      return child;
+    });
+  }
+
+  @override
+  Stream<List<Place>> watchPlaces(String userId) {
+    _owner(userId);
+    return _watch(() => _places).map((s) => s.value);
+  }
+
+  @override
+  Future<Place> createPlace(String userId, String name) async {
+    _owner(userId);
+    final created = Place(
+      id: const Uuid().v4(),
+      name: requiredText(name, 'Orchard name'),
+      ownerId: userId,
+      createdAt: DateTime.now().toUtc(),
+    );
+    final places = [..._places.skip(1), created];
+    if (!await preferences.setString(
+      catalogKey,
+      jsonEncode([
+        for (final p in places)
+          {
+            'id': p.id,
+            'name': p.name,
+            'createdAt': p.createdAt.toIso8601String(),
+          },
+      ]),
+    )) {
+      throw StateError('Could not save orchard');
+    }
+    _changes.add(null);
+    return created;
+  }
+
+  @override
+  Future<void> selectPlace(String userId, String placeId) async {
+    _owner(userId);
+    _for(placeId);
+    if (!await preferences.setString('trial-selected:$userId', placeId)) {
+      throw StateError('Could not save orchard selection');
+    }
+  }
+
   Stream<RepositorySnapshot<List<T>>> _watch<T>(List<T> Function() read) =>
       Stream.multi((controller) {
         void emit() => controller.add(
@@ -182,22 +276,28 @@ class LocalTrialRepository implements OrchardRepository {
   @override
   Stream<RepositorySnapshot<List<ManagedPlant>>> watchPlants(
     String propertyId,
-  ) => _watch(
-    () =>
-        plants.where((p) => p.propertyId == propertyId).toList()
-          ..sort((a, b) => a.name.compareTo(b.name)),
-  );
+  ) => propertyId != place.id
+      ? _for(propertyId).watchPlants(propertyId)
+      : _watch(
+          () =>
+              plants.where((p) => p.propertyId == propertyId).toList()
+                ..sort((a, b) => a.name.compareTo(b.name)),
+        );
   @override
   Stream<RepositorySnapshot<List<PlantEvent>>> watchEvents(
     String propertyId,
     String itemId,
-  ) => _watch(
-    () =>
-        events
-            .where((e) => e.propertyId == propertyId && e.itemId == itemId)
-            .toList()
-          ..sort((a, b) => b.activityDate.compareTo(a.activityDate)),
-  );
+  ) => propertyId != place.id
+      ? _for(propertyId).watchEvents(propertyId, itemId)
+      : _watch(
+          () =>
+              events
+                  .where(
+                    (e) => e.propertyId == propertyId && e.itemId == itemId,
+                  )
+                  .toList()
+                ..sort((a, b) => b.activityDate.compareTo(a.activityDate)),
+        );
   @override
   Stream<WriteFailure> get writeFailures => _failures.stream;
 
@@ -264,7 +364,7 @@ class LocalTrialRepository implements OrchardRepository {
     _changes.add(null);
     _writes = _writes.then((_) async {
       try {
-        if (!await preferences.setString(storageKey, json)) {
+        if (!await preferences.setString(recordKey, json)) {
           throw StateError('Device storage rejected write');
         }
       } catch (_) {
@@ -283,6 +383,10 @@ class LocalTrialRepository implements OrchardRepository {
 
   @override
   void savePlant(ManagedPlant plant, {PlantEvent? plantingEvent}) {
+    if (plant.propertyId != place.id) {
+      return _for(plant.propertyId)
+          .savePlant(plant, plantingEvent: plantingEvent);
+    }
     if (plant.propertyId != place.id) {
       throw ArgumentError('Unknown trial property');
     }
@@ -304,10 +408,14 @@ class LocalTrialRepository implements OrchardRepository {
   }
 
   @override
-  Stream<List<Taxon>> watchTaxa(String propertyId) =>
-      _watch(() => List<Taxon>.of(taxa)).map((s) => s.value);
+  Stream<List<Taxon>> watchTaxa(String propertyId) => propertyId != place.id
+      ? _for(propertyId).watchTaxa(propertyId)
+      : _watch(() => List<Taxon>.of(taxa)).map((s) => s.value);
   @override
   void saveTaxon(String propertyId, Taxon taxon) {
+    if (propertyId != place.id) {
+      return _for(propertyId).saveTaxon(propertyId, taxon);
+    }
     if (propertyId != place.id) throw ArgumentError('Unknown property');
     Taxonomy([...starterTaxonomy.taxa, ...taxa, taxon]);
     taxa.add(taxon);
@@ -316,6 +424,9 @@ class LocalTrialRepository implements OrchardRepository {
 
   @override
   void appendEvent(PlantEvent event) {
+    if (event.propertyId != place.id) {
+      return _for(event.propertyId).appendEvent(event);
+    }
     if (!plants.any(
       (p) => p.id == event.itemId && p.propertyId == event.propertyId,
     )) {
@@ -330,6 +441,9 @@ class LocalTrialRepository implements OrchardRepository {
 
   @override
   void updatePlant(ManagedPlant plant) {
+    if (plant.propertyId != place.id) {
+      return _for(plant.propertyId).updatePlant(plant);
+    }
     final index = plants.indexWhere(
       (p) => p.id == plant.id && p.propertyId == plant.propertyId,
     );
@@ -355,12 +469,14 @@ class LocalTrialRepository implements OrchardRepository {
 
   @override
   Stream<RepositorySnapshot<List<OrchardTask>>> watchTasks(String propertyId) =>
-      _watch(
-        () => tasks.where((t) => t.propertyId == propertyId).toList()
-          ..sort(
-            (a, b) => (a.dueDate ?? '9999').compareTo(b.dueDate ?? '9999'),
-          ),
-      );
+      propertyId != place.id
+      ? _for(propertyId).watchTasks(propertyId)
+      : _watch(
+          () => tasks.where((t) => t.propertyId == propertyId).toList()
+            ..sort(
+              (a, b) => (a.dueDate ?? '9999').compareTo(b.dueDate ?? '9999'),
+            ),
+        );
   void _validateTask(OrchardTask task) {
     if (task.propertyId != place.id ||
         (task.itemId != null && !plants.any((p) => p.id == task.itemId)) ||
@@ -386,6 +502,9 @@ class LocalTrialRepository implements OrchardRepository {
 
   @override
   void saveTask(OrchardTask task) {
+    if (task.propertyId != place.id) {
+      return _for(task.propertyId).saveTask(task);
+    }
     _validateTask(task);
     final index = tasks.indexWhere((t) => t.id == task.id);
     if (index < 0) {
@@ -398,6 +517,13 @@ class LocalTrialRepository implements OrchardRepository {
 
   @override
   void saveTaskGroup(List<OrchardTask> group) {
+    if (group.isNotEmpty &&
+        group.any((t) => t.propertyId != group.first.propertyId)) {
+      throw ArgumentError('Group must belong to one orchard');
+    }
+    if (group.isNotEmpty && group.first.propertyId != place.id) {
+      return _for(group.first.propertyId).saveTaskGroup(group);
+    }
     if (group.isEmpty ||
         group.length > 400 ||
         group.first.groupId == null ||
@@ -421,9 +547,16 @@ class LocalTrialRepository implements OrchardRepository {
   @override
   Stream<RepositorySnapshot<List<OrchardSection>>> watchSections(
     String propertyId,
-  ) => _watch(() => sections.where((s) => s.propertyId == propertyId).toList());
+  ) => propertyId != place.id
+      ? _for(propertyId).watchSections(propertyId)
+      : _watch(
+          () => sections.where((s) => s.propertyId == propertyId).toList(),
+        );
   @override
   void saveSection(OrchardSection section) {
+    if (section.propertyId != place.id) {
+      return _for(section.propertyId).saveSection(section);
+    }
     if (section.propertyId != place.id) throw ArgumentError('Unknown property');
     validateSectionParent(section, sections);
     final index = sections.indexWhere((s) => s.id == section.id);
@@ -444,9 +577,14 @@ class LocalTrialRepository implements OrchardRepository {
   @override
   Stream<RepositorySnapshot<List<CropPlanting>>> watchCrops(
     String propertyId,
-  ) => _watch(() => crops.where((c) => c.propertyId == propertyId).toList());
+  ) => propertyId != place.id
+      ? _for(propertyId).watchCrops(propertyId)
+      : _watch(() => crops.where((c) => c.propertyId == propertyId).toList());
   @override
   void saveCrop(CropPlanting crop) {
+    if (crop.propertyId != place.id) {
+      return _for(crop.propertyId).saveCrop(crop);
+    }
     if (crop.propertyId != place.id ||
         !sections.any((s) => s.id == crop.sectionId)) {
       throw ArgumentError('Unknown crop section');
@@ -475,11 +613,16 @@ class LocalTrialRepository implements OrchardRepository {
   @override
   Stream<RepositorySnapshot<List<CropHarvest>>> watchCropHarvests(
     String propertyId,
-  ) => _watch(
-    () => cropHarvests.where((h) => h.propertyId == propertyId).toList(),
-  );
+  ) => propertyId != place.id
+      ? _for(propertyId).watchCropHarvests(propertyId)
+      : _watch(
+          () => cropHarvests.where((h) => h.propertyId == propertyId).toList(),
+        );
   @override
   void appendCropHarvest(CropHarvest harvest) {
+    if (harvest.propertyId != place.id) {
+      return _for(harvest.propertyId).appendCropHarvest(harvest);
+    }
     if (harvest.propertyId != place.id ||
         !crops.any((c) => c.id == harvest.cropId) ||
         cropHarvests.any((h) => h.id == harvest.id)) {
@@ -497,7 +640,18 @@ class LocalTrialRepository implements OrchardRepository {
   @override
   Future<void> clearDeviceCache() async {
     await _writes;
-    await preferences.remove(storageKey);
+    for (final p in _places.skip(1)) {
+      await _children[p.id]?._writes;
+      await preferences.remove('$storageKey:orchard:${p.id}');
+    }
+    for (final subscription in _childFailures) {
+      await subscription.cancel();
+    }
+    _childFailures.clear();
+    _children.clear();
+    await preferences.remove(catalogKey);
+    await preferences.remove('trial-selected:$userId');
+    await preferences.remove(recordKey);
     plants.clear();
     events.clear();
     taxa.clear();

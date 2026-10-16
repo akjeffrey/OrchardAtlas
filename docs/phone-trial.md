@@ -22,6 +22,23 @@ only replace an installation after preserving the data or deciding it is disposa
 The artifact includes `SHA256SUMS.txt` for checking that the transferred APK matches.
 Artifacts expire after 14 days; a new branch push builds another trial.
 
+## Trial 0.5: multiple orchards and saved map views
+
+- Open **Orchard options → Select orchard** to create or select an orchard. The last
+  selection is remembered on this device. Plants, activities, tasks, areas, rows,
+  seasonal crops, harvests and custom taxonomy stay within that orchard.
+- **Orchard options → Map settings → Set current view as default** saves location,
+  zoom, bearing/tilt and full-screen/data mode for this orchard. Restart to restore
+  that view. Different orchards can have different defaults. Preferences are local
+  to the device/user; they are not synchronized to other devices.
+- Start **Add row / Add area** without losing the map's location or zoom. Use the
+  visible **Back to map** arrow to leave drawing; nonempty drafts need confirmation.
+  Saving/cancelling restores the preceding display mode. The separate area/row
+  editor also receives the map's current camera when opened through the layout list.
+- Existing trial records remain in **Trial orchard**. Additional orchards get
+  independent snapshots. This storage upgrade does not move or erase old records.
+- [Feature backlog](FEATURE_BACKLOG.md) is the ongoing list of planned work.
+
 ## Trial 0.4: satellite map, drawing and location search
 
 - **Map** defaults to Google satellite imagery in both trial and connected modes.

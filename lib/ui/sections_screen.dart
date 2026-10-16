@@ -65,12 +65,20 @@ class SectionPicker extends ConsumerWidget {
 }
 
 class SectionsScreen extends ConsumerWidget {
-  const SectionsScreen({super.key});
+  const SectionsScreen({super.key, this.initialCamera});
+  final CameraPosition? initialCamera;
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Areas, beds & rows')),
+    appBar: AppBar(
+      title: const Text('Areas, beds & rows'),
+      leading: IconButton(
+        tooltip: 'Back to map',
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.go('/'),
+      ),
+    ),
     floatingActionButton: FloatingActionButton.extended(
-      onPressed: () => context.push('/sections/new'),
+      onPressed: () => context.push('/sections/new', extra: initialCamera),
       icon: const Icon(Icons.add),
       label: const Text('Add area or row'),
     ),
@@ -122,7 +130,13 @@ class SectionsScreen extends ConsumerWidget {
 }
 
 class SectionFormScreen extends ConsumerStatefulWidget {
-  const SectionFormScreen({super.key, this.sectionId, this.parentId});
+  const SectionFormScreen({
+    super.key,
+    this.sectionId,
+    this.parentId,
+    this.initialCamera,
+  });
+  final CameraPosition? initialCamera;
   final String? sectionId, parentId;
   @override
   ConsumerState<SectionFormScreen> createState() => _SectionFormState();
@@ -141,8 +155,14 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
   void initState() {
     super.initState();
     parentId = widget.parentId;
+    final initial = widget.initialCamera;
+    if (initial != null) {
+      center = Coordinates(initial.target.latitude, initial.target.longitude);
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && widget.sectionId == null) locate();
+      if (mounted && widget.sectionId == null && widget.initialCamera == null) {
+        locate();
+      }
     });
   }
 
@@ -278,11 +298,41 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
     }
   }
 
+  Future<void> backToMap() async {
+    if (busy) return;
+    if (points.isNotEmpty || name.text.trim().isNotEmpty) {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Leave area / row editor?'),
+          content: const Text('Unsaved changes will be discarded.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Keep editing'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Back to map'),
+            ),
+          ],
+        ),
+      );
+      if (discard != true || !mounted) return;
+    }
+    if (mounted) context.go('/');
+  }
+
   @override
   Widget build(BuildContext context) {
     final data = ref.watch(sectionsProvider);
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          tooltip: 'Back to map',
+          icon: const Icon(Icons.arrow_back),
+          onPressed: busy ? null : backToMap,
+        ),
         actions: [
           IconButton(
             tooltip: 'Search map location',
@@ -392,13 +442,18 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
                   sections: snapshot.value
                       .where((s) => s.id != old?.id)
                       .toList(),
+                  initialCamera: widget.initialCamera,
                   draft: List.of(points),
                   draftKind: kind,
                   center: center,
                   span: span,
                   onMapCreated: (c) {
                     map = c;
-                    if (center != null) {
+                    if (widget.initialCamera != null) {
+                      c.animateCamera(
+                        CameraUpdate.newCameraPosition(widget.initialCamera!),
+                      );
+                    } else if (center != null) {
                       c.animateCamera(
                         CameraUpdate.newLatLngZoom(
                           LatLng(center!.latitude, center!.longitude),
@@ -489,12 +544,19 @@ class SectionDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
     appBar: AppBar(
-      title: const Text('Area / row detail'),
       leading: IconButton(
-        tooltip: 'All areas',
-        onPressed: () => context.go('/layout'),
+        tooltip: 'Back to map',
         icon: const Icon(Icons.arrow_back),
+        onPressed: () => context.go('/'),
       ),
+      title: const Text('Area / row detail'),
+      actions: [
+        IconButton(
+          tooltip: 'All areas',
+          onPressed: () => context.go('/layout'),
+          icon: const Icon(Icons.list),
+        ),
+      ],
     ),
     body: ref
         .watch(sectionsProvider)

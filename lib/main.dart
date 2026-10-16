@@ -11,6 +11,7 @@ import 'data/firestore_orchard_repository.dart';
 import 'data/local_trial_repository.dart';
 import 'data/platform_repositories.dart';
 import 'data/map_services.dart';
+import 'data/map_view_repository.dart';
 import 'ui/app.dart';
 
 Future<void> main() async {
@@ -22,6 +23,9 @@ Future<void> main() async {
       runApp(
         ProviderScope(
           overrides: [
+            mapViewRepositoryProvider.overrideWithValue(
+              DeviceMapViewRepository(preferences),
+            ),
             mapsConfiguredProvider.overrideWithValue(mapsConfigured),
             addressSearchRepositoryProvider.overrideWithValue(
               DeviceAddressSearchRepository(),
@@ -71,6 +75,9 @@ Future<void> main() async {
     runApp(
       ProviderScope(
         overrides: [
+          mapViewRepositoryProvider.overrideWithValue(
+            DeviceMapViewRepository(preferences),
+          ),
           mapsConfiguredProvider.overrideWithValue(mapsConfigured),
           addressSearchRepositoryProvider.overrideWithValue(
             DeviceAddressSearchRepository(),

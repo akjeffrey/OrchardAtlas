@@ -9,6 +9,9 @@ import 'package:orchard_atlas/data/local_trial_repository.dart';
 import 'package:orchard_atlas/domain/landscape.dart';
 import 'package:orchard_atlas/domain/map_search.dart';
 import 'package:orchard_atlas/domain/models.dart';
+import 'package:orchard_atlas/domain/orchards.dart';
+import 'package:orchard_atlas/data/map_view_repository.dart';
+import 'package:orchard_atlas/ui/sections_screen.dart';
 import 'package:orchard_atlas/ui/map_screen.dart';
 import 'package:orchard_atlas/ui/plant_filters.dart';
 import 'package:orchard_atlas/ui/plant_symbols.dart';
@@ -40,7 +43,7 @@ void main() {
   });
   tearDown(() => GoogleMapsFlutterPlatform.instance = previous);
 
-  Future<void> show(WidgetTester tester) async {
+  Future<void> show(WidgetTester tester, {OrchardMapView? initialView}) async {
     SharedPreferences.setMockInitialValues({});
     repo = LocalTrialRepository.open(await SharedPreferences.getInstance());
     platform.initialize.complete();
@@ -51,6 +54,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          mapViewRepositoryProvider.overrideWithValue(
+            DeviceMapViewRepository(await SharedPreferences.getInstance()),
+          ),
           trialModeProvider.overrideWithValue(true),
           mapsConfiguredProvider.overrideWithValue(true),
           orchardRepositoryProvider.overrideWithValue(repo),
@@ -58,7 +64,12 @@ void main() {
           addressSearchRepositoryProvider.overrideWithValue(addresses),
           markerSymbolsProvider.overrideWith((ref) async => {}),
         ],
-        child: MaterialApp(home: MapScreen(focus: Coordinates(51, 1))),
+        child: MaterialApp(
+          home: MapScreen(
+            focus: initialView == null ? Coordinates(51, 1) : null,
+            initialView: initialView,
+          ),
+        ),
       ),
     );
     await tester.pumpAndSettle();
@@ -230,6 +241,112 @@ void main() {
         platform.cameras.last,
         CameraUpdate.newLatLngZoom(const LatLng(45, -75), 19).toJson(),
       );
+    },
+    timeout: const Timeout(Duration(minutes: 1)),
+  );
+  testWidgets('drawing preserves camera and Back to map restores data mode', (
+    tester,
+  ) async {
+    await show(tester);
+    const position = CameraPosition(
+      target: LatLng(52, 2),
+      zoom: 16.5,
+      bearing: 40,
+      tilt: 20,
+    );
+    tester.widget<GoogleMap>(find.byType(GoogleMap)).onCameraMove!(position);
+    await tester.tap(find.text('Add row'));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<GoogleMap>(find.byType(GoogleMap)).initialCameraPosition,
+      position,
+    );
+    expect(platform.disposed, isEmpty);
+    await tester.tap(find.byTooltip('Back to map'));
+    await tester.pumpAndSettle();
+    expect(find.byType(TabBar), findsOneWidget);
+    expect(find.byType(PlantFilterBar), findsOneWidget);
+    expect(find.text('Add row'), findsOneWidget);
+    expect(
+      tester.widget<GoogleMap>(find.byType(GoogleMap)).initialCameraPosition,
+      position,
+    );
+    expect(platform.disposed, isEmpty);
+  }, timeout: const Timeout(Duration(minutes: 1)));
+
+  testWidgets(
+    'Map settings saves camera and startup restores default view and display mode',
+    (tester) async {
+      final view = OrchardMapView(
+        center: Coordinates(52, 2),
+        zoom: 16.5,
+        bearing: 40,
+        tilt: 20,
+        fullScreen: true,
+      );
+      await show(tester, initialView: view);
+      expect(find.byType(PlantFilterBar), findsNothing);
+      final map = tester.widget<GoogleMap>(find.byType(GoogleMap));
+      expect(map.initialCameraPosition.target, const LatLng(52, 2));
+      expect(map.initialCameraPosition.zoom, 16.5);
+      expect(map.initialCameraPosition.bearing, 40);
+      await tester.tap(find.byTooltip('Orchard options'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Map settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Set current view as default'));
+      await tester.pumpAndSettle();
+      await tester.runAsync(() async {
+        final saved = await DeviceMapViewRepository(
+          await SharedPreferences.getInstance(),
+        ).load(LocalTrialRepository.userId, repo.place.id);
+        expect(saved!.zoom, 16.5);
+        expect(saved.fullScreen, isTrue);
+        expect(saved.tilt, 20);
+      });
+      expect(find.textContaining('Default map view saved'), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(minutes: 1)),
+  );
+
+  testWidgets(
+    'separate section editor starts at supplied camera instead of auto GPS',
+    (tester) async {
+      await show(tester);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      const position = CameraPosition(
+        target: LatLng(52, 2),
+        zoom: 16.5,
+        bearing: 40,
+        tilt: 20,
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            orchardRepositoryProvider.overrideWithValue(repo),
+            placeProvider.overrideWith((ref) async => repo.place),
+            mapsConfiguredProvider.overrideWithValue(true),
+            markerSymbolsProvider.overrideWith((ref) async => {}),
+          ],
+          child: const MaterialApp(
+            home: SectionFormScreen(initialCamera: position),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      platform.attachPendingViews();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<GoogleMap>(find.byType(GoogleMap)).initialCameraPosition,
+        position,
+      );
+      expect(
+        platform.cameras.last,
+        CameraUpdate.newCameraPosition(position).toJson(),
+      );
+      expect(find.textContaining('GPS unavailable'), findsNothing);
+      expect(find.byTooltip('Back to map'), findsOneWidget);
     },
     timeout: const Timeout(Duration(minutes: 1)),
   );

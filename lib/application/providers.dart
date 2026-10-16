@@ -6,6 +6,25 @@ import '../domain/landscape.dart';
 import '../domain/repositories.dart';
 import '../domain/taxonomy.dart';
 import '../domain/map_search.dart';
+import '../domain/orchards.dart';
+
+final orchardDirectoryProvider = Provider<OrchardDirectoryRepository>(
+  (ref) => ref.watch(orchardRepositoryProvider) as OrchardDirectoryRepository,
+);
+final selectedOrchardProvider = StateProvider<Place?>((ref) => null);
+final orchardsProvider = StreamProvider<List<Place>>((ref) async* {
+  final directory = ref.watch(orchardDirectoryProvider);
+  final place = await ref.watch(placeProvider.future);
+  yield* directory.watchPlaces(place.ownerId);
+});
+final mapViewRepositoryProvider = Provider<MapViewRepository>(
+  (ref) => throw UnimplementedError(),
+);
+final defaultMapViewProvider = FutureProvider<OrchardMapView?>((ref) async {
+  final repository = ref.watch(mapViewRepositoryProvider);
+  final place = await ref.watch(placeProvider.future);
+  return repository.load(place.ownerId, place.id);
+});
 
 final addressSearchRepositoryProvider = Provider<AddressSearchRepository>(
   (ref) => throw UnimplementedError(),
@@ -39,7 +58,7 @@ final taxonomyProvider = Provider<Taxonomy>(
     {
       for (final t in starterTaxonomy.taxa) t.id: t,
       ...ref.watch(submittedTaxaProvider),
-      for (final t in ref.watch(customTaxaProvider).valueOrNull ?? <Taxon>[])
+      for (final t in ref.watch(customTaxaProvider).asData?.value ?? <Taxon>[])
         t.id: t,
     }.values.toList(),
   ),
@@ -51,6 +70,8 @@ final sessionLockedProvider = StateProvider<bool>((ref) => false);
 final placeProvider = FutureProvider.autoDispose<Place>((ref) async {
   final user = ref.watch(userProvider).valueOrNull;
   if (user == null) throw StateError('Please sign in');
+  final selected = ref.watch(selectedOrchardProvider);
+  if (selected != null && selected.ownerId == user.id) return selected;
   return ref.watch(orchardRepositoryProvider).openDefaultPlace(user.id);
 });
 final plantsProvider =

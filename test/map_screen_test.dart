@@ -72,7 +72,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         platform.cameras.last,
-        CameraUpdate.newLatLngZoom(const LatLng(52, 2), 19).toJson(),
+        CameraUpdate.newCameraPosition(
+          const CameraPosition(target: LatLng(52, 2), zoom: 19),
+        ).toJson(),
       );
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();

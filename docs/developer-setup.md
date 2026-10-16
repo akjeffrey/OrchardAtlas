@@ -143,3 +143,18 @@ provisioning profiles, or service accounts belong in Git. The ignore list covers
 common local files; review `git diff --cached` before each commit. Configuration is
 injected into builds and never printed. Production keys should have platform
 restrictions, quotas, and separate debug/release projects.
+
+## Multiple orchards and map preferences
+
+The orchard selector queries properties by authenticated ownerId. Each orchard's
+records remain in its existing property subcollections, so no security rule or
+Firestore schema migration is needed. Existing records keep their property ID.
+Selection is persisted per user on the device; cached orchards remain selectable
+offline. Creating another orchard submits its metadata to Firestore's local queue.
+
+The local trial retains the original JSON snapshot for Trial orchard, plus a local
+catalog and one independent snapshot per additional UUID orchard. The fixed trial
+identity represents this phone, not a cloud account. Default map views are stored
+through MapViewRepository and scoped by user ID and orchard ID. No Maps API key or
+Firebase credentials are part of these preferences. Physical-device offline restart
+and cloud reconnect acceptance checks still apply.

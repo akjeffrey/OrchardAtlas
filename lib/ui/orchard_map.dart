@@ -27,6 +27,8 @@ class OrchardMap extends ConsumerWidget {
     this.onMapCreated,
     this.onCameraMove,
     this.onMoveVertex,
+    this.initialCamera,
+    this.onCameraChanged,
   });
   final List<OrchardSection> sections;
   final List<ManagedPlant> plants;
@@ -38,6 +40,8 @@ class OrchardMap extends ConsumerWidget {
   final ValueChanged<String>? onPlant, onSection;
   final ValueChanged<GoogleMapController>? onMapCreated;
   final void Function(int, Coordinates)? onMoveVertex;
+  final CameraPosition? initialCamera;
+  final ValueChanged<CameraPosition>? onCameraChanged;
 
   LatLng point(Coordinates p) => LatLng(p.latitude, p.longitude);
 
@@ -78,14 +82,17 @@ class OrchardMap extends ConsumerWidget {
         sections.firstOrNull?.vertices.first;
     return GoogleMap(
       mapType: MapType.satellite,
-      initialCameraPosition: CameraPosition(
-        target: target == null ? const LatLng(0, 0) : point(target),
-        zoom: target == null ? 2 : 19,
-      ),
+      initialCameraPosition:
+          initialCamera ??
+          CameraPosition(
+            target: target == null ? const LatLng(0, 0) : point(target),
+            zoom: target == null ? 2 : 19,
+          ),
       onMapCreated: onMapCreated,
-      onCameraMove: (p) => onCameraMove?.call(
-        Coordinates(p.target.latitude, p.target.longitude),
-      ),
+      onCameraMove: (p) {
+        onCameraChanged?.call(p);
+        onCameraMove?.call(Coordinates(p.target.latitude, p.target.longitude));
+      },
       onTap: onTap == null
           ? null
           : (p) => onTap!(Coordinates(p.latitude, p.longitude)),
