@@ -131,7 +131,7 @@ class TaskGroupScreen extends ConsumerWidget {
                 Text(members.first.groupScope),
                 Text(groupProgress(members)),
                 const Text(
-                  'Membership was captured when this task was created. Complete each plant on the day you work on it. Tap a plant to record a separate activity.',
+                  'Membership was captured when this task was created. Complete each target on the day you work on it. Tap a target for its details and activity/harvest controls.',
                 ),
                 SyncStatus(snapshot),
                 for (final task in members)
@@ -286,6 +286,7 @@ class TaskFormScreen extends ConsumerStatefulWidget {
 class _TaskFormState extends ConsumerState<TaskFormScreen> {
   final title = TextEditingController(), notes = TextEditingController();
   String target = '', scopeTaxon = '', scopeSection = '';
+  SectionKind scopeKind = SectionKind.row;
   DateTime? dueDate;
   String? error;
   bool busy = false;
@@ -328,6 +329,25 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
             newId: const Uuid().v4,
             taxonId: scopeTaxon.isEmpty ? null : scopeTaxon,
             sectionId: scopeSection.isEmpty ? null : scopeSection,
+            dueDate: dueDate == null ? null : calendarDate(dueDate!),
+            notes: notes.text,
+          ),
+        );
+      } else if (target == '__sections__' || target == '__crops__') {
+        final crops = await ref.read(cropsProvider.future);
+        if (!mounted) return;
+        repo.saveTaskGroup(
+          groupLayoutTasks(
+            propertyId: place.id,
+            title: title.text,
+            sections: sections.value,
+            crops: crops.value,
+            taxonomy: ref.read(taxonomyProvider),
+            newId: const Uuid().v4,
+            targetCrops: target == '__crops__',
+            kind: scopeKind,
+            sectionId: scopeSection.isEmpty ? null : scopeSection,
+            taxonId: scopeTaxon.isEmpty ? null : scopeTaxon,
             dueDate: dueDate == null ? null : calendarDate(dueDate!),
             notes: notes.text,
           ),
@@ -392,6 +412,8 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
           final choices = <String, String>{
             '': 'Whole property',
             '__group__': 'Group: all matching plants',
+            '__sections__': 'Group: areas / beds / rows',
+            '__crops__': 'Group: seasonal crops',
             for (final p in snapshot.value)
               p.id:
                   '${p.name}${p.status == ItemStatus.archived ? ' (archived)' : ''}',
@@ -424,32 +446,45 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                     ? null
                     : (value) => setState(() => target = value!),
               ),
-              if (target == '__group__') ...[
-                DropdownButtonFormField<String>(
-                  initialValue: scopeTaxon,
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'All plants classified as',
-                  ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: '',
-                      child: Text('All classifications'),
+              if (target.startsWith('__')) ...[
+                if (target == '__sections__')
+                  DropdownButtonFormField<SectionKind>(
+                    initialValue: scopeKind,
+                    decoration: const InputDecoration(
+                      labelText: 'Each target is a',
                     ),
-                    for (final t in taxonomy.taxa)
-                      DropdownMenuItem(
-                        value: t.id,
-                        child: Text(
-                          taxonomy
-                              .ancestry(t.id)
-                              .map((a) => a.name)
-                              .join(' › '),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                    items: [
+                      for (final k in SectionKind.values)
+                        DropdownMenuItem(value: k, child: Text(k.name)),
+                    ],
+                    onChanged: (k) => setState(() => scopeKind = k!),
+                  ),
+                if (target != '__sections__')
+                  DropdownButtonFormField<String>(
+                    initialValue: scopeTaxon,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'All plants classified as',
+                    ),
+                    items: [
+                      const DropdownMenuItem(
+                        value: '',
+                        child: Text('All classifications'),
                       ),
-                  ],
-                  onChanged: (id) => setState(() => scopeTaxon = id!),
-                ),
+                      for (final t in taxonomy.taxa)
+                        DropdownMenuItem(
+                          value: t.id,
+                          child: Text(
+                            taxonomy
+                                .ancestry(t.id)
+                                .map((a) => a.name)
+                                .join(' › '),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: (id) => setState(() => scopeTaxon = id!),
+                  ),
                 SectionPicker(
                   value: scopeSection.isEmpty ? null : scopeSection,
                   label: 'Within area / row (includes descendants)',
@@ -457,7 +492,9 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                   onChanged: (id) => setState(() => scopeSection = id ?? ''),
                 ),
                 Text(
-                  '$count active plants will be included. New plants added later are not included automatically.',
+                  target == '__group__'
+                      ? '$count active plants will be included. New plants added later are not included automatically.'
+                      : '${target == '__sections__' ? sections.where((s) => s.kind == scopeKind && (sectionIds == null || sectionIds.contains(s.id))).length : crops.where((c) => c.status == CropStatus.growing && (taxonIds == null || taxonIds.contains(c.taxonId)) && (sectionIds == null || sectionIds.contains(c.sectionId))).length} targets will be included. Newly added targets are not included automatically.',
                 ),
               ],
               ListTile(
@@ -498,7 +535,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                 child: Text(
                   busy
                       ? 'Saving…'
-                      : target == '__group__'
+                      : target.startsWith('__')
                       ? 'Create group checklist'
                       : 'Save task',
                 ),

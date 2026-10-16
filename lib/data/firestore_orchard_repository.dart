@@ -242,7 +242,8 @@ class FirestoreOrchardRepository implements OrchardRepository {
               t.propertyId != tasks.first.propertyId ||
               t.groupId != tasks.first.groupId,
         ) ||
-        tasks.map((t) => t.itemId).toSet().length != tasks.length ||
+        tasks.map((t) => t.itemId ?? t.sectionId ?? t.cropId).toSet().length !=
+            tasks.length ||
         tasks.map((t) => t.id).toSet().length != tasks.length) {
       throw ArgumentError('Invalid task group');
     }

@@ -456,4 +456,66 @@ void main() {
       'g',
     );
   });
+  test(
+    'row and seasonal crop groups preserve independent target identities',
+    () async {
+      final repo = await repository();
+      final bed = section('bed', repo.place.id),
+          row = section(
+            'row',
+            repo.place.id,
+            parent: 'bed',
+            kind: SectionKind.row,
+          );
+      repo.saveSection(bed);
+      repo.saveSection(row);
+      final garlic = starterTaxonomy.taxa.firstWhere((t) => t.name == 'Garlic');
+      final crop = CropPlanting(
+        id: 'crop',
+        propertyId: repo.place.id,
+        sectionId: row.id,
+        taxonId: garlic.id,
+        label: 'Music',
+        season: '2026',
+        createdAt: now,
+      );
+      repo.saveCrop(crop);
+      var serial = 0;
+      final rows = groupLayoutTasks(
+        propertyId: repo.place.id,
+        title: 'Harvest rows',
+        sections: repo.sections,
+        crops: repo.crops,
+        taxonomy: starterTaxonomy,
+        newId: () => 'r-${++serial}',
+        targetCrops: false,
+        sectionId: 'bed',
+      );
+      repo.saveTaskGroup(rows);
+      expect(rows.single.sectionId, 'row');
+      final crops = groupLayoutTasks(
+        propertyId: repo.place.id,
+        title: 'Inspect garlic',
+        sections: repo.sections,
+        crops: repo.crops,
+        taxonomy: starterTaxonomy,
+        newId: () => 'c-${++serial}',
+        targetCrops: true,
+        taxonId: garlic.id,
+        sectionId: 'bed',
+      );
+      repo.saveTaskGroup(crops);
+      expect(crops.single.cropId, 'crop');
+      repo.saveTask(
+        rows.single.withStatus(
+          TaskStatus.completed,
+          now: DateTime(2026, 10, 16),
+        ),
+      );
+      expect(repo.tasks.last.status, TaskStatus.open);
+      await repo
+          .watchTasks(repo.place.id)
+          .firstWhere((s) => !s.hasPendingWrites);
+    },
+  );
 }

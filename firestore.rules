@@ -34,7 +34,7 @@ service cloud.firestore {
         && (d.dueDate == null || date(d.dueDate))
         && (d.get('completedOn', null) == null || (d.status == 'completed' && date(d.completedOn)))
         && d.get('groupScope', '') is string && d.get('groupScope', '').size() <= 500
-        && (d.get('groupId', null) == null || (d.groupId is string && uuid(d.groupId) && d.itemId != null))
+        && (d.get('groupId', null) == null || (d.groupId is string && uuid(d.groupId) && (d.itemId != null || d.get('sectionId', null) != null || d.get('cropId', null) != null)))
         && validTaskTarget(d, propertyId);
     }
     function validTaskTarget(d, propertyId) {
@@ -43,8 +43,8 @@ service cloud.firestore {
       return (d.itemId == null && section == null && crop == null)
         || (d.itemId is string && uuid(d.itemId) && section == null && crop == null
           && (d.get('groupId', null) != null || exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(d.itemId))))
-        || (d.itemId == null && section is string && uuid(section) && crop == null && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(section)))
-        || (d.itemId == null && section == null && crop is string && uuid(crop) && exists(/databases/$(database)/documents/properties/$(propertyId)/crops/$(crop)));
+        || (d.itemId == null && section is string && uuid(section) && crop == null && (d.get('groupId', null) != null || exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(section))))
+        || (d.itemId == null && section == null && crop is string && uuid(crop) && (d.get('groupId', null) != null || exists(/databases/$(database)/documents/properties/$(propertyId)/crops/$(crop))));
     }
     function pointAt(points, index) { return points.size() <= index || points[index] is latlng; }
     function validSection(d, propertyId) {

@@ -63,6 +63,9 @@ void main() {
       250,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save plant locally'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save plant locally'));
     await tester.pumpAndSettle();
   }

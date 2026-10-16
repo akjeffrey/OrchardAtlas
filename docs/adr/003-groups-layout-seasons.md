@@ -6,7 +6,7 @@ Status: accepted design for Trial 0.3. Commit this design before application cha
 
 Create one group from active plants matching an optional taxonomy ancestor and/or orchard section (including descendants). Snapshot membership at creation; new plants are not silently added, archived targets remain in the checklist. One UUID group links individual UUID task records. Reuse existing per-plant status storage and derive group progress from every member, regardless of list filters. Each member can be completed, reopened, cancelled or skipped independently; completion stores its local calendar date. Creating the group is atomic, limited to 400 members per submission. No automatic pruning events: checking a task does not assert a separate observation; activity recording remains explicit.
 
-The task form also supports directly targeting a row/area or seasonal crop. Group progress shows completed, skipped/cancelled and remaining counts. Group detail includes every target so work can continue across days. Property-wide and individual tasks remain supported.
+The task form also supports group checklists over areas/beds/rows or current seasonal crops, with independent member completion, and directly targeting a row/area or seasonal crop. Group progress shows completed, skipped/cancelled and remaining counts. Group detail includes every target so work can continue across days. Property-wide and individual tasks remain supported.
 
 ## Layout
 

@@ -243,9 +243,82 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Save area / row'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Save area / row'));
     await tester.pumpAndSettle();
     expect(repo.sections.single.vertices.length, 3);
     expect(find.text('Saved area'), findsOneWidget);
   }, timeout: const Timeout(Duration(minutes: 1)));
+  testWidgets(
+    'group task form creates a separate checklist member for each garlic row',
+    (tester) async {
+      final repo = await repository();
+      final now = DateTime.utc(2026);
+      repo.saveSection(
+        OrchardSection(
+          id: 'bed',
+          propertyId: repo.place.id,
+          name: 'Garlic bed',
+          kind: SectionKind.bed,
+          vertices: [
+            Coordinates(51, 1),
+            Coordinates(51.001, 1),
+            Coordinates(51.001, 1.001),
+          ],
+          createdAt: now,
+        ),
+      );
+      for (final id in ['row-a', 'row-b']) {
+        repo.saveSection(
+          OrchardSection(
+            id: id,
+            propertyId: repo.place.id,
+            name: id,
+            kind: SectionKind.row,
+            parentId: 'bed',
+            vertices: [Coordinates(51, 1), Coordinates(51.001, 1)],
+            createdAt: now,
+          ),
+        );
+      }
+      final router = GoRouter(
+        initialLocation: '/new',
+        routes: [
+          GoRoute(path: '/new', builder: (_, _) => const TaskFormScreen()),
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const Scaffold(body: Text('Saved rows')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        wrap(repo, MaterialApp.router(routerConfig: router)),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Task title'),
+        'Harvest garlic',
+      );
+      await tester.tap(find.text('Whole property').first);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Group: areas / beds / rows').last);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('Create group checklist'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.text('Create group checklist'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Create group checklist'));
+      await tester.pumpAndSettle();
+      expect(repo.tasks.map((t) => t.sectionId).toSet(), {'row-a', 'row-b'});
+      expect(find.text('Saved rows'), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(minutes: 1)),
+  );
 }

@@ -241,3 +241,76 @@ List<OrchardTask> groupPlantTasks({
       ),
   ];
 }
+
+List<OrchardTask> groupLayoutTasks({
+  required String propertyId,
+  required String title,
+  required List<OrchardSection> sections,
+  required List<CropPlanting> crops,
+  required Taxonomy taxonomy,
+  required String Function() newId,
+  required bool targetCrops,
+  SectionKind kind = SectionKind.row,
+  String? sectionId,
+  String? taxonId,
+  String? dueDate,
+  String notes = '',
+}) {
+  final descendants = sectionId == null
+      ? null
+      : sectionDescendants(sectionId, sections);
+  final taxonIds = taxonId == null ? null : taxonomy.descendants(taxonId);
+  final rows = sections
+      .where(
+        (s) =>
+            s.propertyId == propertyId &&
+            s.kind == kind &&
+            (descendants == null || descendants.contains(s.id)),
+      )
+      .toList();
+  final plantings = crops
+      .where(
+        (c) =>
+            c.propertyId == propertyId &&
+            c.status == CropStatus.growing &&
+            (descendants == null || descendants.contains(c.sectionId)) &&
+            (taxonIds == null || taxonIds.contains(c.taxonId)),
+      )
+      .toList();
+  final count = targetCrops ? plantings.length : rows.length;
+  if (count == 0 || count > 400) {
+    throw ArgumentError('Select 1–400 matching targets');
+  }
+  final group = newId(), now = DateTime.now().toUtc();
+  final scope =
+      '${targetCrops ? 'Seasonal crops' : kind.name}${sectionId == null ? ' · whole property' : ' · ${sections.firstWhere((s) => s.id == sectionId).name}'}';
+  return targetCrops
+      ? [
+          for (final c in plantings)
+            OrchardTask(
+              id: newId(),
+              propertyId: propertyId,
+              title: title,
+              cropId: c.id,
+              groupId: group,
+              groupScope: scope,
+              dueDate: dueDate,
+              notes: notes,
+              createdAt: now,
+            ),
+        ]
+      : [
+          for (final s in rows)
+            OrchardTask(
+              id: newId(),
+              propertyId: propertyId,
+              title: title,
+              sectionId: s.id,
+              groupId: group,
+              groupScope: scope,
+              dueDate: dueDate,
+              notes: notes,
+              createdAt: now,
+            ),
+        ];
+}

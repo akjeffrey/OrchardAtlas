@@ -407,7 +407,8 @@ class LocalTrialRepository implements OrchardRepository {
               tasks.any((old) => old.id == t.id),
         ) ||
         group.map((t) => t.id).toSet().length != group.length ||
-        group.map((t) => t.itemId).toSet().length != group.length) {
+        group.map((t) => t.itemId ?? t.sectionId ?? t.cropId).toSet().length !=
+            group.length) {
       throw ArgumentError('Invalid group membership');
     }
     for (final task in group) {

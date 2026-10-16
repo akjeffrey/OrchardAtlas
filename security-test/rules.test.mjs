@@ -222,3 +222,15 @@ test('section and crop tasks require same-property targets', async () => {
   await assertSucceeds(setDoc(doc(db('alice'),path), {...task, sectionId}));
   await assertSucceeds(setDoc(doc(db('alice'),`${propertyPath}/tasks/${cropId}`), {...task, cropId}));
 });
+test('section and crop group members complete independently and retain private scope', async () => {
+  await setDoc(doc(db('alice'), sectionPath), sectionData);
+  await setDoc(doc(db('alice'), `${propertyPath}/crops/${cropId}`), cropData);
+  const base = { schemaVersion: 1, title: 'Harvest garlic bed', notes: '', itemId: null, dueDate: null, status: 'open', createdAt: now, groupId: event, groupScope: 'Garlic bed', completedOn: null };
+  const rowTask = `${propertyPath}/tasks/${sectionId}`, cropTask = `${propertyPath}/tasks/${cropId}`;
+  await assertSucceeds(setDoc(doc(db('alice'),rowTask), {...base, sectionId}));
+  await assertSucceeds(setDoc(doc(db('alice'),cropTask), {...base, cropId}));
+  await assertSucceeds(updateDoc(doc(db('alice'),rowTask), {status:'completed', completedOn:'2026-10-16'}));
+  await assertFails(updateDoc(doc(db('bob'),cropTask), {status:'completed', completedOn:'2026-10-16'}));
+  await assertFails(updateDoc(doc(db('alice'),rowTask), {sectionId:rowId}));
+  await assertFails(setDoc(doc(db('alice'),`${propertyPath}/tasks/${harvestId}`), base));
+});

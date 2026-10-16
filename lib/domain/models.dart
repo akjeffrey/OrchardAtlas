@@ -340,8 +340,9 @@ class OrchardTask {
     if ([itemId, sectionId, cropId].whereType<String>().length > 1) {
       throw ArgumentError('Choose one task target');
     }
-    if (groupId != null && itemId == null) {
-      throw ArgumentError('Group tasks need a plant target');
+    if (groupId != null &&
+        [itemId, sectionId, cropId].whereType<String>().length != 1) {
+      throw ArgumentError('Group tasks need one explicit target');
     }
     if (completedOn != null && status != TaskStatus.completed) {
       throw ArgumentError('Completion date requires completed status');
