@@ -9,6 +9,11 @@ val orchardLocalProperties = java.util.Properties().apply {
     if (localFile.exists()) localFile.inputStream().use { load(it) }
 }
 
+val orchardDartDefines = (project.findProperty("dart-defines") as? String).orEmpty()
+    .split(",").filter { it.isNotEmpty() }
+    .map { String(java.util.Base64.getDecoder().decode(it), Charsets.UTF_8) }
+val orchardTrialBuild = orchardDartDefines.contains("TRIAL_MODE=true")
+
 android {
     namespace = "com.orchardatlas.orchard_atlas"
     compileSdk = flutter.compileSdkVersion
@@ -22,6 +27,8 @@ android {
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.orchardatlas.orchard_atlas"
+        if (orchardTrialBuild) applicationIdSuffix = ".trial"
+        manifestPlaceholders["APP_LABEL"] = if (orchardTrialBuild) "OrchardAtlas Trial" else "OrchardAtlas"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = maxOf(flutter.minSdkVersion, 23)

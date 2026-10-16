@@ -32,12 +32,28 @@ class FirestoreOrchardRepository implements OrchardRepository {
     );
   }
 
+  Future<DocumentSnapshot<Map<String, dynamic>>> _cachedProperty(
+    DocumentReference<Map<String, dynamic>> reference,
+  ) async {
+    try {
+      final cached = await reference.get(
+        const GetOptions(source: Source.cache),
+      );
+      if (cached.exists) return cached;
+    } on FirebaseException catch (error) {
+      // A cache miss needs the server. Other errors must remain visible.
+      if (error.code != 'unavailable') rethrow;
+    }
+    return reference.get(const GetOptions(source: Source.server));
+  }
+
   @override
   Future<Place> openDefaultPlace(String userId) async {
     final key = 'default-place:$userId';
     final knownId = preferences.getString(key);
     if (knownId != null) {
-      final doc = await firestore.collection('properties').doc(knownId).get();
+      final reference = firestore.collection('properties').doc(knownId);
+      final doc = await _cachedProperty(reference);
       if (!doc.exists) {
         throw StateError('Property unavailable. Reconnect to restore access.');
       }

@@ -38,3 +38,31 @@ native persistent disk cache; pending-state widget tests use injected snapshots.
   as a custom recovery journal. Server rejection can roll back a local record.
 - Sign-out clears the cache and requires app restart; pending changes can be lost,
   so the UI prompts the user to wait for sync before signing out.
+
+## Follow-up review of PR #1
+
+The initial GitHub Actions run passed both the Flutter and Firestore security jobs:
+[Foundation checks](https://github.com/akjeffrey/OrchardAtlas/actions/runs/38794845308).
+Those results apply to the initial foundation commit, not the follow-up fixes.
+
+The follow-up fixes cache-first property loading, captures provider dependencies
+before asynchronous waits, centers a delayed native map on the latest GPS selection,
+and lets the GoogleMap widget own controller disposal. Five regression cases were
+added for offline lookup/error behavior and map lifecycle. They have **not been
+executed**: the user requested that testing be skipped. The review commit originally used `[skip ci]`. The subsequent request to run CI
+and publish a phone trial starts GitHub Actions on the updated branch. Native
+Android and iOS simulator build results should be checked on that current commit.
+
+No Firebase/Maps developer configuration or physical devices are available in this
+workspace. Setup is waiting for the developer project ID and secure configuration.
+Native/device acceptance checks remain outstanding; this review does not constitute
+release or merge approval.
+
+## Android phone-trial build
+
+A separate, explicitly labeled `TRIAL_MODE` configuration uses device-local storage
+and a coordinate preview without Firebase/Maps keys. Its CI workflow uploads a signed
+debug APK and SHA-256 checksum as **OrchardAtlas-Android-trial**. See
+[phone-trial instructions](phone-trial.md) for installation, data-loss limitations,
+and the distinction from the connected app. Local test execution remains skipped;
+CI and phone installation results must be checked separately.

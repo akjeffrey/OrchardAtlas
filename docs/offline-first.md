@@ -8,6 +8,11 @@ Offline queries only include downloaded records; a cached empty collection does
 not establish there are no remote records. Initial online sync is required for
 account creation and discovery on a new/reinstalled device.
 
+Known default properties are read explicitly from the native cache first, so an
+offline restart does not wait for a server timeout. A cache miss falls back to a
+server read; first-time setup still requires connectivity. Data streams continue
+to enforce authorization on reconnection.
+
 ## Write lifecycle
 1. Validate domain input and allocate one UUID.
 2. Submit set to native Firestore; return control without awaiting server ACK.

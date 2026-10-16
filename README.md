@@ -5,6 +5,8 @@ with native Firestore offline persistence. V1 provides map/list → GPS or manua
 position → hierarchical taxonomy → plant detail → activities and annual harvest
 totals, plus **Add Another Like This** for orchard rows.
 
+For a phone build without project credentials, see [Android phone trial](docs/phone-trial.md).
+
 Start with the [design documentation](docs/README.md) and
 [developer setup](docs/developer-setup.md). Firebase/Maps configuration is supplied
 locally and is not included. Sharing, tasks, foraging-resource UI and photo uploads

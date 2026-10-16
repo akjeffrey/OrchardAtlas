@@ -63,6 +63,7 @@ class OrchardAtlasApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final locked = ref.watch(sessionLockedProvider);
+    final trial = ref.watch(trialModeProvider);
     final theme = ThemeData(
       colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff315e35)),
       useMaterial3: true,
@@ -96,6 +97,19 @@ class OrchardAtlasApp extends ConsumerWidget {
       routerConfig: ref.watch(routerProvider),
       builder: (context, child) => Column(
         children: [
+          if (trial)
+            SafeArea(
+              bottom: false,
+              child: Material(
+                color: theme.colorScheme.secondaryContainer,
+                child: const Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Text(
+                    'PHONE TRIAL · Data stays on this device · No cloud sync',
+                  ),
+                ),
+              ),
+            ),
           if (failure != null && dismissedFailure != failure.recordId)
             SafeArea(
               bottom: false,

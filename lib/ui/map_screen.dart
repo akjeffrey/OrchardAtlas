@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import 'common.dart';
+import 'coordinate_preview.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key, this.focus});
@@ -101,12 +102,6 @@ class _MapState extends ConsumerState<MapScreen> {
   }
 
   @override
-  void dispose() {
-    controller?.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     final place = ref.watch(placeProvider);
     final plants = ref.watch(plantsProvider);
@@ -148,8 +143,8 @@ class _MapState extends ConsumerState<MapScreen> {
           data: (snapshot) {
             final items = snapshot.value;
             final center =
-                widget.focus ??
                 selected ??
+                widget.focus ??
                 (items.isNotEmpty ? items.first.location : null);
             return Column(
               children: [
@@ -179,46 +174,72 @@ class _MapState extends ConsumerState<MapScreen> {
                 Expanded(
                   child: TabBarView(
                     children: [
-                      GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: center == null
-                              ? const LatLng(0, 0)
-                              : LatLng(center.latitude, center.longitude),
-                          zoom: center == null ? 2 : 18,
+                      if (ref.watch(trialModeProvider))
+                        CoordinatePreview(
+                          plants: items,
+                          selected: selected,
+                          focus: widget.focus,
+                          onSelect: (coordinates) => setState(() {
+                            selected = coordinates;
+                            locationMessage = 'Coordinate selected for Add Plant. Confirm the exact position before saving.';
+                          }),
+                          onOpen: (id) => context.push('/plants/$id'),
+                        )
+                      else
+                        GoogleMap(
+                          initialCameraPosition: CameraPosition(
+                            target: center == null
+                                ? const LatLng(0, 0)
+                                : LatLng(center.latitude, center.longitude),
+                            zoom: center == null ? 2 : 18,
+                          ),
+                          onMapCreated: (map) {
+                            controller = map;
+                            // GPS or save focus can arrive while the native view
+                            // is still initializing; initialCameraPosition is not
+                            // reapplied to an existing native map.
+                            final latest = selected ?? widget.focus;
+                            if (latest != null) {
+                              map.animateCamera(
+                                CameraUpdate.newLatLngZoom(
+                                  LatLng(latest.latitude, latest.longitude),
+                                  19,
+                                ),
+                              );
+                            }
+                          },
+                          onTap: (p) => setState(() {
+                            selected = Coordinates(p.latitude, p.longitude);
+                            locationMessage =
+                                'Map position selected for Add Plant.';
+                          }),
+                          markers: {
+                            for (final p in items)
+                              Marker(
+                                markerId: MarkerId(p.id),
+                                position: LatLng(
+                                  p.location.latitude,
+                                  p.location.longitude,
+                                ),
+                                infoWindow: InfoWindow(title: p.name),
+                                onTap: () => context.push('/plants/${p.id}'),
+                              ),
+                            if (selected != null)
+                              Marker(
+                                markerId: const MarkerId('selected-position'),
+                                position: LatLng(
+                                  selected!.latitude,
+                                  selected!.longitude,
+                                ),
+                                icon: BitmapDescriptor.defaultMarkerWithHue(
+                                  BitmapDescriptor.hueAzure,
+                                ),
+                                infoWindow: const InfoWindow(
+                                  title: 'Selected add location',
+                                ),
+                              ),
+                          },
                         ),
-                        onMapCreated: (map) => controller = map,
-                        onTap: (p) => setState(() {
-                          selected = Coordinates(p.latitude, p.longitude);
-                          locationMessage =
-                              'Map position selected for Add Plant.';
-                        }),
-                        markers: {
-                          for (final p in items)
-                            Marker(
-                              markerId: MarkerId(p.id),
-                              position: LatLng(
-                                p.location.latitude,
-                                p.location.longitude,
-                              ),
-                              infoWindow: InfoWindow(title: p.name),
-                              onTap: () => context.push('/plants/${p.id}'),
-                            ),
-                          if (selected != null)
-                            Marker(
-                              markerId: const MarkerId('selected-position'),
-                              position: LatLng(
-                                selected!.latitude,
-                                selected!.longitude,
-                              ),
-                              icon: BitmapDescriptor.defaultMarkerWithHue(
-                                BitmapDescriptor.hueAzure,
-                              ),
-                              infoWindow: const InfoWindow(
-                                title: 'Selected add location',
-                              ),
-                            ),
-                        },
-                      ),
                       items.isEmpty
                           ? const Center(
                               child: Text(

@@ -8,12 +8,32 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'application/providers.dart';
 import 'data/firestore_orchard_repository.dart';
+import 'data/local_trial_repository.dart';
 import 'data/platform_repositories.dart';
 import 'ui/app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
+    if (const bool.fromEnvironment('TRIAL_MODE')) {
+      final preferences = await SharedPreferences.getInstance();
+      runApp(
+        ProviderScope(
+          overrides: [
+            trialModeProvider.overrideWithValue(true),
+            orchardRepositoryProvider.overrideWithValue(
+              LocalTrialRepository.open(preferences),
+            ),
+            authRepositoryProvider.overrideWithValue(TrialAuthRepository()),
+            locationRepositoryProvider.overrideWithValue(
+              DeviceLocationRepository(),
+            ),
+          ],
+          child: const OrchardAtlasApp(),
+        ),
+      );
+      return;
+    }
     const project = String.fromEnvironment('FIREBASE_PROJECT_ID');
     const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
     const appId = String.fromEnvironment('FIREBASE_APP_ID');

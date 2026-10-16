@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../application/providers.dart';
 
 import '../domain/repositories.dart';
 
@@ -22,14 +25,18 @@ class ErrorPanel extends StatelessWidget {
   );
 }
 
-class SyncStatus extends StatelessWidget {
+class SyncStatus extends ConsumerWidget {
   const SyncStatus(this.snapshot, {super.key});
   final RepositorySnapshot<dynamic> snapshot;
   @override
-  Widget build(BuildContext context) => Padding(
+  Widget build(BuildContext context, WidgetRef ref) => Padding(
     padding: const EdgeInsets.all(8),
     child: Text(
-      snapshot.hasPendingWrites
+      ref.watch(trialModeProvider)
+          ? (snapshot.hasPendingWrites
+                ? 'Saving on this phone…'
+                : 'Saved on this phone · Trial data')
+          : snapshot.hasPendingWrites
           ? 'Saved locally · Pending sync'
           : snapshot.isFromCache
           ? 'Cached data · May be incomplete'

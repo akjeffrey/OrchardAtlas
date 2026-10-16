@@ -15,3 +15,5 @@ separated from shipped behavior.
 9. [Developer setup](developer-setup.md)
 
 See [validation and release checks](validation.md) for observed results and remaining native testing.
+
+[Android phone trial and installation](phone-trial.md) describes the credential-free trial APK.

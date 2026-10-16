@@ -17,6 +17,7 @@ final locationRepositoryProvider = Provider<LocationRepository>(
 final photoRepositoryProvider = Provider<PhotoRepository>(
   (ref) => throw UnimplementedError(),
 );
+final trialModeProvider = Provider<bool>((ref) => false);
 final taxonomyProvider = Provider<Taxonomy>((ref) => starterTaxonomy);
 final userProvider = StreamProvider(
   (ref) => ref.watch(authRepositoryProvider).userChanges,
@@ -31,13 +32,15 @@ final plantsProvider =
     StreamProvider.autoDispose<RepositorySnapshot<List<ManagedPlant>>>((
       ref,
     ) async* {
+      final repository = ref.watch(orchardRepositoryProvider);
       final place = await ref.watch(placeProvider.future);
-      yield* ref.watch(orchardRepositoryProvider).watchPlants(place.id);
+      yield* repository.watchPlants(place.id);
     });
 final eventsProvider = StreamProvider.autoDispose
     .family<RepositorySnapshot<List<PlantEvent>>, String>((ref, id) async* {
+      final repository = ref.watch(orchardRepositoryProvider);
       final place = await ref.watch(placeProvider.future);
-      yield* ref.watch(orchardRepositoryProvider).watchEvents(place.id, id);
+      yield* repository.watchEvents(place.id, id);
     });
 final failuresProvider = StreamProvider(
   (ref) => ref.watch(orchardRepositoryProvider).writeFailures,
