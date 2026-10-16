@@ -1,20 +1,24 @@
+import com.android.build.api.dsl.ApplicationExtension
+import java.util.Base64
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-val orchardLocalProperties = java.util.Properties().apply {
+val orchardLocalProperties = Properties().apply {
     val localFile = rootProject.file("local.properties")
     if (localFile.exists()) localFile.inputStream().use { load(it) }
 }
 
 val orchardDartDefines = (project.findProperty("dart-defines") as? String).orEmpty()
     .split(",").filter { it.isNotEmpty() }
-    .map { String(java.util.Base64.getDecoder().decode(it), Charsets.UTF_8) }
+    .map { String(Base64.getDecoder().decode(it), Charsets.UTF_8) }
 val orchardTrialBuild = orchardDartDefines.contains("TRIAL_MODE=true")
 
-android {
+extensions.configure<ApplicationExtension> {
     namespace = "com.orchardatlas.orchard_atlas"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
@@ -42,11 +46,7 @@ android {
         manifestPlaceholders["MAPS_API_KEY"] = orchardLocalProperties.getProperty("MAPS_API_KEY", "")
     }
 
-    buildTypes {
-        release {
-            // Production signing must be configured outside Git before distribution.
-        }
-    }
+    // Production signing must be configured outside Git before distribution.
 }
 
 kotlin {
