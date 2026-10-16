@@ -137,3 +137,88 @@ test('explicit phenology and lifecycle events remain append-only activities', as
     await assertFails(updateDoc(doc(db('alice'), `${itemPath}/events/${id}`), { notes: 'Overwrite' }));
   }
 });
+
+const sectionId = '00000000-0000-4000-8000-000000000004';
+const rowId = '00000000-0000-4000-8000-000000000005';
+const cropId = '00000000-0000-4000-8000-000000000006';
+const harvestId = '00000000-0000-4000-8000-000000000007';
+const sectionPath = `${propertyPath}/sections/${sectionId}`;
+const sectionData = { schemaVersion: 1, name: 'Garlic bed', kind: 'bed', parentId: null, notes: '', createdAt: now, vertices: [new GeoPoint(51,1), new GeoPoint(51.001,1), new GeoPoint(51.001,1.001)] };
+const cropData = { schemaVersion: 1, sectionId, taxonId: taxon, label: 'German Extra Hardy', season: '2026', notes: '', plantedOn: '2026-01-01', harvestedOn: null, status: 'growing', createdAt: now };
+test('sections enforce ownership, parent scope and shape schema without destructive mutation', async () => {
+  for (const uid of ['bob', undefined]) await assertFails(setDoc(doc(db(uid), sectionPath), sectionData));
+  for (const change of [{ vertices: [new GeoPoint(51,1)] }, { vertices: ['bad', 'bad', 'bad'] }, { parentId: sectionId }, { parentId: item }, { kind: 'unknown' }, { vertices: Array(41).fill(new GeoPoint(51,1)) }]) {
+    await assertFails(setDoc(doc(db('alice'), sectionPath), { ...sectionData, ...change }));
+  }
+  await assertSucceeds(setDoc(doc(db('alice'), sectionPath), sectionData));
+  await assertSucceeds(setDoc(doc(db('alice'), `${propertyPath}/sections/${rowId}`), { ...sectionData, kind: 'row', name: 'Garlic row A', parentId: sectionId, vertices: sectionData.vertices.slice(0,2) }));
+  await assertFails(setDoc(doc(db('alice'), `${propertyPath}/sections/${cropId}`), { ...sectionData, parentId: rowId }));
+  await assertFails(updateDoc(doc(db('alice'), sectionPath), { parentId: rowId }));
+  await assertFails(updateDoc(doc(db('alice'), sectionPath), { kind: 'row' }));
+  await assertSucceeds(updateDoc(doc(db('alice'), sectionPath), { name: 'Garlic bed north' }));
+  for (const uid of ['bob', undefined]) await assertFails(getDoc(doc(db(uid), sectionPath)));
+  await assertFails(deleteDoc(doc(db('alice'), sectionPath)));
+});
+test('plants can move between same-property sections but cannot point at an unavailable section', async () => {
+  await setDoc(doc(db('alice'), sectionPath), sectionData);
+  await assertSucceeds(updateDoc(doc(db('alice'), itemPath), { sectionId }));
+  await assertFails(updateDoc(doc(db('alice'), itemPath), { sectionId: rowId }));
+  await assertSucceeds(updateDoc(doc(db('alice'), itemPath), { sectionId: null }));
+});
+test('seasonal crops retain immutable history and validate harvest records', async () => {
+  await setDoc(doc(db('alice'), sectionPath), sectionData);
+  const path = `${propertyPath}/crops/${cropId}`;
+  await assertFails(setDoc(doc(db('bob'), path), cropData));
+  await assertFails(setDoc(doc(db('alice'), path), { ...cropData, sectionId: rowId }));
+  await assertSucceeds(setDoc(doc(db('alice'), path), cropData));
+  await assertFails(updateDoc(doc(db('alice'), path), { label: 'Overwrite old variety' }));
+  await assertFails(updateDoc(doc(db('alice'), path), { season: '2027' }));
+  await assertFails(updateDoc(doc(db('alice'), path), { sectionId: rowId }));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), { status: 'harvested', harvestedOn: '2026-07-10' }));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), { status: 'ended' }));
+  await assertFails(updateDoc(doc(db('alice'), path), { status: 'growing' }));
+  await assertFails(deleteDoc(doc(db('alice'), path)));
+  await assertFails(getDoc(doc(db('bob'), path)));
+  const harvestPath = `${propertyPath}/cropHarvests/${harvestId}`;
+  const data = { schemaVersion: 1, cropId, activityDate: '2026-07-10', notes: '', recordedAt: now, harvest: { quantity: 13.1, unit: 'lb' } };
+  await assertFails(setDoc(doc(db('bob'), harvestPath), data));
+  await assertFails(setDoc(doc(db('alice'), harvestPath), { ...data, cropId: rowId }));
+  await assertFails(setDoc(doc(db('alice'), harvestPath), { ...data, harvest: { quantity: -1, unit: 'kg' } }));
+  await assertSucceeds(setDoc(doc(db('alice'), harvestPath), data));
+  await assertFails(updateDoc(doc(db('alice'), harvestPath), { notes: 'Overwrite' }));
+  await assertFails(deleteDoc(doc(db('alice'), harvestPath)));
+  await assertFails(getDoc(doc(db('bob'), harvestPath)));
+});
+test('group checklist batches exceed 20 members with independent immutable targets and dated completion', async () => {
+  const store = db('alice');
+  await env.withSecurityRulesDisabled(async (context) => {
+    const seed = writeBatch(context.firestore());
+    for (let i=100;i<125;i++) { const id = `00000000-0000-4000-8000-${i.toString().padStart(12,'0')}`; seed.set(doc(context.firestore(), `${propertyPath}/items/${id}`), plant); }
+    await seed.commit();
+  });
+  const batch = writeBatch(store);
+  const groupId = '00000000-0000-4000-8000-000000000008';
+  const task = { schemaVersion: 1, title: 'Prune apples', notes: '', itemId: item, dueDate: null, status: 'open', createdAt: now, groupId, groupScope: 'Apple', completedOn: null };
+  for (let i=100;i<125;i++) {
+    const id = `00000000-0000-4000-8000-${i.toString().padStart(12,'0')}`;
+    batch.set(doc(store, `${propertyPath}/tasks/${id}`), { ...task, itemId: id });
+  }
+  await assertSucceeds(batch.commit());
+  const path = `${propertyPath}/tasks/00000000-0000-4000-8000-000000000100`;
+  await assertSucceeds(updateDoc(doc(store,path), { status: 'completed', completedOn: '2026-10-16' }));
+  await assertFails(updateDoc(doc(store,path), { groupId: item }));
+  await assertFails(updateDoc(doc(store,path), { itemId: event }));
+  await assertFails(updateDoc(doc(store,path), { status: 'skipped' }));
+  await assertSucceeds(updateDoc(doc(store,path), { status: 'skipped', completedOn: null }));
+  await assertFails(getDoc(doc(db('bob'), path)));
+});
+test('section and crop tasks require same-property targets', async () => {
+  await setDoc(doc(db('alice'), sectionPath), sectionData);
+  await setDoc(doc(db('alice'), `${propertyPath}/crops/${cropId}`), cropData);
+  const path = `${propertyPath}/tasks/${harvestId}`;
+  const task = { schemaVersion: 1, title: 'Water', notes: '', itemId: null, dueDate: null, status: 'open', createdAt: now, completedOn: null };
+  await assertFails(setDoc(doc(db('alice'),path), {...task, sectionId: rowId}));
+  await assertFails(setDoc(doc(db('alice'),path), {...task, sectionId, cropId}));
+  await assertSucceeds(setDoc(doc(db('alice'),path), {...task, sectionId}));
+  await assertSucceeds(setDoc(doc(db('alice'),`${propertyPath}/tasks/${cropId}`), {...task, cropId}));
+});

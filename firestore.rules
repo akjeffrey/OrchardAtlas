@@ -9,9 +9,9 @@ service cloud.firestore {
       return signedIn() && get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
     }
     function text(value) { return value is string && value.size() > 0 && value.size() <= 500; }
-    function validItem(d) {
+    function validItem(d, propertyId) {
       return d.keys().hasAll(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
-        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt', 'plantedOn', 'rootstock', 'nursery', 'notes', 'status', 'accuracyMeters'])
+        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt', 'plantedOn', 'rootstock', 'nursery', 'notes', 'status', 'accuracyMeters', 'sectionId'])
         && d.schemaVersion == 1 && d.kind == 'managedPlant'
         && text(d.name) && d.taxonId is string && uuid(d.taxonId)
         && d.location is latlng && d.createdAt is timestamp
@@ -20,6 +20,7 @@ service cloud.firestore {
         && d.get('nursery', '') is string && d.get('nursery', '').size() <= 500
         && d.get('notes', '') is string && d.get('notes', '').size() <= 10000
         && d.get('status', 'active') in ['active', 'archived']
+        && (d.get('sectionId', null) == null || (d.sectionId is string && uuid(d.sectionId) && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.sectionId))))
         && (d.get('accuracyMeters', null) == null || (d.accuracyMeters is number && d.accuracyMeters >= 0 && d.accuracyMeters <= 100000));
     }
     function date(value) {
@@ -27,12 +28,82 @@ service cloud.firestore {
     }
     function validTask(d, propertyId) {
       return d.keys().hasAll(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt'])
-        && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt'])
+        && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt', 'sectionId', 'cropId', 'groupId', 'groupScope', 'completedOn'])
         && d.schemaVersion == 1 && text(d.title) && d.notes is string && d.notes.size() <= 10000
-        && d.createdAt is timestamp && d.status in ['open', 'completed', 'cancelled']
+        && d.createdAt is timestamp && d.status in ['open', 'completed', 'cancelled', 'skipped']
         && (d.dueDate == null || date(d.dueDate))
-        && (d.itemId == null || (d.itemId is string && uuid(d.itemId)
-          && exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(d.itemId))));
+        && (d.get('completedOn', null) == null || (d.status == 'completed' && date(d.completedOn)))
+        && d.get('groupScope', '') is string && d.get('groupScope', '').size() <= 500
+        && (d.get('groupId', null) == null || (d.groupId is string && uuid(d.groupId) && d.itemId != null))
+        && validTaskTarget(d, propertyId);
+    }
+    function validTaskTarget(d, propertyId) {
+      let section = d.get('sectionId', null);
+      let crop = d.get('cropId', null);
+      return (d.itemId == null && section == null && crop == null)
+        || (d.itemId is string && uuid(d.itemId) && section == null && crop == null
+          && (d.get('groupId', null) != null || exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(d.itemId))))
+        || (d.itemId == null && section is string && uuid(section) && crop == null && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(section)))
+        || (d.itemId == null && section == null && crop is string && uuid(crop) && exists(/databases/$(database)/documents/properties/$(propertyId)/crops/$(crop)));
+    }
+    function pointAt(points, index) { return points.size() <= index || points[index] is latlng; }
+    function validSection(d, propertyId) {
+      return d.keys().hasAll(['schemaVersion','name','kind','parentId','notes','createdAt','vertices'])
+        && d.keys().hasOnly(['schemaVersion','name','kind','parentId','notes','createdAt','vertices'])
+        && d.schemaVersion == 1 && text(d.name) && d.notes is string && d.notes.size() <= 10000 && d.createdAt is timestamp
+        && d.kind in ['area','bed','row'] && d.vertices is list && d.vertices.size() <= 40
+        && d.vertices.size() >= (d.kind == 'row' ? 2 : 3)
+        && (d.parentId == null || (d.parentId is string && uuid(d.parentId)
+          && get(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.parentId)).data.kind in ['area','bed']))
+        && pointAt(d.vertices, 0)
+        && pointAt(d.vertices, 1)
+        && pointAt(d.vertices, 2)
+        && pointAt(d.vertices, 3)
+        && pointAt(d.vertices, 4)
+        && pointAt(d.vertices, 5)
+        && pointAt(d.vertices, 6)
+        && pointAt(d.vertices, 7)
+        && pointAt(d.vertices, 8)
+        && pointAt(d.vertices, 9)
+        && pointAt(d.vertices, 10)
+        && pointAt(d.vertices, 11)
+        && pointAt(d.vertices, 12)
+        && pointAt(d.vertices, 13)
+        && pointAt(d.vertices, 14)
+        && pointAt(d.vertices, 15)
+        && pointAt(d.vertices, 16)
+        && pointAt(d.vertices, 17)
+        && pointAt(d.vertices, 18)
+        && pointAt(d.vertices, 19)
+        && pointAt(d.vertices, 20)
+        && pointAt(d.vertices, 21)
+        && pointAt(d.vertices, 22)
+        && pointAt(d.vertices, 23)
+        && pointAt(d.vertices, 24)
+        && pointAt(d.vertices, 25)
+        && pointAt(d.vertices, 26)
+        && pointAt(d.vertices, 27)
+        && pointAt(d.vertices, 28)
+        && pointAt(d.vertices, 29)
+        && pointAt(d.vertices, 30)
+        && pointAt(d.vertices, 31)
+        && pointAt(d.vertices, 32)
+        && pointAt(d.vertices, 33)
+        && pointAt(d.vertices, 34)
+        && pointAt(d.vertices, 35)
+        && pointAt(d.vertices, 36)
+        && pointAt(d.vertices, 37)
+        && pointAt(d.vertices, 38)
+        && pointAt(d.vertices, 39);
+    }
+    function validCrop(d, propertyId) {
+      return d.keys().hasAll(['schemaVersion','sectionId','taxonId','label','season','notes','plantedOn','harvestedOn','status','createdAt'])
+        && d.keys().hasOnly(['schemaVersion','sectionId','taxonId','label','season','notes','plantedOn','harvestedOn','status','createdAt'])
+        && d.schemaVersion == 1 && d.sectionId is string && uuid(d.sectionId) && d.taxonId is string && uuid(d.taxonId)
+        && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.sectionId))
+        && text(d.label) && text(d.season) && d.notes is string && d.notes.size() <= 10000 && d.createdAt is timestamp
+        && (d.plantedOn == null || date(d.plantedOn)) && (d.harvestedOn == null || date(d.harvestedOn))
+        && d.status in ['growing','harvested','ended'] && (d.status != 'harvested' || d.harvestedOn != null);
     }
     function validHarvest(d) {
       return d.harvest is map && d.harvest.keys().hasAll(['quantity', 'unit'])
@@ -61,11 +132,36 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && text(request.resource.data.name) && request.resource.data.createdAt is timestamp;
       allow update, delete: if false;
+      match /sections/{sectionId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(sectionId) && request.resource.data.parentId != sectionId && validSection(request.resource.data, propertyId);
+        allow update: if owner(propertyId) && validSection(request.resource.data, propertyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','notes','vertices']);
+        allow delete: if false;
+      }
+      match /crops/{cropId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(cropId) && validCrop(request.resource.data, propertyId) && request.resource.data.status == 'growing';
+        allow update: if owner(propertyId) && validCrop(request.resource.data, propertyId) && resource.data.status != 'ended'
+          && request.resource.data.status != 'growing' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','harvestedOn']);
+        allow delete: if false;
+      }
+      match /cropHarvests/{harvestId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(harvestId)
+          && request.resource.data.keys().hasAll(['schemaVersion','cropId','activityDate','notes','recordedAt','harvest'])
+          && request.resource.data.keys().hasOnly(['schemaVersion','cropId','activityDate','notes','recordedAt','harvest'])
+          && request.resource.data.schemaVersion == 1 && request.resource.data.cropId is string && uuid(request.resource.data.cropId)
+          && exists(/databases/$(database)/documents/properties/$(propertyId)/crops/$(request.resource.data.cropId))
+          && date(request.resource.data.activityDate) && request.resource.data.recordedAt is timestamp
+          && request.resource.data.notes is string && request.resource.data.notes.size() <= 10000 && validHarvest(request.resource.data);
+        allow update, delete: if false;
+      }
       match /tasks/{taskId} {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(taskId) && validTask(request.resource.data, propertyId);
         allow update: if owner(propertyId) && validTask(request.resource.data, propertyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedOn']);
         allow delete: if false;
       }
       match /taxa/{taxonId} {
@@ -82,9 +178,9 @@ service cloud.firestore {
       }
       match /items/{itemId} {
         allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data);
-        allow update: if owner(propertyId) && validItem(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'rootstock', 'nursery', 'notes', 'status']);
+        allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data, propertyId);
+        allow update: if owner(propertyId) && validItem(request.resource.data, propertyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'rootstock', 'nursery', 'notes', 'status', 'sectionId']);
         allow delete: if false;
         match /events/{eventId} {
           allow read: if owner(propertyId);

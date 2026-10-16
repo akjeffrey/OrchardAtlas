@@ -7,10 +7,17 @@ import '../application/providers.dart';
 import '../domain/models.dart';
 import '../domain/taxonomy.dart';
 import 'plant_symbols.dart';
+import 'sections_screen.dart';
 
 class AddPlantScreen extends ConsumerStatefulWidget {
-  const AddPlantScreen({super.key, this.template, this.location});
+  const AddPlantScreen({
+    super.key,
+    this.template,
+    this.location,
+    this.sectionId,
+  });
   final PlantTemplate? template;
+  final String? sectionId;
   final Coordinates? location;
   @override
   ConsumerState<AddPlantScreen> createState() => _AddPlantState();
@@ -22,6 +29,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   final nursery = TextEditingController();
   final notes = TextEditingController();
   double? accuracyMeters;
+  String? sectionId;
   final latitude = TextEditingController();
   final longitude = TextEditingController();
   final selected = <String?>[null, null, null, null];
@@ -34,6 +42,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   @override
   void initState() {
     super.initState();
+    sectionId = widget.sectionId;
     applyTemplate(ref.read(taxonomyProvider));
     if (widget.location != null) {
       setCoordinates(widget.location!);
@@ -56,6 +65,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     plantingDate = template.plantedOn == null
         ? null
         : parseCalendarDate(template.plantedOn!);
+    sectionId = template.sectionId;
     rootstock.text = template.rootstock;
     nursery.text = template.nursery;
     customName = template.name != path.last.name;
@@ -241,6 +251,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             taxonId: taxonId,
             location: position,
             plantingDate: plantingDate,
+            sectionId: sectionId,
             rootstock: rootstock.text,
             nursery: nursery.text,
             notes: notes.text,
@@ -394,6 +405,10 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                         ? null
                         : () => setState(() => plantingDate = null),
                   ),
+          ),
+          SectionPicker(
+            value: sectionId,
+            onChanged: (id) => setState(() => sectionId = id),
           ),
           TextField(
             controller: rootstock,

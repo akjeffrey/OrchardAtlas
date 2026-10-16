@@ -4,7 +4,7 @@ enum PlantSymbol { tree, apple, pear, berry, flower, citrus, nut, vine }
 
 enum ItemStatus { active, archived }
 
-enum TaskStatus { open, completed, cancelled }
+enum TaskStatus { open, completed, cancelled, skipped }
 
 enum ItemKind { managedPlant, foragingResource }
 
@@ -118,6 +118,7 @@ class ManagedPlant extends TrackedItem {
     required super.location,
     required super.createdAt,
     this.plantedOn,
+    this.sectionId,
     String rootstock = '',
     String nursery = '',
     String notes = '',
@@ -135,6 +136,7 @@ class ManagedPlant extends TrackedItem {
     }
   }
   final String? plantedOn;
+  final String? sectionId;
   final String rootstock, nursery, notes;
   final ItemStatus status;
   final double? accuracyMeters;
@@ -144,6 +146,7 @@ class ManagedPlant extends TrackedItem {
     name: name,
     taxonId: taxonId,
     plantedOn: plantedOn,
+    sectionId: sectionId,
     rootstock: rootstock,
     nursery: nursery,
   );
@@ -163,6 +166,7 @@ class ManagedPlant extends TrackedItem {
       taxonId: taxonId,
       rootstock: rootstock,
       nursery: nursery,
+      sectionId: sectionId,
       plantedOn:
           plantedOn ?? (planting.isEmpty ? null : planting.first.activityDate),
     );
@@ -174,6 +178,8 @@ class ManagedPlant extends TrackedItem {
     String? nursery,
     String? notes,
     ItemStatus? status,
+    String? sectionId,
+    bool clearSection = false,
   }) => ManagedPlant(
     id: id,
     propertyId: propertyId,
@@ -187,6 +193,7 @@ class ManagedPlant extends TrackedItem {
     notes: notes ?? this.notes,
     status: status ?? this.status,
     accuracyMeters: accuracyMeters,
+    sectionId: clearSection ? null : sectionId ?? this.sectionId,
   );
 }
 
@@ -217,12 +224,13 @@ class PlantTemplate {
     required this.name,
     required this.taxonId,
     this.plantedOn,
+    this.sectionId,
     this.rootstock = '',
     this.nursery = '',
   });
   final String name;
   final String taxonId;
-  final String? plantedOn;
+  final String? plantedOn, sectionId;
   final String rootstock, nursery;
 }
 
@@ -316,26 +324,49 @@ class OrchardTask {
     required String title,
     required this.createdAt,
     this.itemId,
+    this.sectionId,
+    this.cropId,
+    this.groupId,
+    String groupScope = '',
     this.dueDate,
+    this.completedOn,
     String notes = '',
     this.status = TaskStatus.open,
   }) : title = requiredText(title, 'Task title'),
-       notes = optionalText(notes, 10000) {
+       notes = optionalText(notes, 10000),
+       groupScope = optionalText(groupScope, 500) {
     if (dueDate != null) parseCalendarDate(dueDate!);
+    if (completedOn != null) parseCalendarDate(completedOn!);
+    if ([itemId, sectionId, cropId].whereType<String>().length > 1) {
+      throw ArgumentError('Choose one task target');
+    }
+    if (groupId != null && itemId == null) {
+      throw ArgumentError('Group tasks need a plant target');
+    }
+    if (completedOn != null && status != TaskStatus.completed) {
+      throw ArgumentError('Completion date requires completed status');
+    }
   }
-  final String id, propertyId, title, notes;
-  final String? itemId, dueDate;
+  final String id, propertyId, title, notes, groupScope;
+  final String? itemId, sectionId, cropId, groupId, dueDate, completedOn;
   final DateTime createdAt;
   final TaskStatus status;
-  OrchardTask withStatus(TaskStatus value) => OrchardTask(
+  OrchardTask withStatus(TaskStatus value, {DateTime? now}) => OrchardTask(
     id: id,
     propertyId: propertyId,
     title: title,
     createdAt: createdAt,
     itemId: itemId,
+    sectionId: sectionId,
+    cropId: cropId,
+    groupId: groupId,
+    groupScope: groupScope,
     dueDate: dueDate,
     notes: notes,
     status: value,
+    completedOn: value == TaskStatus.completed
+        ? calendarDate(now ?? DateTime.now())
+        : null,
   );
 }
 

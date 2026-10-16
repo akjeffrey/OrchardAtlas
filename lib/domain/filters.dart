@@ -1,25 +1,35 @@
 import 'models.dart';
+import 'landscape.dart';
 import 'taxonomy.dart';
 
 class PlantFilter {
   const PlantFilter({
     this.query = '',
     this.taxonId,
+    this.sectionId,
     this.year,
     this.status = ItemStatus.active,
   });
   final String query;
-  final String? taxonId;
+  final String? taxonId, sectionId;
   final int? year;
   final ItemStatus? status;
-  List<ManagedPlant> apply(Iterable<ManagedPlant> plants, Taxonomy taxonomy) {
+  List<ManagedPlant> apply(
+    Iterable<ManagedPlant> plants,
+    Taxonomy taxonomy, {
+    List<OrchardSection> sections = const [],
+  }) {
     final ids = taxonId == null ? null : taxonomy.descendants(taxonId!);
+    final sectionIds = sectionId == null
+        ? null
+        : sectionDescendants(sectionId!, sections);
     final search = query.trim().toLowerCase();
     return plants.where((p) {
       final labels = taxonomy.taxa.any((t) => t.id == p.taxonId)
           ? taxonomy.ancestry(p.taxonId).map((t) => t.name).join(' ')
           : '';
-      return (status == null || p.status == status) &&
+      return (sectionIds == null || sectionIds.contains(p.sectionId)) &&
+          (status == null || p.status == status) &&
           (ids == null || ids.contains(p.taxonId)) &&
           (year == null ||
               (p.plantedOn != null &&

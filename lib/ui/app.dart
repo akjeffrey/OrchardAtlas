@@ -11,6 +11,9 @@ import 'plant_detail_screen.dart';
 import 'sign_in_screen.dart';
 import 'edit_plant_screen.dart';
 import 'tasks_screen.dart';
+import 'sections_screen.dart';
+import 'crops_screen.dart';
+import '../domain/landscape.dart';
 
 final dismissedFailureProvider = StateProvider<String?>((ref) => null);
 
@@ -28,6 +31,44 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/layout', builder: (_, _) => const SectionsScreen()),
+      GoRoute(
+        path: '/sections/new',
+        builder: (_, state) =>
+            SectionFormScreen(parentId: state.extra as String?),
+      ),
+      GoRoute(
+        path: '/sections/:id',
+        builder: (_, state) => SectionDetailScreen(state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/sections/:id/edit',
+        builder: (_, state) =>
+            SectionFormScreen(sectionId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/crops/new',
+        builder: (_, state) => CropFormScreen(
+          section: state.extra is OrchardSection
+              ? state.extra as OrchardSection
+              : null,
+          source: state.extra is CropPlanting
+              ? state.extra as CropPlanting
+              : null,
+        ),
+      ),
+      GoRoute(
+        path: '/crops/:id',
+        builder: (_, state) => CropDetailScreen(state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/crops/:id/harvest',
+        builder: (_, state) => CropHarvestScreen(state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/task-groups/:id',
+        builder: (_, state) => TaskGroupScreen(state.pathParameters['id']!),
+      ),
       GoRoute(path: '/sign-in', builder: (_, _) => const SignInScreen()),
       GoRoute(
         path: '/',
@@ -38,6 +79,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/plants/new',
         builder: (_, state) => AddPlantScreen(
+          sectionId: state.extra is OrchardSection
+              ? (state.extra as OrchardSection).id
+              : null,
           template: state.extra is PlantTemplate
               ? state.extra as PlantTemplate
               : null,
@@ -60,7 +104,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/tasks/new',
-        builder: (_, state) => TaskFormScreen(itemId: state.extra as String?),
+        builder: (_, state) => TaskFormScreen(
+          itemId: state.extra is String ? state.extra as String : null,
+          sectionId: state.extra is TaskTarget
+              ? (state.extra as TaskTarget).sectionId
+              : null,
+          cropId: state.extra is TaskTarget
+              ? (state.extra as TaskTarget).cropId
+              : null,
+        ),
       ),
       GoRoute(
         path: '/plants/:id/activity',

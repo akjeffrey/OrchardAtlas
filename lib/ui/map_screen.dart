@@ -6,10 +6,11 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import 'common.dart';
-import 'coordinate_preview.dart';
 import 'plant_symbols.dart';
 import 'plant_filters.dart';
 import 'tasks_screen.dart';
+import '../domain/landscape.dart';
+import 'layout_canvas.dart';
 
 class MapScreen extends ConsumerStatefulWidget {
   const MapScreen({super.key, this.focus});
@@ -93,6 +94,11 @@ class _MapState extends ConsumerState<MapScreen>
           'Pending offline changes can be lost. Wait until records sync before signing out. You will need to restart the app afterwards.',
         ),
         actions: [
+          IconButton(
+            tooltip: 'Areas, beds & rows',
+            onPressed: () => context.push('/layout'),
+            icon: const Icon(Icons.polyline),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Keep working'),
@@ -122,6 +128,8 @@ class _MapState extends ConsumerState<MapScreen>
     final place = ref.watch(placeProvider);
     final plants = ref.watch(plantsProvider);
     final taxonomy = ref.watch(taxonomyProvider);
+    final sections =
+        ref.watch(sectionsProvider).valueOrNull?.value ?? <OrchardSection>[];
     final markerSymbols = ref.watch(trialModeProvider)
         ? null
         : ref.watch(markerSymbolsProvider).valueOrNull;
@@ -170,11 +178,13 @@ class _MapState extends ConsumerState<MapScreen>
               data: (snapshot) {
                 final items = ref
                     .watch(plantFilterProvider)
-                    .apply(snapshot.value, taxonomy);
+                    .apply(snapshot.value, taxonomy, sections: sections);
                 final center =
                     selected ??
                     widget.focus ??
-                    (items.isNotEmpty ? items.first.location : null);
+                    (items.isNotEmpty
+                        ? items.first.location
+                        : sections.firstOrNull?.vertices.first);
                 return Column(
                   children: [
                     SyncStatus(snapshot),
@@ -210,15 +220,17 @@ class _MapState extends ConsumerState<MapScreen>
                         controller: tabs,
                         children: [
                           if (ref.watch(trialModeProvider))
-                            CoordinatePreview(
+                            LayoutCanvas(
+                              sections: sections,
                               plants: items,
                               selected: selected,
-                              focus: widget.focus,
-                              onSelect: (coordinates) => setState(() {
+                              center: widget.focus,
+                              onTap: (coordinates) => setState(() {
                                 selected = coordinates;
                                 locationMessage = 'Coordinate selected for Add Plant. Adjust coordinates on the plant form if needed.';
                               }),
-                              onOpen: (id) => context.push('/plants/$id'),
+                              onPlant: (id) => context.push('/plants/$id'),
+                              onSection: (id) => context.push('/sections/$id'),
                             )
                           else
                             GoogleMap(
@@ -249,6 +261,47 @@ class _MapState extends ConsumerState<MapScreen>
                                 locationMessage =
                                     'Map position selected for Add Plant.';
                               }),
+                              polylines: {
+                                for (final s in sections.where(
+                                  (s) => s.kind == SectionKind.row,
+                                ))
+                                  Polyline(
+                                    polylineId: PolylineId(s.id),
+                                    points: s.vertices
+                                        .map(
+                                          (p) =>
+                                              LatLng(p.latitude, p.longitude),
+                                        )
+                                        .toList(),
+                                    color: Colors.blue,
+                                    width: 4,
+                                    consumeTapEvents: true,
+                                    onTap: () =>
+                                        context.push('/sections/${s.id}'),
+                                  ),
+                              },
+                              polygons: {
+                                for (final s in sections.where(
+                                  (s) => s.kind != SectionKind.row,
+                                ))
+                                  Polygon(
+                                    polygonId: PolygonId(s.id),
+                                    points: s.vertices
+                                        .map(
+                                          (p) =>
+                                              LatLng(p.latitude, p.longitude),
+                                        )
+                                        .toList(),
+                                    fillColor: Colors.green.withValues(
+                                      alpha: 0.12,
+                                    ),
+                                    strokeColor: Colors.green,
+                                    strokeWidth: 2,
+                                    consumeTapEvents: true,
+                                    onTap: () =>
+                                        context.push('/sections/${s.id}'),
+                                  ),
+                              },
                               markers: {
                                 for (final p in items)
                                   Marker(

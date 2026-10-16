@@ -54,6 +54,13 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
               ),
               Text(path),
               Text('Status: ${plant.status.name}'),
+              if (plant.sectionId != null)
+                TextButton(
+                  onPressed: () => context.push('/sections/${plant.sectionId}'),
+                  child: Text(
+                    'Area / row: ${ref.watch(sectionsProvider).valueOrNull?.value.where((s) => s.id == plant.sectionId).firstOrNull?.name ?? plant.sectionId}',
+                  ),
+                ),
               Text('Planting date: ${plant.plantedOn ?? 'Not recorded'}'),
               if (plant.rootstock.isNotEmpty)
                 Text('Rootstock: ${plant.rootstock}'),

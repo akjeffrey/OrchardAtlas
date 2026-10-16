@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
+import '../domain/landscape.dart';
+import 'landscape_mapping.dart';
 import '../domain/repositories.dart';
 import '../domain/taxonomy.dart';
 import 'firestore_mapping.dart';
@@ -17,6 +19,9 @@ class LocalTrialRepository implements OrchardRepository {
     this.events,
     this.taxa,
     this.tasks,
+    this.sections,
+    this.crops,
+    this.cropHarvests,
   );
   final SharedPreferences preferences;
   final Place place;
@@ -24,6 +29,9 @@ class LocalTrialRepository implements OrchardRepository {
   final List<PlantEvent> events;
   final List<Taxon> taxa;
   final List<OrchardTask> tasks;
+  final List<OrchardSection> sections;
+  final List<CropPlanting> crops;
+  final List<CropHarvest> cropHarvests;
   final _changes = StreamController<void>.broadcast();
   final _failures = StreamController<WriteFailure>.broadcast();
   Future<void> _writes = Future.value();
@@ -47,6 +55,7 @@ class LocalTrialRepository implements OrchardRepository {
         ManagedPlant(
           id: p['id'] as String,
           propertyId: place.id,
+          sectionId: p['sectionId'] as String?,
           plantedOn: _readPlantedOn(p as Map, data),
           rootstock: p['rootstock'] as String? ?? '',
           nursery: p['nursery'] as String? ?? '',
@@ -94,6 +103,11 @@ class LocalTrialRepository implements OrchardRepository {
         OrchardTask(
           id: t['id'] as String,
           propertyId: place.id,
+          sectionId: t['sectionId'] as String?,
+          cropId: t['cropId'] as String?,
+          groupId: t['groupId'] as String?,
+          groupScope: t['groupScope'] as String? ?? '',
+          completedOn: t['completedOn'] as String?,
           title: t['title'] as String,
           notes: t['notes'] as String,
           itemId: t['itemId'] as String?,
@@ -109,6 +123,30 @@ class LocalTrialRepository implements OrchardRepository {
       events,
       taxa,
       tasks,
+      [
+        for (final s in data?['sections'] as List? ?? [])
+          LandscapeMapping.readSection(
+            place.id,
+            s['id'] as String,
+            Map<String, dynamic>.from(s as Map),
+          ),
+      ],
+      [
+        for (final c in data?['crops'] as List? ?? [])
+          LandscapeMapping.readCrop(
+            place.id,
+            c['id'] as String,
+            Map<String, dynamic>.from(c as Map),
+          ),
+      ],
+      [
+        for (final h in data?['cropHarvests'] as List? ?? [])
+          LandscapeMapping.readHarvest(
+            place.id,
+            h['id'] as String,
+            Map<String, dynamic>.from(h as Map),
+          ),
+      ],
     );
   }
 
@@ -166,6 +204,16 @@ class LocalTrialRepository implements OrchardRepository {
   void _persist(String recordId) {
     final json = jsonEncode({
       'createdAt': place.createdAt.toIso8601String(),
+      'sections': [
+        for (final s in sections) {'id': s.id, ...LandscapeMapping.section(s)},
+      ],
+      'crops': [
+        for (final c in crops) {'id': c.id, ...LandscapeMapping.crop(c)},
+      ],
+      'cropHarvests': [
+        for (final h in cropHarvests)
+          {'id': h.id, ...LandscapeMapping.harvest(h)},
+      ],
       'taxa': [
         for (final t in taxa) {'id': t.id, ...FirestoreMapping.taxonToMap(t)},
       ],
@@ -185,6 +233,7 @@ class LocalTrialRepository implements OrchardRepository {
         for (final t in tasks)
           {
             'id': t.id,
+            ...FirestoreMapping.taskExtrasToMap(t),
             'title': t.title,
             'notes': t.notes,
             'itemId': t.itemId,
@@ -245,6 +294,10 @@ class LocalTrialRepository implements OrchardRepository {
             plantingEvent.propertyId != plant.propertyId)) {
       throw ArgumentError('Planting activity must belong to this plant');
     }
+    if (plant.sectionId != null &&
+        !sections.any((s) => s.id == plant.sectionId)) {
+      throw ArgumentError('Unknown section');
+    }
     plants.add(plant);
     if (plantingEvent != null) events.add(plantingEvent);
     _persist(plant.id);
@@ -292,6 +345,10 @@ class LocalTrialRepository implements OrchardRepository {
         'Plant identity and capture fields cannot be changed',
       );
     }
+    if (plant.sectionId != null &&
+        !sections.any((s) => s.id == plant.sectionId)) {
+      throw ArgumentError('Unknown section');
+    }
     plants[index] = plant;
     _persist(plant.id);
   }
@@ -304,27 +361,136 @@ class LocalTrialRepository implements OrchardRepository {
             (a, b) => (a.dueDate ?? '9999').compareTo(b.dueDate ?? '9999'),
           ),
       );
-  @override
-  void saveTask(OrchardTask task) {
+  void _validateTask(OrchardTask task) {
     if (task.propertyId != place.id ||
-        (task.itemId != null && !plants.any((p) => p.id == task.itemId))) {
+        (task.itemId != null && !plants.any((p) => p.id == task.itemId)) ||
+        (task.sectionId != null &&
+            !sections.any((s) => s.id == task.sectionId)) ||
+        (task.cropId != null && !crops.any((c) => c.id == task.cropId))) {
       throw ArgumentError('Unknown task target');
     }
+    final old = tasks.where((t) => t.id == task.id).firstOrNull;
+    if (old != null &&
+        (old.itemId != task.itemId ||
+            old.sectionId != task.sectionId ||
+            old.cropId != task.cropId ||
+            old.groupId != task.groupId ||
+            old.groupScope != task.groupScope ||
+            old.createdAt != task.createdAt ||
+            old.title != task.title ||
+            old.notes != task.notes ||
+            old.dueDate != task.dueDate)) {
+      throw ArgumentError('Only task status can be updated');
+    }
+  }
+
+  @override
+  void saveTask(OrchardTask task) {
+    _validateTask(task);
     final index = tasks.indexWhere((t) => t.id == task.id);
     if (index < 0) {
       tasks.add(task);
     } else {
-      final old = tasks[index];
-      if (old.itemId != task.itemId ||
-          old.createdAt != task.createdAt ||
-          old.title != task.title ||
-          old.notes != task.notes ||
-          old.dueDate != task.dueDate) {
-        throw ArgumentError('Only task status can be updated');
-      }
       tasks[index] = task;
     }
     _persist(task.id);
+  }
+
+  @override
+  void saveTaskGroup(List<OrchardTask> group) {
+    if (group.isEmpty ||
+        group.length > 400 ||
+        group.first.groupId == null ||
+        group.any(
+          (t) =>
+              t.groupId != group.first.groupId ||
+              tasks.any((old) => old.id == t.id),
+        ) ||
+        group.map((t) => t.id).toSet().length != group.length ||
+        group.map((t) => t.itemId).toSet().length != group.length) {
+      throw ArgumentError('Invalid group membership');
+    }
+    for (final task in group) {
+      _validateTask(task);
+    }
+    tasks.addAll(group);
+    _persist(group.first.groupId!);
+  }
+
+  @override
+  Stream<RepositorySnapshot<List<OrchardSection>>> watchSections(
+    String propertyId,
+  ) => _watch(() => sections.where((s) => s.propertyId == propertyId).toList());
+  @override
+  void saveSection(OrchardSection section) {
+    if (section.propertyId != place.id) throw ArgumentError('Unknown property');
+    validateSectionParent(section, sections);
+    final index = sections.indexWhere((s) => s.id == section.id);
+    if (index >= 0) {
+      final old = sections[index];
+      if (old.parentId != section.parentId ||
+          old.kind != section.kind ||
+          old.createdAt != section.createdAt) {
+        throw ArgumentError('Section identity is immutable');
+      }
+      sections[index] = section;
+    } else {
+      sections.add(section);
+    }
+    _persist(section.id);
+  }
+
+  @override
+  Stream<RepositorySnapshot<List<CropPlanting>>> watchCrops(
+    String propertyId,
+  ) => _watch(() => crops.where((c) => c.propertyId == propertyId).toList());
+  @override
+  void saveCrop(CropPlanting crop) {
+    if (crop.propertyId != place.id ||
+        !sections.any((s) => s.id == crop.sectionId)) {
+      throw ArgumentError('Unknown crop section');
+    }
+    final index = crops.indexWhere((c) => c.id == crop.id);
+    if (index >= 0) {
+      final old = crops[index];
+      final a = LandscapeMapping.crop(old)
+        ..remove('status')
+        ..remove('harvestedOn');
+      final b = LandscapeMapping.crop(crop)
+        ..remove('status')
+        ..remove('harvestedOn');
+      if (jsonEncode(a) != jsonEncode(b) ||
+          old.status == CropStatus.ended ||
+          crop.status == CropStatus.growing) {
+        throw ArgumentError('Create a new planting to change a season');
+      }
+      crops[index] = crop;
+    } else {
+      crops.add(crop);
+    }
+    _persist(crop.id);
+  }
+
+  @override
+  Stream<RepositorySnapshot<List<CropHarvest>>> watchCropHarvests(
+    String propertyId,
+  ) => _watch(
+    () => cropHarvests.where((h) => h.propertyId == propertyId).toList(),
+  );
+  @override
+  void appendCropHarvest(CropHarvest harvest) {
+    if (harvest.propertyId != place.id ||
+        !crops.any((c) => c.id == harvest.cropId) ||
+        cropHarvests.any((h) => h.id == harvest.id)) {
+      throw ArgumentError('Invalid harvest target or duplicate ID');
+    }
+    final crop = crops.firstWhere((c) => c.id == harvest.cropId);
+    if (crop.plantedOn != null &&
+        harvest.activityDate.compareTo(crop.plantedOn!) < 0) {
+      throw ArgumentError('Harvest date precedes planting');
+    }
+    cropHarvests.add(harvest);
+    _persist(harvest.id);
   }
 
   @override
@@ -335,6 +501,9 @@ class LocalTrialRepository implements OrchardRepository {
     events.clear();
     taxa.clear();
     tasks.clear();
+    sections.clear();
+    crops.clear();
+    cropHarvests.clear();
     _changes.add(null);
   }
 }

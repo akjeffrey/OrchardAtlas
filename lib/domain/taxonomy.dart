@@ -113,6 +113,20 @@ final starterTaxonomy = Taxonomy([
     rank: TaxonRank.species,
     parentId: '38a0fbb0-6a36-4a48-8d17-000000000009',
   ),
+  const Taxon(
+    id: '38a0fbb0-6a36-4a48-8d17-000000000901',
+    name: 'Allium',
+    rank: TaxonRank.genus,
+    parentId: '38a0fbb0-6a36-4a48-8d17-000000000228',
+    symbol: PlantSymbol.flower,
+  ),
+  const Taxon(
+    id: '38a0fbb0-6a36-4a48-8d17-000000000902',
+    name: 'Garlic',
+    rank: TaxonRank.species,
+    parentId: '38a0fbb0-6a36-4a48-8d17-000000000901',
+    symbol: PlantSymbol.flower,
+  ),
   ...additionalStarterTaxa(),
 ]);
 

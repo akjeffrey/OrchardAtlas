@@ -67,6 +67,7 @@ class FirestoreMapping {
     return ManagedPlant(
       id: id,
       propertyId: propertyId,
+      sectionId: d['sectionId'] as String?,
       plantedOn: d['plantedOn'] as String?,
       rootstock: d['rootstock'] as String? ?? '',
       nursery: d['nursery'] as String? ?? '',
@@ -81,6 +82,7 @@ class FirestoreMapping {
   }
 
   static Map<String, dynamic> plantMetadataToMap(ManagedPlant p) => {
+    if (p.sectionId != null) 'sectionId': p.sectionId,
     'plantedOn': p.plantedOn,
     'rootstock': p.rootstock,
     'nursery': p.nursery,
@@ -90,13 +92,22 @@ class FirestoreMapping {
   };
   static Map<String, dynamic> editablePlantToMap(ManagedPlant p) => {
     'name': p.name,
+    'sectionId': p.sectionId,
     'rootstock': p.rootstock,
     'nursery': p.nursery,
     'notes': p.notes,
     'status': p.status.name,
   };
+  static Map<String, dynamic> taskExtrasToMap(OrchardTask t) => {
+    if (t.sectionId != null) 'sectionId': t.sectionId,
+    if (t.cropId != null) 'cropId': t.cropId,
+    if (t.groupId != null) 'groupId': t.groupId,
+    if (t.groupScope.isNotEmpty) 'groupScope': t.groupScope,
+    'completedOn': t.completedOn,
+  };
   static Map<String, dynamic> taskToMap(OrchardTask t) => {
     'schemaVersion': 1,
+    ...taskExtrasToMap(t),
     'title': t.title,
     'notes': t.notes,
     'itemId': t.itemId,
@@ -115,6 +126,11 @@ class FirestoreMapping {
       propertyId: propertyId,
       title: d['title'] as String,
       notes: d['notes'] as String,
+      sectionId: d['sectionId'] as String?,
+      cropId: d['cropId'] as String?,
+      groupId: d['groupId'] as String?,
+      groupScope: d['groupScope'] as String? ?? '',
+      completedOn: d['completedOn'] as String?,
       itemId: d['itemId'] as String?,
       dueDate: d['dueDate'] as String?,
       status: TaskStatus.values.byName(d['status'] as String),

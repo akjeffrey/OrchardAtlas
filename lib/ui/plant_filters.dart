@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import '../domain/filters.dart';
+import 'sections_screen.dart';
 
 final plantFilterProvider = StateProvider<PlantFilter>(
   (ref) => const PlantFilter(),
@@ -42,6 +43,7 @@ class _FilterBarState extends ConsumerState<PlantFilterBar> {
                   ref.read(plantFilterProvider.notifier).state = PlantFilter(
                     query: value,
                     taxonId: filter.taxonId,
+                    sectionId: filter.sectionId,
                     year: filter.year,
                     status: filter.status,
                   ),
@@ -96,6 +98,19 @@ class PlantFilterSheet extends ConsumerWidget {
               const Text(
                 'The map and plant list use the same filters. Parent classifications include every descendant.',
               ),
+              SectionPicker(
+                value: filter.sectionId,
+                label: 'Area / bed / row (includes descendants)',
+                empty: 'All areas',
+                onChanged: (id) =>
+                    ref.read(plantFilterProvider.notifier).state = PlantFilter(
+                      query: filter.query,
+                      taxonId: filter.taxonId,
+                      sectionId: id,
+                      year: filter.year,
+                      status: filter.status,
+                    ),
+              ),
               DropdownButtonFormField<String>(
                 key: ValueKey('filter-taxon-${filter.taxonId}'),
                 initialValue: filter.taxonId ?? '',
@@ -119,6 +134,7 @@ class PlantFilterSheet extends ConsumerWidget {
                     ref.read(plantFilterProvider.notifier).state = PlantFilter(
                       query: filter.query,
                       taxonId: value == '' ? null : value,
+                      sectionId: filter.sectionId,
                       year: filter.year,
                       status: filter.status,
                     ),
@@ -139,6 +155,7 @@ class PlantFilterSheet extends ConsumerWidget {
                     ref.read(plantFilterProvider.notifier).state = PlantFilter(
                       query: filter.query,
                       taxonId: filter.taxonId,
+                      sectionId: filter.sectionId,
                       year: value == '' ? null : int.parse(value!),
                       status: filter.status,
                     ),
@@ -162,6 +179,7 @@ class PlantFilterSheet extends ConsumerWidget {
                     ref.read(plantFilterProvider.notifier).state = PlantFilter(
                       query: filter.query,
                       taxonId: filter.taxonId,
+                      sectionId: filter.sectionId,
                       year: filter.year,
                       status: value == 'all'
                           ? null

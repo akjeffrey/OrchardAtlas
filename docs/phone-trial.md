@@ -67,3 +67,16 @@ Android updates must have the same signing certificate as the installed app. The
 - Record first/full bloom, petal fall, fruit set, pests/disease or damage. Record lb and kg harvests in the same year and verify the totals remain separate.
 
 Older trial saves load with active status and empty metadata; an existing planting activity supplies a missing planting-date field. No records are intentionally deleted by this storage upgrade. This does not remove the signing limitation described above: replacing an installed trial by uninstalling still deletes its data.
+
+## Trial 0.3: group checklists, layout and seasons
+
+The launcher uses the supplied **OrchardAtlas Original Option 1** artwork on Android and iOS. Android's flattened source is used as a legacy launcher image, not an invented adaptive foreground.
+
+1. Open **Areas, beds & rows** from the home app-bar icon. Add an area/bed polygon or row line. Tap vertices in order, undo, enter coordinates, or edit a numbered vertex. GPS centers the sketch; it does not claim survey accuracy. Areas close automatically. The trial sketch has no basemap; connected mode uses Google Maps.
+2. Create a garlic bed, then **Add child area / row** twice. Name the rows. Section detail shows children, assigned plants, current crops and previous seasons. Shape/name/notes can be edited; parent identity remains fixed.
+3. Use **Add plant here**, or choose an area/row on Add/Edit Plant. Put several blueberry bushes of different varieties in one row. Similar entry preserves the section, planting date and rootstock/source. Home plant filters can select an area and all its descendant rows.
+4. For a raspberry patch or garlic row, choose **Add seasonal planting**. Select the species/variety, add a new variety if needed, and enter a season/year and optional planting date. Label a mixed row segment, such as north half. Permanent sections can contain several varieties or seasonal records without individual plant markers.
+5. Record crop harvests with explicit units and dates. **Mark harvest complete** or **End season** preserves the record. **Replant for a new season** creates another UUID record with classification/label prefilled and a fresh season/date; edit those fields before saving. Prior crop varieties, dates and unit-separated yearly harvests remain available. Due-date tasks can target sections or crops.
+6. Add a task and select **Group: all matching plants**. Choose Apple (includes varieties), and optionally an area/row (includes descendants). One submission creates a checklist for the matching active plants. Open the group and complete, skip/cancel or reopen each plant independently. Completion dates and remaining work persist. Counts use the whole group even when the main list is filtered. Membership is captured at creation; later-added trees are not silently included. Maximum 400 members per group; split larger groups by area. Checking a task does not automatically create a pruning activity; tap the plant to record that separately.
+
+All additions use the trial's existing local storage and write queue. Existing plants, tasks and activities load with unassigned sections/no group IDs and empty layout/season collections. The debug signing limitation still applies: do not uninstall an old trial with valuable local records merely to resolve a certificate mismatch.

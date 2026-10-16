@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../application/providers.dart';
 import 'common.dart';
+import 'sections_screen.dart';
 
 class EditPlantScreen extends ConsumerStatefulWidget {
   const EditPlantScreen(this.itemId, {super.key});
@@ -18,6 +19,7 @@ class _EditState extends ConsumerState<EditPlantScreen> {
       nursery = TextEditingController(),
       notes = TextEditingController();
   bool initialized = false;
+  String? sectionId;
   String? error;
   @override
   void dispose() {
@@ -42,6 +44,7 @@ class _EditState extends ConsumerState<EditPlantScreen> {
                 .firstOrNull;
             if (plant == null) return const ErrorPanel('Plant unavailable');
             if (!initialized) {
+              sectionId = plant.sectionId;
               name.text = plant.name;
               rootstock.text = plant.rootstock;
               nursery.text = plant.nursery;
@@ -58,6 +61,10 @@ class _EditState extends ConsumerState<EditPlantScreen> {
                   controller: name,
                   maxLength: 500,
                   decoration: const InputDecoration(labelText: 'Plant name'),
+                ),
+                SectionPicker(
+                  value: sectionId,
+                  onChanged: (id) => setState(() => sectionId = id),
                 ),
                 TextField(
                   controller: rootstock,
@@ -90,6 +97,8 @@ class _EditState extends ConsumerState<EditPlantScreen> {
                               rootstock: rootstock.text,
                               nursery: nursery.text,
                               notes: notes.text,
+                              sectionId: sectionId,
+                              clearSection: sectionId == null,
                             ),
                           );
                       context.go('/plants/${plant.id}');

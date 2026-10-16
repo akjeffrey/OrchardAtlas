@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/models.dart';
+import '../domain/landscape.dart';
+import 'landscape_mapping.dart';
 import '../domain/repositories.dart';
 import 'firestore_mapping.dart';
 
@@ -228,6 +230,100 @@ class FirestoreOrchardRepository implements OrchardRepository {
         .collection('tasks')
         .doc(task.id)
         .set(FirestoreMapping.taskToMap(task)),
+  );
+
+  @override
+  void saveTaskGroup(List<OrchardTask> tasks) {
+    if (tasks.isEmpty ||
+        tasks.length > 400 ||
+        tasks.first.groupId == null ||
+        tasks.any(
+          (t) =>
+              t.propertyId != tasks.first.propertyId ||
+              t.groupId != tasks.first.groupId,
+        ) ||
+        tasks.map((t) => t.itemId).toSet().length != tasks.length ||
+        tasks.map((t) => t.id).toSet().length != tasks.length) {
+      throw ArgumentError('Invalid task group');
+    }
+    final batch = firestore.batch();
+    for (final task in tasks) {
+      batch.set(
+        firestore
+            .collection('properties')
+            .doc(task.propertyId)
+            .collection('tasks')
+            .doc(task.id),
+        FirestoreMapping.taskToMap(task),
+      );
+    }
+    _observe(tasks.first.groupId!, batch.commit());
+  }
+
+  CollectionReference<Map<String, dynamic>> _collection(
+    String propertyId,
+    String name,
+  ) => firestore.collection('properties').doc(propertyId).collection(name);
+  Stream<RepositorySnapshot<List<T>>> _landscapeStream<T>(
+    String propertyId,
+    String name,
+    T Function(String, Map<String, dynamic>) decode,
+  ) => _collection(propertyId, name)
+      .snapshots(includeMetadataChanges: true)
+      .map(
+        (s) => RepositorySnapshot(
+          s.docs.map((d) => decode(d.id, d.data())).toList(),
+          isFromCache: s.metadata.isFromCache,
+          hasPendingWrites: s.metadata.hasPendingWrites,
+        ),
+      );
+  @override
+  Stream<RepositorySnapshot<List<OrchardSection>>> watchSections(
+    String propertyId,
+  ) => _landscapeStream(
+    propertyId,
+    'sections',
+    (id, d) => LandscapeMapping.readSection(propertyId, id, d),
+  );
+  @override
+  void saveSection(OrchardSection section) => _observe(
+    section.id,
+    _collection(
+      section.propertyId,
+      'sections',
+    ).doc(section.id).set(LandscapeMapping.section(section, native: true)),
+  );
+  @override
+  Stream<RepositorySnapshot<List<CropPlanting>>> watchCrops(
+    String propertyId,
+  ) => _landscapeStream(
+    propertyId,
+    'crops',
+    (id, d) => LandscapeMapping.readCrop(propertyId, id, d),
+  );
+  @override
+  void saveCrop(CropPlanting crop) => _observe(
+    crop.id,
+    _collection(
+      crop.propertyId,
+      'crops',
+    ).doc(crop.id).set(LandscapeMapping.crop(crop, native: true)),
+  );
+  @override
+  Stream<RepositorySnapshot<List<CropHarvest>>> watchCropHarvests(
+    String propertyId,
+  ) => _landscapeStream(
+    propertyId,
+    'cropHarvests',
+    (id, d) => LandscapeMapping.readHarvest(propertyId, id, d),
+  );
+  @override
+  void appendCropHarvest(CropHarvest harvest) => _observe(
+    harvest.id,
+    _collection(
+      harvest.propertyId,
+      'cropHarvests',
+    ).doc(harvest.id).set(LandscapeMapping.harvest(harvest, native: true)),
   );
 
   @override

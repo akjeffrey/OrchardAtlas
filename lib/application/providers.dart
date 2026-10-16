@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/models.dart';
+import '../domain/landscape.dart';
 import '../domain/repositories.dart';
 import '../domain/taxonomy.dart';
 
@@ -88,6 +89,7 @@ class OrchardCommands {
     required Coordinates location,
     DateTime? plantingDate,
     String? authorId,
+    String? sectionId,
     String rootstock = '',
     String nursery = '',
     String notes = '',
@@ -103,6 +105,7 @@ class OrchardCommands {
       taxonId: taxonId,
       location: location,
       createdAt: DateTime.now().toUtc(),
+      sectionId: sectionId,
       plantedOn: plantingDate == null ? null : calendarDate(plantingDate),
       rootstock: rootstock,
       nursery: nursery,
@@ -153,3 +156,23 @@ class OrchardCommands {
     );
   }
 }
+
+final sectionsProvider =
+    StreamProvider<RepositorySnapshot<List<OrchardSection>>>((ref) async* {
+      final repo = ref.watch(orchardRepositoryProvider);
+      final place = await ref.watch(placeProvider.future);
+      yield* repo.watchSections(place.id);
+    });
+final cropsProvider = StreamProvider<RepositorySnapshot<List<CropPlanting>>>((
+  ref,
+) async* {
+  final repo = ref.watch(orchardRepositoryProvider);
+  final place = await ref.watch(placeProvider.future);
+  yield* repo.watchCrops(place.id);
+});
+final cropHarvestsProvider =
+    StreamProvider<RepositorySnapshot<List<CropHarvest>>>((ref) async* {
+      final repo = ref.watch(orchardRepositoryProvider);
+      final place = await ref.watch(placeProvider.future);
+      yield* repo.watchCropHarvests(place.id);
+    });

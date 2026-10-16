@@ -1,0 +1,231 @@
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../application/providers.dart';
+import 'plant_symbols.dart';
+
+import '../domain/models.dart';
+import '../domain/landscape.dart';
+
+class LayoutCanvas extends ConsumerWidget {
+  const LayoutCanvas({
+    super.key,
+    this.sections = const [],
+    this.plants = const [],
+    this.draft = const [],
+    this.selected,
+    this.center,
+    this.span,
+    this.onTap,
+    this.onSection,
+    this.onPlant,
+  });
+  final List<OrchardSection> sections;
+  final List<ManagedPlant> plants;
+  final List<Coordinates> draft;
+  final Coordinates? selected, center;
+  final double? span;
+  final ValueChanged<Coordinates>? onTap;
+  final ValueChanged<String>? onSection, onPlant;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final points = [
+      ...sections.expand((s) => s.vertices),
+      ...plants.map((p) => p.location),
+      ...draft,
+      ?selected,
+      ?center,
+    ];
+    if (points.isEmpty) {
+      return const Center(
+        child: Text(
+          'Capture GPS or enter a coordinate to start.\nNo basemap in trial mode.',
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    final minLat = center != null && span != null
+        ? math.max(-90.0, center!.latitude - span!)
+        : math.max(
+            -90.0,
+            points.map((p) => p.latitude).reduce(math.min) - 0.0002,
+          );
+    final maxLat = center != null && span != null
+        ? math.min(90.0, center!.latitude + span!)
+        : math.min(
+            90.0,
+            points.map((p) => p.latitude).reduce(math.max) + 0.0002,
+          );
+    final minLon = center != null && span != null
+        ? math.max(-180.0, center!.longitude - span!)
+        : math.max(
+            -180.0,
+            points.map((p) => p.longitude).reduce(math.min) - 0.0002,
+          );
+    final maxLon = center != null && span != null
+        ? math.min(180.0, center!.longitude + span!)
+        : math.min(
+            180.0,
+            points.map((p) => p.longitude).reduce(math.max) + 0.0002,
+          );
+    return LayoutBuilder(
+      builder: (context, bounds) {
+        final width = math.max(1.0, bounds.maxWidth - 48),
+            height = math.max(1.0, bounds.maxHeight - 48);
+        Offset pixel(Coordinates p) => Offset(
+          24 + (p.longitude - minLon) / (maxLon - minLon) * width,
+          24 + (maxLat - p.latitude) / (maxLat - minLat) * height,
+        );
+        return ClipRect(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapUp: onTap == null
+                ? null
+                : (tap) => onTap!(
+                    Coordinates(
+                      maxLat -
+                          ((tap.localPosition.dy - 24) / height).clamp(
+                                0.0,
+                                1.0,
+                              ) *
+                              (maxLat - minLat),
+                      minLon +
+                          ((tap.localPosition.dx - 24) / width).clamp(
+                                0.0,
+                                1.0,
+                              ) *
+                              (maxLon - minLon),
+                    ),
+                  ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                ColoredBox(
+                  color: Theme.of(context).colorScheme.surfaceContainerLow,
+                ),
+                CustomPaint(
+                  painter: _Shapes(
+                    sections: sections,
+                    draft: draft,
+                    pixel: pixel,
+                  ),
+                ),
+                const Positioned(
+                  left: 8,
+                  top: 4,
+                  child: Text('Coordinate sketch · North ↑ · No basemap'),
+                ),
+                for (final s in sections)
+                  Positioned(
+                    left: pixel(s.vertices.first).dx - 12,
+                    top: pixel(s.vertices.first).dy - 18,
+                    child: TextButton(
+                      onPressed: onSection == null
+                          ? null
+                          : () => onSection!(s.id),
+                      child: Text(
+                        s.name,
+                        style: const TextStyle(backgroundColor: Colors.white70),
+                      ),
+                    ),
+                  ),
+                for (final p in plants)
+                  Positioned(
+                    left: pixel(p.location).dx - 20,
+                    top: pixel(p.location).dy - 20,
+                    child: IconButton(
+                      tooltip: p.name,
+                      onPressed: onPlant == null ? null : () => onPlant!(p.id),
+                      icon: Text(
+                        symbolLabels[ref
+                                .watch(taxonomyProvider)
+                                .taxa
+                                .where((t) => t.id == p.taxonId)
+                                .firstOrNull
+                                ?.symbol ??
+                            PlantSymbol.tree]!,
+                        style: const TextStyle(fontSize: 26),
+                      ),
+                    ),
+                  ),
+                if (selected != null)
+                  Positioned(
+                    left: pixel(selected!).dx - 12,
+                    top: pixel(selected!).dy - 24,
+                    child: const IgnorePointer(
+                      child: Icon(Icons.location_on, color: Colors.blue),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _Shapes extends CustomPainter {
+  _Shapes({required this.sections, required this.draft, required this.pixel});
+  final List<OrchardSection> sections;
+  final List<Coordinates> draft;
+  final Offset Function(Coordinates) pixel;
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final s in sections) {
+      final path = Path()
+        ..moveTo(pixel(s.vertices.first).dx, pixel(s.vertices.first).dy);
+      for (final p in s.vertices.skip(1)) {
+        path.lineTo(pixel(p).dx, pixel(p).dy);
+      }
+      if (s.kind != SectionKind.row) {
+        path.close();
+        canvas.drawPath(
+          path,
+          Paint()..color = Colors.green.withValues(alpha: 0.12),
+        );
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = (s.kind == SectionKind.row ? Colors.blue : Colors.green)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
+      );
+    }
+    if (draft.isNotEmpty) {
+      final path = Path()..moveTo(pixel(draft.first).dx, pixel(draft.first).dy);
+      for (final p in draft.skip(1)) {
+        path.lineTo(pixel(p).dx, pixel(p).dy);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = Colors.deepOrange
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
+      );
+      for (var i = 0; i < draft.length; i++) {
+        canvas.drawCircle(
+          pixel(draft[i]),
+          5,
+          Paint()..color = Colors.deepOrange,
+        );
+        final text = TextPainter(
+          text: TextSpan(
+            text: '${i + 1}',
+            style: const TextStyle(color: Colors.black, fontSize: 12),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        text.paint(canvas, pixel(draft[i]) + const Offset(6, 2));
+        text.dispose();
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _Shapes oldDelegate) => true;
+}
