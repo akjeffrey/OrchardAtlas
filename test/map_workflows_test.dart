@@ -44,6 +44,10 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     repo = LocalTrialRepository.open(await SharedPreferences.getInstance());
     platform.initialize.complete();
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -94,6 +98,7 @@ void main() {
       expect(platform.created.length, count);
       expect(platform.disposed, isEmpty);
     },
+    timeout: const Timeout(Duration(minutes: 1)),
   );
 
   testWidgets(
@@ -125,14 +130,17 @@ void main() {
             .value,
         repo.sections.single.id,
       );
-      await repo
-          .watchSections(repo.place.id)
-          .firstWhere((s) => !s.hasPendingWrites);
-      final restarted = LocalTrialRepository.open(
-        await SharedPreferences.getInstance(),
-      );
-      expect(restarted.sections.single.name, 'Blueberry row');
+      await tester.runAsync(() async {
+        await repo
+            .watchSections(repo.place.id)
+            .firstWhere((s) => !s.hasPendingWrites);
+        final restarted = LocalTrialRepository.open(
+          await SharedPreferences.getInstance(),
+        );
+        expect(restarted.sections.single.name, 'Blueberry row');
+      });
     },
+    timeout: const Timeout(Duration(minutes: 1)),
   );
 
   testWidgets(
@@ -183,6 +191,7 @@ void main() {
         isEmpty,
       );
     },
+    timeout: const Timeout(Duration(minutes: 1)),
   );
 
   testWidgets(
@@ -222,5 +231,6 @@ void main() {
         CameraUpdate.newLatLngZoom(const LatLng(45, -75), 19).toJson(),
       );
     },
+    timeout: const Timeout(Duration(minutes: 1)),
   );
 }
