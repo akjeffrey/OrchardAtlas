@@ -24,6 +24,7 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 
 ## Remaining product features
 
+- [ ] Simplify plant classification selectors to **Group → Type → Variety**: keep Group, rename Genus to Type and Species to Variety, and remove the Cultivar selector entirely. Plan how existing cultivar selections and custom taxonomy remain usable when moving to the three-level selection flow.
 - [ ] Areas, Beds & Rows page basemap: use Google Maps with the app's default satellite view beneath the orchard's area/bed polygons and row lines, so their full shapes are shown over geographic imagery.
 - [ ] Row and area colors: let users choose and save a color for each row and each area, while continuing to display the complete row line or area shape on the map.
 - [ ] Optional row/area icons: let users choose an optional icon displayed at the center of the row or area, in addition to its full colored line or shape.
