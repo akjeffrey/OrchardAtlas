@@ -44,8 +44,9 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     final template = widget.template;
     if (template == null ||
         templateApplied ||
-        !taxonomy.taxa.any((t) => t.id == template.taxonId))
+        !taxonomy.taxa.any((t) => t.id == template.taxonId)) {
       return;
+    }
     final path = taxonomy.ancestry(template.taxonId);
     name.text = template.name;
     customName = template.name != path.last.name;

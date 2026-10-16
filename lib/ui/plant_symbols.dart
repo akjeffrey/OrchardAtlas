@@ -38,6 +38,7 @@ final markerSymbolsProvider =
           canvas,
           Offset((64 - painter.width) / 2, (64 - painter.height) / 2),
         );
+        painter.dispose();
         final picture = recorder.endRecording();
         final image = await picture.toImage(64, 64);
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);

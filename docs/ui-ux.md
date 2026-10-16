@@ -16,8 +16,8 @@ states with recoverable actions. Never show raw credentials in errors.
    retain manual map selection. Do not silently use a hardcoded coordinate.
 3. **Add Plant**: plant name; dependent group, genus, species, cultivar selectors;
    changing a parent clears descendants. Current-GPS button, lat/lon with manual
-   correction, explicit location confirmation. Save requires identity and valid
-   confirmed position. Success centers the map on the saved marker without awaiting network sync; tap
+   correction and optional planting date. Save requires identity and valid
+   coordinates. The post-save prompt offers another plant or centers the map without awaiting network sync; tap
    the marker to open detail.
 4. **Plant Detail**: taxonomy breadcrumb, coordinates, annual selector with kg and
    count totals, ordered activity history, Record Activity and Add Another Like
@@ -25,8 +25,8 @@ states with recoverable actions. Never show raw credentials in errors.
 5. **Record Activity**: type selector, selected date (defaults today), notes;
    harvest adds quantity and unit. Validate inline, prevent double submits.
    New event returns to detail and updates derived totals from the local stream.
-6. **Add Another Like This**: preselect taxonomy and name; blank location until GPS
-   or manual position is explicitly confirmed. Generate a new plant ID on save.
+6. **Add Another Like This**: preselect taxonomy and name, then fetch a fresh GPS
+   position with manual correction available. Generate a new plant ID on save.
 
 ## Errors and accessibility
 GPS denial explains manual entry and offers app settings for permanent denial.

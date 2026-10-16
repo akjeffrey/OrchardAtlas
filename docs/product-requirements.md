@@ -15,9 +15,9 @@ to a plant over successive seasons. Precise foraging coordinates are private.
 - Request foreground GPS only after a user action. Handle disabled services,
   denied permission, permanent denial, timeout, and poor accuracy. Let the user
   move the map pin if GPS is unavailable or unsuitable.
-- Add a named managed plant at a confirmed coordinate. Select a hierarchical
+- Add a managed plant at a GPS or manually selected coordinate. Select a hierarchical
   taxonomy (group → genus → species → optional cultivar), with stable UUID IDs.
-  V1 ships a small curated local catalog, not a complete botanical database.
+  V1 ships a small starter catalog and supports property-specific additions with map symbols.
 - Save a plant locally through Firestore persistence and show its marker. Open
   the plant detail through the marker or plant list.
 - Record dated activities: planting, bloom, pruning, fertilizing, spraying,
@@ -28,7 +28,7 @@ to a plant over successive seasons. Precise foraging coordinates are private.
   Derive totals for the selected calendar year from events. Normalize mass to kg;
   display count separately. Never silently combine count with mass.
 - “Add Another Like This” copies taxon and name into a new form but requires a
-  new location confirmation and new UUID. Never copy events or plant identity.
+  fresh GPS location (or manual coordinates) and new UUID. Never copy events or plant identity.
 - Offline after a successful online sign-in: browse cached plants/events, save
   plants, append events, see local totals, restart and recover those records.
   Show local/pending versus server-confirmed data and rejected-write errors.

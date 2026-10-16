@@ -107,7 +107,9 @@ class _MapState extends ConsumerState<MapScreen> {
     final place = ref.watch(placeProvider);
     final plants = ref.watch(plantsProvider);
     final taxonomy = ref.watch(taxonomyProvider);
-    final markerSymbols = ref.watch(markerSymbolsProvider).valueOrNull;
+    final markerSymbols = ref.watch(trialModeProvider)
+        ? null
+        : ref.watch(markerSymbolsProvider).valueOrNull;
     PlantSymbol symbolFor(String id) =>
         taxonomy.taxa.where((t) => t.id == id).firstOrNull?.symbol ??
         PlantSymbol.tree;
