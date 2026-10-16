@@ -24,6 +24,7 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 
 ## Remaining product features
 
+- [ ] Filter row/area visibility by plant type: when a plant-type filter is active, hide a row's line or an area's shape (and any associated icon) if it contains no plants matching that type. Keep rows/areas containing matching plants visible, including matches within nested sections, and restore normal visibility when the filter is cleared.
 - [ ] Android immersive display: hide the bottom Android system navigation buttons/bar while OrchardAtlas is open, where supported by the Android version and navigation mode. Preserve the system gesture to temporarily reveal navigation controls and restore normal system navigation when leaving the app.
 - [ ] Simplify plant classification selectors to **Group → Type → Variety**: keep Group, rename Genus to Type and Species to Variety, and remove the Cultivar selector entirely. Plan how existing cultivar selections and custom taxonomy remain usable when moving to the three-level selection flow.
 - [ ] Areas, Beds & Rows page basemap: use Google Maps with the app's default satellite view beneath the orchard's area/bed polygons and row lines, so their full shapes are shown over geographic imagery.
