@@ -47,6 +47,16 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  Future<String> plantName(WidgetTester tester) async {
+    final field = find.byKey(const ValueKey('plant-name'));
+    await tester.scrollUntilVisible(
+      field,
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    return tester.widget<TextField>(field).controller!.text;
+  }
+
   Future<void> save(WidgetTester tester) async {
     await tester.scrollUntilVisible(
       find.text('Save plant locally'),
@@ -84,27 +94,18 @@ void main() {
       );
       await tester.pumpAndSettle();
       await select(tester, 'Group', '🌳 Fruit trees');
-      expect(
-        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'Fruit trees',
-      );
+      expect(await plantName(tester), 'Fruit trees');
       await select(tester, 'Genus', '🍐 Pear (Pyrus)');
-      expect(
-        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'Pear (Pyrus)',
-      );
-      await tester.enterText(find.byType(TextField).first, 'My pear');
-      await select(tester, 'Species', '🍐 European pear');
-      expect(
-        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
+      expect(await plantName(tester), 'Pear (Pyrus)');
+      await tester.enterText(
+        find.byKey(const ValueKey('plant-name')),
         'My pear',
       );
-      await tester.enterText(find.byType(TextField).first, '');
+      await select(tester, 'Species', '🍐 European pear');
+      expect(await plantName(tester), 'My pear');
+      await tester.enterText(find.byKey(const ValueKey('plant-name')), '');
       await select(tester, '🍐 Pear (Pyrus)', '🍎 Apple (Malus)');
-      expect(
-        tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-        'Apple (Malus)',
-      );
+      expect(await plantName(tester), 'Apple (Malus)');
       expect(find.text('🍐 European pear'), findsNothing);
     },
   );
@@ -213,18 +214,15 @@ void main() {
     await select(tester, 'Group', '+ Add new option…');
     await tester.enterText(
       find.widgetWithText(TextField, 'Option name'),
-      'Nut trees',
+      'Trial nut trees',
     );
     await select(tester, '🌳 tree', '🌰 nut');
     await tester.tap(find.text('Add option'));
     await tester.pumpAndSettle();
-    expect(repo.taxa.single.name, 'Nut trees');
+    expect(repo.taxa.single.name, 'Trial nut trees');
     expect(repo.taxa.single.symbol, PlantSymbol.nut);
-    expect(find.text('🌰 Nut trees'), findsOneWidget);
-    expect(
-      tester.widget<TextField>(find.byType(TextField).first).controller!.text,
-      'Nut trees',
-    );
+    expect(find.text('🌰 Trial nut trees'), findsOneWidget);
+    expect(await plantName(tester), 'Trial nut trees');
   });
   testWidgets(
     'detail renders pending status, derived harvest totals and history',

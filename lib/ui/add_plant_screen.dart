@@ -230,7 +230,9 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
         double.parse(longitude.text),
       );
       final place = await ref.read(placeProvider.future);
+      final user = await ref.read(userProvider.future);
       if (!mounted) return;
+      if (user == null) throw StateError('Please sign in again');
       final plant = ref
           .read(commandsProvider)
           .addPlant(
@@ -243,7 +245,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             nursery: nursery.text,
             notes: notes.text,
             accuracyMeters: accuracyMeters,
-            authorId: ref.read(userProvider).valueOrNull?.id,
+            authorId: user.id,
           );
       final another = await showDialog<bool>(
         context: context,
@@ -303,6 +305,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
               'Name, taxonomy, planting date, rootstock and source copied. Fetching a fresh position.',
             ),
           TextField(
+            key: const ValueKey('plant-name'),
             controller: name,
             maxLength: 500,
             decoration: const InputDecoration(
