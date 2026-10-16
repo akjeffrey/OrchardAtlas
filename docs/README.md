@@ -22,3 +22,5 @@ See [validation and release checks](validation.md) for observed results and rema
 
 - [Supplied OrchardAtlas specification](ORCHARDATLAS_CODEX_SPEC.md)
 - [ADR-002: plant management and tasks](adr/002-trial-management.md), including scope, date inheritance, persistence, security and acceptance checks for the next trial increment.
+
+- [ADR-003: group tasks, orchard layout and seasons](adr/003-groups-layout-seasons.md) describes the Trial 0.3 implementation contract and acceptance scenarios.
