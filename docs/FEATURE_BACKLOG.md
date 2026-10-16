@@ -24,6 +24,9 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 
 ## Remaining product features
 
+- [ ] Row endpoints and direction: explicitly track start (first point) and stop/finish point(s).
+- [ ] Default plant ordering within a row: sequence newly added row plants from the start toward the finish.
+- [ ] Manual row plant ordering: let users rearrange plants while viewing a row (for example, drag-and-drop or move up/down), and persist the revised order.
 - [ ] Orchard rename/archive and explicit ownership transfer/deletion policies.
 - [ ] Sharing: invitations, owner/editor/viewer permissions and collaboration UI.
 - [ ] Foraging-resource entry, seasonality, observations and private/public visibility controls.
