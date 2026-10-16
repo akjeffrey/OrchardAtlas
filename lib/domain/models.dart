@@ -2,6 +2,10 @@ enum TaxonRank { group, genus, species, cultivar }
 
 enum PlantSymbol { tree, apple, pear, berry, flower, citrus, nut, vine }
 
+enum ItemStatus { active, archived }
+
+enum TaskStatus { open, completed, cancelled }
+
 enum ItemKind { managedPlant, foragingResource }
 
 enum PermissionRole { owner, editor, viewer }
@@ -9,6 +13,18 @@ enum PermissionRole { owner, editor, viewer }
 enum ActivityType {
   planting,
   bloom,
+  budBreak,
+  firstBloom,
+  fullBloom,
+  petalFall,
+  fruitSet,
+  pest,
+  disease,
+  damage,
+  harvestStart,
+  harvestEnd,
+  died,
+  observation,
   pruning,
   fertilizing,
   spraying,
@@ -101,10 +117,85 @@ class ManagedPlant extends TrackedItem {
     required super.taxonId,
     required super.location,
     required super.createdAt,
-  });
+    this.plantedOn,
+    String rootstock = '',
+    String nursery = '',
+    String notes = '',
+    this.status = ItemStatus.active,
+    this.accuracyMeters,
+  }) : rootstock = optionalText(rootstock, 500),
+       nursery = optionalText(nursery, 500),
+       notes = optionalText(notes, 10000) {
+    if (plantedOn != null) parseCalendarDate(plantedOn!);
+    if (accuracyMeters != null &&
+        (!accuracyMeters!.isFinite ||
+            accuracyMeters! < 0 ||
+            accuracyMeters! > 100000)) {
+      throw ArgumentError('Invalid GPS accuracy');
+    }
+  }
+  final String? plantedOn;
+  final String rootstock, nursery, notes;
+  final ItemStatus status;
+  final double? accuracyMeters;
   @override
   ItemKind get kind => ItemKind.managedPlant;
-  PlantTemplate get template => PlantTemplate(name: name, taxonId: taxonId);
+  PlantTemplate get template => PlantTemplate(
+    name: name,
+    taxonId: taxonId,
+    plantedOn: plantedOn,
+    rootstock: rootstock,
+    nursery: nursery,
+  );
+  PlantTemplate templateWithHistory(Iterable<PlantEvent> events) {
+    final planting =
+        events
+            .where(
+              (e) =>
+                  e.type == ActivityType.planting &&
+                  e.itemId == id &&
+                  e.propertyId == propertyId,
+            )
+            .toList()
+          ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
+    return PlantTemplate(
+      name: name,
+      taxonId: taxonId,
+      rootstock: rootstock,
+      nursery: nursery,
+      plantedOn:
+          plantedOn ?? (planting.isEmpty ? null : planting.first.activityDate),
+    );
+  }
+
+  ManagedPlant copyWith({
+    String? name,
+    String? rootstock,
+    String? nursery,
+    String? notes,
+    ItemStatus? status,
+  }) => ManagedPlant(
+    id: id,
+    propertyId: propertyId,
+    name: name ?? this.name,
+    taxonId: taxonId,
+    location: location,
+    createdAt: createdAt,
+    plantedOn: plantedOn,
+    rootstock: rootstock ?? this.rootstock,
+    nursery: nursery ?? this.nursery,
+    notes: notes ?? this.notes,
+    status: status ?? this.status,
+    accuracyMeters: accuracyMeters,
+  );
+}
+
+String optionalText(String value, int limit) {
+  final result = value.trim();
+  if (result.length > limit) {
+    throw ArgumentError('Text exceeds $limit characters');
+  }
+  return result;
 }
 
 class ForagingResource extends TrackedItem {
@@ -122,9 +213,17 @@ class ForagingResource extends TrackedItem {
 
 // A bulk-entry template deliberately contains no identity, location or history.
 class PlantTemplate {
-  const PlantTemplate({required this.name, required this.taxonId});
+  const PlantTemplate({
+    required this.name,
+    required this.taxonId,
+    this.plantedOn,
+    this.rootstock = '',
+    this.nursery = '',
+  });
   final String name;
   final String taxonId;
+  final String? plantedOn;
+  final String rootstock, nursery;
 }
 
 class Harvest {
@@ -211,18 +310,49 @@ class HarvestTotals {
 }
 
 class OrchardTask {
-  const OrchardTask({
+  OrchardTask({
     required this.id,
     required this.propertyId,
-    required this.title,
+    required String title,
+    required this.createdAt,
     this.itemId,
     this.dueDate,
-    this.completed = false,
-  });
-  final String id, propertyId, title;
-  final String? itemId;
-  final DateTime? dueDate;
-  final bool completed;
+    String notes = '',
+    this.status = TaskStatus.open,
+  }) : title = requiredText(title, 'Task title'),
+       notes = optionalText(notes, 10000) {
+    if (dueDate != null) parseCalendarDate(dueDate!);
+  }
+  final String id, propertyId, title, notes;
+  final String? itemId, dueDate;
+  final DateTime createdAt;
+  final TaskStatus status;
+  OrchardTask withStatus(TaskStatus value) => OrchardTask(
+    id: id,
+    propertyId: propertyId,
+    title: title,
+    createdAt: createdAt,
+    itemId: itemId,
+    dueDate: dueDate,
+    notes: notes,
+    status: value,
+  );
+}
+
+Map<HarvestUnit, double> harvestByUnit(Iterable<PlantEvent> events, int year) {
+  final totals = <HarvestUnit, double>{};
+  for (final event in events) {
+    if (event.type == ActivityType.harvest &&
+        parseCalendarDate(event.activityDate).year == year) {
+      final harvest = event.harvest!;
+      totals.update(
+        harvest.unit,
+        (q) => q + harvest.quantity,
+        ifAbsent: () => harvest.quantity,
+      );
+    }
+  }
+  return Map.unmodifiable(totals);
 }
 
 class Photo {

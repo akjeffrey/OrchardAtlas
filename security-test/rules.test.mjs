@@ -93,3 +93,47 @@ test('custom taxonomy is owner scoped, append only and requires a supported icon
   await assertFails(updateDoc(doc(db('alice'), path), { name: 'Changed' }));
   await assertFails(deleteDoc(doc(db('alice'), path)));
 });
+
+test('metadata edits and archive preserve identity, position and planting date', async () => {
+  await assertSucceeds(updateDoc(doc(db('alice'), itemPath), { name: 'Apple 12', rootstock: 'M.111', nursery: 'Local', notes: 'South slope', status: 'archived' }));
+  await assertFails(updateDoc(doc(db('bob'), itemPath), { name: 'Stolen' }));
+  await assertFails(updateDoc(doc(db(), itemPath), { status: 'active' }));
+  for (const change of [{ taxonId: item }, { location: new GeoPoint(52, 2) }, { plantedOn: '2022-04-10' }, { accuracyMeters: 5 }, { status: 'unknown' }, { notes: 'x'.repeat(10001) }]) {
+    await assertFails(updateDoc(doc(db('alice'), itemPath), change));
+  }
+  await assertSucceeds(updateDoc(doc(db('alice'), itemPath), { status: 'active' }));
+  const path = `${propertyPath}/items/${event}`;
+  const metadata = { ...plant, plantedOn: '2022-04-10', rootstock: 'M.111', nursery: '', notes: '', status: 'active', accuracyMeters: 6 };
+  for (const change of [{ accuracyMeters: -1 }, { accuracyMeters: Infinity }, { plantedOn: 'yesterday' }, { rootstock: 'x'.repeat(501) }]) {
+    await assertFails(setDoc(doc(db('alice'), path), { ...metadata, ...change }));
+  }
+  await assertSucceeds(setDoc(doc(db('alice'), path), metadata));
+});
+test('tasks support owner-only status changes and same-property plant targets', async () => {
+  const path = `${propertyPath}/tasks/${event}`;
+  const task = { schemaVersion: 1, title: 'Prune', notes: '', itemId: item, dueDate: '2026-10-16', status: 'open', createdAt: now };
+  for (const uid of ['bob', undefined]) await assertFails(setDoc(doc(db(uid), path), task));
+  for (const change of [{ title: '' }, { status: 'unknown' }, { dueDate: 'yesterday' }, { itemId: event }, { ownerId: 'bob' }]) {
+    await assertFails(setDoc(doc(db('alice'), path), { ...task, ...change }));
+  }
+  await assertSucceeds(setDoc(doc(db('alice'), path), task));
+  await assertSucceeds(getDocs(collection(db('alice'), `${propertyPath}/tasks`)));
+  for (const uid of ['bob', undefined]) {
+    await assertFails(getDoc(doc(db(uid), path)));
+    await assertFails(updateDoc(doc(db(uid), path), { status: 'completed' }));
+  }
+  for (const status of ['completed', 'cancelled', 'open']) await assertSucceeds(updateDoc(doc(db('alice'), path), { status }));
+  await assertFails(updateDoc(doc(db('alice'), path), { itemId: null }));
+  await assertFails(updateDoc(doc(db('alice'), path), { createdAt: Timestamp.fromMillis(0) }));
+  await assertFails(deleteDoc(doc(db('alice'), path)));
+  await assertSucceeds(setDoc(doc(db('alice'), `${propertyPath}/tasks/${item}`), { ...task, itemId: null, dueDate: null }));
+});
+test('explicit phenology and lifecycle events remain append-only activities', async () => {
+  const { harvest: ignored, ...base } = harvest;
+  let index = 10;
+  for (const type of ['budBreak', 'firstBloom', 'fullBloom', 'petalFall', 'fruitSet', 'pest', 'disease', 'damage', 'harvestStart', 'harvestEnd', 'died', 'observation']) {
+    const id = `00000000-0000-4000-8000-${(++index).toString().padStart(12, '0')}`;
+    await assertSucceeds(setDoc(doc(db('alice'), `${itemPath}/events/${id}`), { ...base, type }));
+    await assertFails(updateDoc(doc(db('alice'), `${itemPath}/events/${id}`), { notes: 'Overwrite' }));
+  }
+});

@@ -57,6 +57,14 @@ final eventsProvider = StreamProvider.autoDispose
       final place = await ref.watch(placeProvider.future);
       yield* repository.watchEvents(place.id, id);
     });
+final tasksProvider =
+    StreamProvider.autoDispose<RepositorySnapshot<List<OrchardTask>>>((
+      ref,
+    ) async* {
+      final repository = ref.watch(orchardRepositoryProvider);
+      final place = await ref.watch(placeProvider.future);
+      yield* repository.watchTasks(place.id);
+    });
 final failuresProvider = StreamProvider(
   (ref) => ref.watch(orchardRepositoryProvider).writeFailures,
 );
@@ -80,6 +88,10 @@ class OrchardCommands {
     required Coordinates location,
     DateTime? plantingDate,
     String? authorId,
+    String rootstock = '',
+    String nursery = '',
+    String notes = '',
+    double? accuracyMeters,
   }) {
     if (!taxonomy.isPlantIdentity(taxonId)) {
       throw ArgumentError('Select a species or cultivar');
@@ -91,6 +103,11 @@ class OrchardCommands {
       taxonId: taxonId,
       location: location,
       createdAt: DateTime.now().toUtc(),
+      plantedOn: plantingDate == null ? null : calendarDate(plantingDate),
+      rootstock: rootstock,
+      nursery: nursery,
+      notes: notes,
+      accuracyMeters: accuracyMeters,
     );
     if (plantingDate != null && authorId == null) {
       throw ArgumentError('Planting author required');

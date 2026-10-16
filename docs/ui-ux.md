@@ -47,8 +47,19 @@ Each taxonomy dropdown includes **Add new option**. The dialog requires a name a
 
 The plant name follows the deepest selected taxonomy label until the user enters a custom name. Changing an ancestor clears descendant selections and updates an automatic name. Clearing a custom name re-enables automatic naming; saving an empty name uses the selected species/cultivar label.
 
-Planting date is optional, can be entered on Add Plant, and creates a dated planting activity in the same local submission as the plant. It is not inferred from the record creation timestamp. Leaving the date empty records no planting activity.
+Planting date is optional and defaults to today for a new plant. A similar plant inherits the source date, including an unset date. A set date creates a dated planting activity in the same local submission as the plant. It is not inferred from the record creation timestamp. Leaving the date empty records no planting activity.
 
 Add Plant requests foreground GPS automatically unless opened with an explicitly selected map position. It displays accuracy and editable coordinates. The former confirmation checkbox has been removed. A late GPS response never overwrites manual coordinate edits. Permission denial or unavailable GPS leaves manual entry available.
 
-Saving opens **Plant added: Add another like this?**. Back to map focuses the saved plant. Add another keeps name and taxonomy, clears the planting date and coordinates, and fetches a fresh GPS position. It never silently reuses the prior plant's position or activity history. Google Maps markers, trial coordinate markers, and the Plants list use the taxonomy icon.
+Saving opens **Plant added: Add another like this?**. Back to map focuses the saved plant. Add another keeps name, taxonomy, planting date, rootstock and source, clears unique notes and coordinates, and fetches a fresh GPS position. It never silently reuses the prior plant's position or activity history. Google Maps markers, trial coordinate markers, and the Plants list use the taxonomy icon.
+
+
+## Trial management increment
+
+Add Plant also offers rootstock, nursery/source and plant notes, and retains GPS accuracy when coordinates come from an unmodified GPS fix. Manual coordinate edits clear the accuracy claim. Detail shows this metadata and offers Edit, Archive/Restore and Plant tasks. The metadata editor does not rewrite planting history or captured location. Archived plants remain reachable through the status filter and keep events/tasks.
+
+Home navigation is Map / Plants / Tasks. Plant search matches name, classification ancestors, rootstock, nursery and notes. Classification, year and status filters apply to both markers and list; active plants are the default. Filter state survives navigation during the session. Connected maps use hybrid imagery; the trial still uses its coordinate sketch.
+
+Tasks can target the property or a plant. They have a title, notes, optional due date and open/completed/cancelled status, with explicit completion, cancellation and reopening controls. Today and This week include overdue tasks; Upcoming includes dates beyond the current week plus undated tasks. Task due dates do not schedule notifications in this increment.
+
+The activity picker includes explicit bloom stages, pests, disease, damage, harvest start/end, death and observation. Annual harvest summaries display each recorded unit separately; no default conversion combines pounds and kilograms.

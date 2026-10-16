@@ -52,3 +52,6 @@ second account cannot see the first account's cached records.
 ## Custom taxonomy and planting dates
 
 Property taxonomy uses a repository stream, including Firestore's persistent local cache. Newly submitted taxa are immediately available to the form; asynchronous cloud rejection appears through the existing write-failure banner. Trial mode stores custom taxa and their symbol IDs in the same JSON document as plants and events. The optional `taxa` array defaults to empty when reading older trial saves, preserving existing plants and harvest records. Plant plus planting activity is one serialized trial write or one Firestore batch. Dates remain calendar dates rather than being re-derived from UTC timestamps.
+
+
+Trial 0.2 extends the same JSON snapshot with optional metadata and a tasks array. Older saves default missing fields and recover missing planting-date metadata from the original planting activity. Metadata edits, archives and task status changes use the serialized write queue, survive repository restart, and feed the same pending/error indicators. Firestore counterparts use native persistent cache-backed streams and queued writes. Concurrent edits to mutable metadata/task status use last-submission-wins semantics; there is no custom conflict merge or notification scheduler. Events remain separate append-only records.

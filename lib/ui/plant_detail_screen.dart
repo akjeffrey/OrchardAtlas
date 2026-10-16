@@ -53,6 +53,81 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               Text(path),
+              Text('Status: ${plant.status.name}'),
+              Text('Planting date: ${plant.plantedOn ?? 'Not recorded'}'),
+              if (plant.rootstock.isNotEmpty)
+                Text('Rootstock: ${plant.rootstock}'),
+              if (plant.nursery.isNotEmpty)
+                Text('Nursery / source: ${plant.nursery}'),
+              if (plant.notes.isNotEmpty) Text(plant.notes),
+              if (plant.accuracyMeters != null)
+                Text(
+                  'Captured GPS accuracy: ±${plant.accuracyMeters!.round()} m',
+                ),
+              Wrap(
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () => context.push('/plants/${plant.id}/edit'),
+                    icon: const Icon(Icons.edit),
+                    label: const Text('Edit plant'),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => context.push('/plants/${plant.id}/tasks'),
+                    icon: const Icon(Icons.checklist),
+                    label: const Text('Plant tasks'),
+                  ),
+                  TextButton(
+                    onPressed: () async {
+                      final archive = plant.status == ItemStatus.active;
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text(
+                            archive ? 'Archive plant?' : 'Restore plant?',
+                          ),
+                          content: const Text(
+                            'History and tasks are retained. Archived plants are hidden by the default map filter.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              child: Text(archive ? 'Archive' : 'Restore'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed == true && context.mounted) {
+                        try {
+                          ref
+                              .read(orchardRepositoryProvider)
+                              .updatePlant(
+                                plant.copyWith(
+                                  status: archive
+                                      ? ItemStatus.archived
+                                      : ItemStatus.active,
+                                ),
+                              );
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(SnackBar(content: Text('$e')));
+                          }
+                        }
+                      }
+                    },
+                    child: Text(
+                      plant.status == ItemStatus.active
+                          ? 'Archive plant'
+                          : 'Restore plant',
+                    ),
+                  ),
+                ],
+              ),
               Text(
                 '${plant.location.latitude.toStringAsFixed(7)}, ${plant.location.longitude.toStringAsFixed(7)}',
               ),
@@ -63,8 +138,24 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                 label: const Text('Record Activity / Harvest'),
               ),
               OutlinedButton(
-                onPressed: () =>
-                    context.push('/plants/new', extra: plant.template),
+                onPressed: () async {
+                  try {
+                    final history = await ref.read(
+                      eventsProvider(plant.id).future,
+                    );
+                    if (context.mounted) {
+                      context.push(
+                        '/plants/new',
+                        extra: plant.templateWithHistory(history.value),
+                      );
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context)
+                          .showSnackBar(SnackBar(content: Text('$e')));
+                    }
+                  }
+                },
                 child: const Text('Add Another Like This'),
               ),
               Row(
@@ -97,12 +188,18 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                   retry: () => ref.invalidate(eventsProvider(widget.id)),
                 ),
                 data: (history) {
-                  final totals = HarvestTotals.forYear(history.value, year);
+                  final totals = harvestByUnit(history.value, year);
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        '${totals.kilograms.toStringAsFixed(3)} kg · ${totals.count.toStringAsFixed(0)} count',
+                        totals.isEmpty
+                            ? 'No harvest recorded for $year'
+                            : [
+                                for (final unit in HarvestUnit.values)
+                                  if (totals.containsKey(unit))
+                                    '${totals[unit]!.toStringAsFixed(unit == HarvestUnit.count ? 0 : 3)} ${unit.name}',
+                              ].join(' · '),
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleLarge,
                       ),

@@ -32,12 +32,17 @@ class Taxonomy {
     return path;
   }
 
+  Set<String> descendants(String id) => taxa
+      .where((t) => ancestry(t.id).any((a) => a.id == id))
+      .map((t) => t.id)
+      .toSet();
+
   bool isPlantIdentity(String id) =>
       byId(id).rank.index >= TaxonRank.species.index;
 }
 
 // Curated starter catalog. IDs are stable UUIDs; labels may evolve independently.
-final starterTaxonomy = Taxonomy(const [
+final starterTaxonomy = Taxonomy([
   Taxon(
     id: '38a0fbb0-6a36-4a48-8d17-000000000001',
     name: 'Fruit trees',
@@ -108,4 +113,104 @@ final starterTaxonomy = Taxonomy(const [
     rank: TaxonRank.species,
     parentId: '38a0fbb0-6a36-4a48-8d17-000000000009',
   ),
+  ...additionalStarterTaxa(),
 ]);
+
+// Published allocation order: append only. Never reorder or insert before existing entries.
+List<Taxon> additionalStarterTaxa() {
+  var serial = 200;
+  String id() =>
+      '38a0fbb0-6a36-4a48-8d17-${(++serial).toString().padLeft(12, '0')}';
+  final result = <Taxon>[];
+  void genus(
+    String name,
+    String scientific,
+    String parent,
+    PlantSymbol symbol,
+    List<String> species,
+  ) {
+    final genusId = id();
+    result.add(
+      Taxon(
+        id: genusId,
+        name: name,
+        rank: TaxonRank.genus,
+        parentId: parent,
+        symbol: symbol,
+      ),
+    );
+    for (final label in species) {
+      result.add(
+        Taxon(
+          id: id(),
+          name: label,
+          rank: TaxonRank.species,
+          parentId: genusId,
+          scientificName: scientific,
+          symbol: symbol,
+        ),
+      );
+    }
+  }
+
+  for (final name in ['Zestar', 'Fuji']) {
+    result.add(
+      Taxon(
+        id: id(),
+        name: name,
+        rank: TaxonRank.cultivar,
+        parentId: '38a0fbb0-6a36-4a48-8d17-000000000003',
+        symbol: PlantSymbol.apple,
+      ),
+    );
+  }
+  for (final name in ['Peach', 'Plum', 'Cherry', 'Apricot']) {
+    genus(
+      name,
+      'Prunus',
+      '38a0fbb0-6a36-4a48-8d17-000000000001',
+      PlantSymbol.tree,
+      ['Common $name'],
+    );
+  }
+  result.add(
+    Taxon(
+      id: id(),
+      name: 'Blackberry',
+      rank: TaxonRank.species,
+      parentId: '38a0fbb0-6a36-4a48-8d17-000000000009',
+      symbol: PlantSymbol.berry,
+    ),
+  );
+  for (final name in ['Blueberry', 'Strawberry', 'Gooseberry']) {
+    genus(name, '', '38a0fbb0-6a36-4a48-8d17-000000000008', PlantSymbol.berry, [
+      'Common $name',
+    ]);
+  }
+  for (final entry in <(String, PlantSymbol, List<String>)>[
+    ('Grape', PlantSymbol.vine, ['Grape']),
+    ('Nut trees', PlantSymbol.nut, ['Walnut', 'Hazelnut', 'Chestnut']),
+    ('Vegetables', PlantSymbol.flower, ['Tomato', 'Pepper', 'Squash']),
+    (
+      'Mushrooms',
+      PlantSymbol.tree,
+      ['Morel', 'Oyster', 'Chanterelle', 'Chicken of the Woods'],
+    ),
+    ('Wild plants', PlantSymbol.flower, ['Asparagus']),
+    ('Other', PlantSymbol.tree, ['Other plant']),
+  ]) {
+    final groupId = id();
+    result.add(
+      Taxon(
+        id: groupId,
+        name: entry.$1,
+        rank: TaxonRank.group,
+        symbol: entry.$2,
+      ),
+    );
+    for (final label in entry.$3) {
+      genus(label, '', groupId, entry.$2, [label]);
+    }
+  }
+  return result;
+}

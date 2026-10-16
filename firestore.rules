@@ -11,10 +11,28 @@ service cloud.firestore {
     function text(value) { return value is string && value.size() > 0 && value.size() <= 500; }
     function validItem(d) {
       return d.keys().hasAll(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
-        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
+        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt', 'plantedOn', 'rootstock', 'nursery', 'notes', 'status', 'accuracyMeters'])
         && d.schemaVersion == 1 && d.kind == 'managedPlant'
         && text(d.name) && d.taxonId is string && uuid(d.taxonId)
-        && d.location is latlng && d.createdAt is timestamp;
+        && d.location is latlng && d.createdAt is timestamp
+        && (d.get('plantedOn', null) == null || date(d.plantedOn))
+        && d.get('rootstock', '') is string && d.get('rootstock', '').size() <= 500
+        && d.get('nursery', '') is string && d.get('nursery', '').size() <= 500
+        && d.get('notes', '') is string && d.get('notes', '').size() <= 10000
+        && d.get('status', 'active') in ['active', 'archived']
+        && (d.get('accuracyMeters', null) == null || (d.accuracyMeters is number && d.accuracyMeters >= 0 && d.accuracyMeters <= 100000));
+    }
+    function date(value) {
+      return value is string && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
+    }
+    function validTask(d, propertyId) {
+      return d.keys().hasAll(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt'])
+        && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt'])
+        && d.schemaVersion == 1 && text(d.title) && d.notes is string && d.notes.size() <= 10000
+        && d.createdAt is timestamp && d.status in ['open', 'completed', 'cancelled']
+        && (d.dueDate == null || date(d.dueDate))
+        && (d.itemId == null || (d.itemId is string && uuid(d.itemId)
+          && exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(d.itemId))));
     }
     function validHarvest(d) {
       return d.harvest is map && d.harvest.keys().hasAll(['quantity', 'unit'])
@@ -28,7 +46,7 @@ service cloud.firestore {
       return d.keys().hasAll(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes'])
         && d.keys().hasOnly(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes', 'harvest'])
         && d.schemaVersion == 1 && d.authorId == request.auth.uid
-        && d.type in ['planting', 'bloom', 'pruning', 'fertilizing', 'spraying', 'pestsDisease', 'watering', 'harvest', 'removal', 'note', 'photo']
+        && d.type in ['planting', 'bloom', 'pruning', 'fertilizing', 'spraying', 'pestsDisease', 'watering', 'harvest', 'removal', 'note', 'photo', 'budBreak', 'firstBloom', 'fullBloom', 'petalFall', 'fruitSet', 'pest', 'disease', 'damage', 'harvestStart', 'harvestEnd', 'died', 'observation']
         && d.occurredAt is timestamp && d.recordedAt is timestamp
         && d.activityDate is string && d.activityDate.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
         && d.notes is string && d.notes.size() <= 10000
@@ -43,6 +61,13 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && text(request.resource.data.name) && request.resource.data.createdAt is timestamp;
       allow update, delete: if false;
+      match /tasks/{taskId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(taskId) && validTask(request.resource.data, propertyId);
+        allow update: if owner(propertyId) && validTask(request.resource.data, propertyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']);
+        allow delete: if false;
+      }
       match /taxa/{taxonId} {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(taxonId)
@@ -59,8 +84,7 @@ service cloud.firestore {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data);
         allow update: if owner(propertyId) && validItem(request.resource.data)
-          && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.data.kind == resource.data.kind;
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'rootstock', 'nursery', 'notes', 'status']);
         allow delete: if false;
         match /events/{eventId} {
           allow read: if owner(propertyId);

@@ -94,27 +94,30 @@ void main() {
       throwsArgumentError,
     );
   });
-  test('bulk template only retains name and taxonomy', () {
-    final plant = ManagedPlant(
-      id: 'first',
-      propertyId: 'place',
-      name: ' Gala ',
-      taxonId: 'taxon',
-      location: Coordinates(51, 1),
-      createdAt: DateTime.utc(2026),
-    );
-    expect(plant.template.name, 'Gala');
-    expect(plant.template.taxonId, 'taxon');
-    expect(
-      () => ManagedPlant(
-        id: 'x',
-        propertyId: 'p',
-        name: ' ',
-        taxonId: 't',
-        location: Coordinates(0, 0),
-        createdAt: DateTime.now(),
-      ),
-      throwsArgumentError,
-    );
-  });
+  test(
+    'bulk template omits unique identity, location and activity history',
+    () {
+      final plant = ManagedPlant(
+        id: 'first',
+        propertyId: 'place',
+        name: ' Gala ',
+        taxonId: 'taxon',
+        location: Coordinates(51, 1),
+        createdAt: DateTime.utc(2026),
+      );
+      expect(plant.template.name, 'Gala');
+      expect(plant.template.taxonId, 'taxon');
+      expect(
+        () => ManagedPlant(
+          id: 'x',
+          propertyId: 'p',
+          name: ' ',
+          taxonId: 't',
+          location: Coordinates(0, 0),
+          createdAt: DateTime.now(),
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
 }

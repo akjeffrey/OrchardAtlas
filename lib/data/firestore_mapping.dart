@@ -52,6 +52,7 @@ class FirestoreMapping {
     'taxonId': p.taxonId,
     'location': GeoPoint(p.location.latitude, p.location.longitude),
     'createdAt': Timestamp.fromDate(p.createdAt),
+    ...plantMetadataToMap(p),
   };
   static ManagedPlant plantFromMap(
     String propertyId,
@@ -66,9 +67,57 @@ class FirestoreMapping {
     return ManagedPlant(
       id: id,
       propertyId: propertyId,
+      plantedOn: d['plantedOn'] as String?,
+      rootstock: d['rootstock'] as String? ?? '',
+      nursery: d['nursery'] as String? ?? '',
+      notes: d['notes'] as String? ?? '',
+      status: ItemStatus.values.byName(d['status'] as String? ?? 'active'),
+      accuracyMeters: (d['accuracyMeters'] as num?)?.toDouble(),
       name: d['name'] as String,
       taxonId: d['taxonId'] as String,
       location: Coordinates(point.latitude, point.longitude),
+      createdAt: (d['createdAt'] as Timestamp).toDate().toUtc(),
+    );
+  }
+
+  static Map<String, dynamic> plantMetadataToMap(ManagedPlant p) => {
+    'plantedOn': p.plantedOn,
+    'rootstock': p.rootstock,
+    'nursery': p.nursery,
+    'notes': p.notes,
+    'status': p.status.name,
+    'accuracyMeters': p.accuracyMeters,
+  };
+  static Map<String, dynamic> editablePlantToMap(ManagedPlant p) => {
+    'name': p.name,
+    'rootstock': p.rootstock,
+    'nursery': p.nursery,
+    'notes': p.notes,
+    'status': p.status.name,
+  };
+  static Map<String, dynamic> taskToMap(OrchardTask t) => {
+    'schemaVersion': 1,
+    'title': t.title,
+    'notes': t.notes,
+    'itemId': t.itemId,
+    'dueDate': t.dueDate,
+    'status': t.status.name,
+    'createdAt': Timestamp.fromDate(t.createdAt),
+  };
+  static OrchardTask taskFromMap(
+    String propertyId,
+    String id,
+    Map<String, dynamic> d,
+  ) {
+    version(d);
+    return OrchardTask(
+      id: id,
+      propertyId: propertyId,
+      title: d['title'] as String,
+      notes: d['notes'] as String,
+      itemId: d['itemId'] as String?,
+      dueDate: d['dueDate'] as String?,
+      status: TaskStatus.values.byName(d['status'] as String),
       createdAt: (d['createdAt'] as Timestamp).toDate().toUtc(),
     );
   }

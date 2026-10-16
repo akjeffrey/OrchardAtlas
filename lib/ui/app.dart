@@ -9,6 +9,8 @@ import 'add_plant_screen.dart';
 import 'map_screen.dart';
 import 'plant_detail_screen.dart';
 import 'sign_in_screen.dart';
+import 'edit_plant_screen.dart';
+import 'tasks_screen.dart';
 
 final dismissedFailureProvider = StateProvider<String?>((ref) => null);
 
@@ -47,6 +49,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/plants/:id',
         builder: (_, state) => PlantDetailScreen(state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/plants/:id/edit',
+        builder: (_, state) => EditPlantScreen(state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/plants/:id/tasks',
+        builder: (_, state) => TasksScreen(itemId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/tasks/new',
+        builder: (_, state) => TaskFormScreen(itemId: state.extra as String?),
       ),
       GoRoute(
         path: '/plants/:id/activity',

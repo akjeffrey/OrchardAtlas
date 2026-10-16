@@ -49,3 +49,6 @@ and count quantities integral. Multiple
 harvests on one day are legitimate independent events.
 
 Custom `Taxon` records carry a platform-independent `PlantSymbol` identifier. Flutter widgets render that identifier and the Google Maps adapter draws marker bitmaps; domain types contain no Flutter, Firebase, or image-upload APIs. An optional planting date creates a `planting` event, preserving the append-oriented activity model. The plant creation timestamp continues to mean record creation, and yearly harvest totals continue to consider harvest events only.
+
+
+The primary harvest display now uses `harvestByUnit`, summing each source unit independently for the selected activity-date year. The older normalized-kg helper above remains an explicit, tested conversion utility; it is not the default total shown to users. `ManagedPlant` now holds optional planting metadata, rootstock/source/notes, active/archived status and GPS accuracy. Its similar-entry template carries date/rootstock/source without history or position. `OrchardTask` validates title, notes and an optional calendar due date, supports open/completed/cancelled status, and may target a plant or the property. See [ADR-002](adr/002-trial-management.md) for mutation and compatibility policies.

@@ -57,6 +57,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets('new planting date defaults to today and can be cleared', (
+    tester,
+  ) async {
+    final repo = await repository();
+    await tester.pumpWidget(
+      wrap(repo, TrialLocation(), const MaterialApp(home: AddPlantScreen())),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byTooltip('Clear planting date'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text(calendarDate(DateTime.now())), findsOneWidget);
+    await tester.tap(find.byTooltip('Clear planting date'));
+    await tester.pumpAndSettle();
+    expect(find.text('Not recorded'), findsOneWidget);
+  });
   testWidgets(
     'name follows taxonomy until customized and clearing restores defaults',
     (tester) async {
@@ -104,7 +122,12 @@ void main() {
           gps,
           MaterialApp(
             home: AddPlantScreen(
-              template: PlantTemplate(name: 'Row A', taxonId: species.id),
+              template: PlantTemplate(
+                name: 'Row A',
+                taxonId: species.id,
+                plantedOn: '2020-04-10',
+                rootstock: 'M.111',
+              ),
             ),
           ),
         ),
@@ -122,6 +145,20 @@ void main() {
       expect(repo.plants.length, 1);
       await save(tester);
       expect(repo.plants.length, 2);
+      expect(repo.events.length, 2);
+      expect(
+        repo.events.every(
+          (e) =>
+              e.type == ActivityType.planting && e.activityDate == '2020-04-10',
+        ),
+        isTrue,
+      );
+      expect(
+        repo.plants.every(
+          (p) => p.plantedOn == '2020-04-10' && p.rootstock == 'M.111',
+        ),
+        isTrue,
+      );
       expect(repo.plants.last.location.latitude, 51.02);
       expect(repo.plants.last.taxonId, species.id);
       expect(repo.plants.last.id, isNot(repo.plants.first.id));
@@ -241,7 +278,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Apple 1'), findsOneWidget);
-      expect(find.text('1.500 kg · 0 count'), findsOneWidget);
+      expect(find.text('1500.000 g'), findsOneWidget);
       expect(find.textContaining('Pending sync'), findsNWidgets(2));
       expect(find.textContaining('Harvest ·'), findsOneWidget);
       expect(find.text('Add Another Like This'), findsOneWidget);

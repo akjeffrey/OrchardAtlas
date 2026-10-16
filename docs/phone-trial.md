@@ -54,3 +54,16 @@ installation packages.
 Taxonomy dropdowns now allow property-specific additions with a required built-in map symbol. Names follow selections unless customized. Add Plant fetches GPS automatically, offers an optional planting date, and asks whether to add another after each save. An explicit map-selected position takes precedence over automatic GPS. Existing saved trial JSON remains readable; new taxonomy options and planting events persist on the phone.
 
 Android updates must have the same signing certificate as the installed app. The existing trial workflow uses temporary debug signing, so another build may be rejected as an update. If that happens, keep the installed version and its records; uninstalling deletes local trial data. A stable private signing key is required for reliable future in-place updates. No signing credentials are checked into this repository.
+
+
+## Trial 0.2: management and tasks
+
+- Add a new plant: date defaults to today. Clear it to leave planting unknown. A set date adds one planting activity; no date adds none.
+- Add another from the popup or a plant detail: planting date, rootstock and source carry over, including a cleared date. Each save creates a new identity and a planting activity only when dated.
+- Enter rootstock, nursery/source and notes. Detail displays metadata and GPS accuracy; manual coordinate changes clear captured accuracy.
+- Edit metadata, archive a plant, switch the status filter to archived, then restore it. History and tasks should remain intact.
+- Search or filter by classification ancestor, planting year and status; map and list should agree.
+- On Tasks, create a whole-property or plant-specific task with optional due date. Complete, cancel or reopen it, filter its status/due window, and verify it survives closing and reopening the app. Due dates do not trigger background notifications.
+- Record first/full bloom, petal fall, fruit set, pests/disease or damage. Record lb and kg harvests in the same year and verify the totals remain separate.
+
+Older trial saves load with active status and empty metadata; an existing planting activity supplies a missing planting-date field. No records are intentionally deleted by this storage upgrade. This does not remove the signing limitation described above: replacing an installed trial by uninstalling still deletes its data.

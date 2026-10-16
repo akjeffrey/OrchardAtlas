@@ -16,12 +16,14 @@ class LocalTrialRepository implements OrchardRepository {
     this.plants,
     this.events,
     this.taxa,
+    this.tasks,
   );
   final SharedPreferences preferences;
   final Place place;
   final List<ManagedPlant> plants;
   final List<PlantEvent> events;
   final List<Taxon> taxa;
+  final List<OrchardTask> tasks;
   final _changes = StreamController<void>.broadcast();
   final _failures = StreamController<WriteFailure>.broadcast();
   Future<void> _writes = Future.value();
@@ -45,6 +47,12 @@ class LocalTrialRepository implements OrchardRepository {
         ManagedPlant(
           id: p['id'] as String,
           propertyId: place.id,
+          plantedOn: _readPlantedOn(p as Map, data),
+          rootstock: p['rootstock'] as String? ?? '',
+          nursery: p['nursery'] as String? ?? '',
+          notes: p['notes'] as String? ?? '',
+          status: ItemStatus.values.byName(p['status'] as String? ?? 'active'),
+          accuracyMeters: (p['accuracyMeters'] as num?)?.toDouble(),
           name: p['name'] as String,
           taxonId: p['taxonId'] as String,
           location: Coordinates(
@@ -81,7 +89,41 @@ class LocalTrialRepository implements OrchardRepository {
           Map<String, dynamic>.from(t as Map),
         ),
     ];
-    return LocalTrialRepository._(preferences, place, plants, events, taxa);
+    final tasks = <OrchardTask>[
+      for (final t in data?['tasks'] as List? ?? [])
+        OrchardTask(
+          id: t['id'] as String,
+          propertyId: place.id,
+          title: t['title'] as String,
+          notes: t['notes'] as String,
+          itemId: t['itemId'] as String?,
+          dueDate: t['dueDate'] as String?,
+          status: TaskStatus.values.byName(t['status'] as String),
+          createdAt: DateTime.parse(t['createdAt'] as String),
+        ),
+    ];
+    return LocalTrialRepository._(
+      preferences,
+      place,
+      plants,
+      events,
+      taxa,
+      tasks,
+    );
+  }
+
+  static String? _readPlantedOn(Map p, Map<String, dynamic>? data) {
+    if (p.containsKey('plantedOn')) return p['plantedOn'] as String?;
+    final events =
+        (data?['events'] as List? ?? [])
+            .where((e) => e['itemId'] == p['id'] && e['type'] == 'planting')
+            .toList()
+          ..sort(
+            (a, b) => (a['recordedAt'] as String).compareTo(
+              b['recordedAt'] as String,
+            ),
+          );
+    return events.isEmpty ? null : events.first['activityDate'] as String;
   }
 
   @override
@@ -136,6 +178,19 @@ class LocalTrialRepository implements OrchardRepository {
             'latitude': p.location.latitude,
             'longitude': p.location.longitude,
             'createdAt': p.createdAt.toIso8601String(),
+            ...FirestoreMapping.plantMetadataToMap(p),
+          },
+      ],
+      'tasks': [
+        for (final t in tasks)
+          {
+            'id': t.id,
+            'title': t.title,
+            'notes': t.notes,
+            'itemId': t.itemId,
+            'dueDate': t.dueDate,
+            'status': t.status.name,
+            'createdAt': t.createdAt.toIso8601String(),
           },
       ],
       'events': [
@@ -221,12 +276,65 @@ class LocalTrialRepository implements OrchardRepository {
   }
 
   @override
+  void updatePlant(ManagedPlant plant) {
+    final index = plants.indexWhere(
+      (p) => p.id == plant.id && p.propertyId == plant.propertyId,
+    );
+    if (index < 0) throw StateError('Plant not found');
+    final old = plants[index];
+    if (old.createdAt != plant.createdAt ||
+        old.taxonId != plant.taxonId ||
+        old.plantedOn != plant.plantedOn ||
+        old.location.latitude != plant.location.latitude ||
+        old.location.longitude != plant.location.longitude ||
+        old.accuracyMeters != plant.accuracyMeters) {
+      throw ArgumentError(
+        'Plant identity and capture fields cannot be changed',
+      );
+    }
+    plants[index] = plant;
+    _persist(plant.id);
+  }
+
+  @override
+  Stream<RepositorySnapshot<List<OrchardTask>>> watchTasks(String propertyId) =>
+      _watch(
+        () => tasks.where((t) => t.propertyId == propertyId).toList()
+          ..sort(
+            (a, b) => (a.dueDate ?? '9999').compareTo(b.dueDate ?? '9999'),
+          ),
+      );
+  @override
+  void saveTask(OrchardTask task) {
+    if (task.propertyId != place.id ||
+        (task.itemId != null && !plants.any((p) => p.id == task.itemId))) {
+      throw ArgumentError('Unknown task target');
+    }
+    final index = tasks.indexWhere((t) => t.id == task.id);
+    if (index < 0) {
+      tasks.add(task);
+    } else {
+      final old = tasks[index];
+      if (old.itemId != task.itemId ||
+          old.createdAt != task.createdAt ||
+          old.title != task.title ||
+          old.notes != task.notes ||
+          old.dueDate != task.dueDate) {
+        throw ArgumentError('Only task status can be updated');
+      }
+      tasks[index] = task;
+    }
+    _persist(task.id);
+  }
+
+  @override
   Future<void> clearDeviceCache() async {
     await _writes;
     await preferences.remove(storageKey);
     plants.clear();
     events.clear();
     taxa.clear();
+    tasks.clear();
     _changes.add(null);
   }
 }

@@ -187,6 +187,50 @@ class FirestoreOrchardRepository implements OrchardRepository {
         .set(FirestoreMapping.eventToMap(event)),
   );
   @override
+  void updatePlant(ManagedPlant plant) => _observe(
+    plant.id,
+    _items(plant.propertyId)
+        .doc(plant.id)
+        .update(FirestoreMapping.editablePlantToMap(plant)),
+  );
+  @override
+  Stream<RepositorySnapshot<List<OrchardTask>>> watchTasks(String propertyId) =>
+      firestore
+          .collection('properties')
+          .doc(propertyId)
+          .collection('tasks')
+          .snapshots(includeMetadataChanges: true)
+          .map(
+            (s) => RepositorySnapshot(
+              s.docs
+                  .map(
+                    (d) => FirestoreMapping.taskFromMap(
+                      propertyId,
+                      d.id,
+                      d.data(),
+                    ),
+                  )
+                  .toList()
+                ..sort(
+                  (a, b) =>
+                      (a.dueDate ?? '9999').compareTo(b.dueDate ?? '9999'),
+                ),
+              isFromCache: s.metadata.isFromCache,
+              hasPendingWrites: s.metadata.hasPendingWrites,
+            ),
+          );
+  @override
+  void saveTask(OrchardTask task) => _observe(
+    task.id,
+    firestore
+        .collection('properties')
+        .doc(task.propertyId)
+        .collection('tasks')
+        .doc(task.id)
+        .set(FirestoreMapping.taskToMap(task)),
+  );
+
+  @override
   Future<void> clearDeviceCache() async {
     await firestore.terminate();
     await firestore.clearPersistence();

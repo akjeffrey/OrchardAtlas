@@ -18,13 +18,17 @@ class AddPlantScreen extends ConsumerStatefulWidget {
 
 class _AddPlantState extends ConsumerState<AddPlantScreen> {
   final name = TextEditingController();
+  final rootstock = TextEditingController();
+  final nursery = TextEditingController();
+  final notes = TextEditingController();
+  double? accuracyMeters;
   final latitude = TextEditingController();
   final longitude = TextEditingController();
   final selected = <String?>[null, null, null, null];
   bool customName = false, busy = false, locating = false;
   int locationRevision = 0;
   int dropdownRevision = 0;
-  DateTime? plantingDate;
+  DateTime? plantingDate = DateTime.now();
   bool templateApplied = false;
   String? message;
   @override
@@ -49,6 +53,11 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     }
     final path = taxonomy.ancestry(template.taxonId);
     name.text = template.name;
+    plantingDate = template.plantedOn == null
+        ? null
+        : parseCalendarDate(template.plantedOn!);
+    rootstock.text = template.rootstock;
+    nursery.text = template.nursery;
     customName = template.name != path.last.name;
     for (var i = 0; i < path.length; i++) {
       selected[i] = path[i].id;
@@ -80,6 +89,9 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   @override
   void dispose() {
     name.dispose();
+    rootstock.dispose();
+    nursery.dispose();
+    notes.dispose();
     latitude.dispose();
     longitude.dispose();
     super.dispose();
@@ -94,6 +106,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
       if (!mounted || revision != locationRevision) return;
       setState(() {
         setCoordinates(fix.coordinates);
+        accuracyMeters = fix.accuracyMeters;
         message =
             'GPS accuracy ±${fix.accuracyMeters.round()} m. Adjust coordinates if needed.';
       });
@@ -226,6 +239,10 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             taxonId: taxonId,
             location: position,
             plantingDate: plantingDate,
+            rootstock: rootstock.text,
+            nursery: nursery.text,
+            notes: notes.text,
+            accuracyMeters: accuracyMeters,
             authorId: ref.read(userProvider).valueOrNull?.id,
           );
       final another = await showDialog<bool>(
@@ -251,7 +268,8 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
         setState(() {
           latitude.clear();
           longitude.clear();
-          plantingDate = null;
+          notes.clear();
+          accuracyMeters = null;
           locationRevision++;
           message = null;
         });
@@ -282,7 +300,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
         children: [
           if (widget.template != null)
             const Text(
-              'Name and taxonomy copied. Fetching a fresh position for this plant.',
+              'Name, taxonomy, planting date, rootstock and source copied. Fetching a fresh position.',
             ),
           TextField(
             controller: name,
@@ -374,6 +392,28 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                         : () => setState(() => plantingDate = null),
                   ),
           ),
+          TextField(
+            controller: rootstock,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              labelText: 'Rootstock (optional)',
+            ),
+          ),
+          TextField(
+            controller: nursery,
+            maxLength: 500,
+            decoration: const InputDecoration(
+              labelText: 'Nursery / source (optional)',
+            ),
+          ),
+          TextField(
+            controller: notes,
+            maxLength: 10000,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              labelText: 'Plant notes (optional)',
+            ),
+          ),
           OutlinedButton.icon(
             onPressed: locating || busy ? null : locate,
             icon: const Icon(Icons.my_location),
@@ -393,7 +433,10 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
               decimal: true,
               signed: true,
             ),
-            onChanged: (_) => locationRevision++,
+            onChanged: (_) {
+              locationRevision++;
+              accuracyMeters = null;
+            },
           ),
           TextField(
             controller: longitude,
@@ -404,7 +447,10 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
               decimal: true,
               signed: true,
             ),
-            onChanged: (_) => locationRevision++,
+            onChanged: (_) {
+              locationRevision++;
+              accuracyMeters = null;
+            },
           ),
           if (message != null)
             Padding(padding: const EdgeInsets.all(8), child: Text(message!)),

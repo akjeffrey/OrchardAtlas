@@ -30,6 +30,9 @@ abstract interface class OrchardRepository {
   Stream<List<Taxon>> watchTaxa(String propertyId);
   void saveTaxon(String propertyId, Taxon taxon);
   void appendEvent(PlantEvent event);
+  void updatePlant(ManagedPlant plant);
+  Stream<RepositorySnapshot<List<OrchardTask>>> watchTasks(String propertyId);
+  void saveTask(OrchardTask task);
   Stream<WriteFailure> get writeFailures;
   Future<void> clearDeviceCache();
 }

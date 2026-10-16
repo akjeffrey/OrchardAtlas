@@ -73,4 +73,40 @@ void main() {
     expect(repo.plants.single.name, 'Existing apple');
     expect(repo.taxa, isEmpty);
   });
+  test(
+    'older trial saves recover planting date from their original activity',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        LocalTrialRepository.storageKey: jsonEncode({
+          'createdAt': '2026-10-16T12:00:00Z',
+          'plants': [
+            {
+              'id': 'old',
+              'name': 'Existing apple',
+              'taxonId': starterTaxonomy.taxa[2].id,
+              'latitude': 51,
+              'longitude': 1,
+              'createdAt': '2026-10-16T12:00:00Z',
+            },
+          ],
+          'events': [
+            {
+              'id': 'planting',
+              'itemId': 'old',
+              'type': 'planting',
+              'notes': '',
+              'occurredAt': '2020-04-10T00:00:00Z',
+              'activityDate': '2020-04-10',
+              'recordedAt': '2026-10-16T12:00:00Z',
+            },
+          ],
+        }),
+      });
+      final repo = LocalTrialRepository.open(
+        await SharedPreferences.getInstance(),
+      );
+      expect(repo.plants.single.template.plantedOn, '2020-04-10');
+      expect(repo.events.length, 1);
+    },
+  );
 }

@@ -25,7 +25,7 @@ to a plant over successive seasons. Precise foraging coordinates are private.
   V1 implements textual activities and harvest; capturing/uploading photos is
   deferred, with a Storage repository boundary and schema reserved.
 - Record harvest as positive quantity plus explicit unit (kg, g, lb, count).
-  Derive totals for the selected calendar year from events. Normalize mass to kg;
+  Derive totals for the selected calendar year from events. Display each recorded unit separately;
   display count separately. Never silently combine count with mass.
 - “Add Another Like This” copies taxon and name into a new form but requires a
   fresh GPS location (or manual coordinates) and new UUID. Never copy events or plant identity.
@@ -52,3 +52,6 @@ iOS, then repeat after disabling network and restarting the app. Domain tests co
 calendar boundaries and unit conversions; mapper tests prove schema round trips;
 emulator tests verify private access and immutable activities. Deployment needs a
 real developer Firebase/Maps project and physical-device checks, not just unit tests.
+
+
+The next trial increment in [ADR-002](adr/002-trial-management.md) adds planting-date defaults/inheritance, metadata editing, soft archive, search/classification/year/status filters, basic due-date tasks and expanded phenology events. These are usable in local trial mode with corresponding Firestore adapters/rules; nested places, foraging geometry, photos, notification scheduling and sharing remain future increments.

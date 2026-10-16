@@ -50,5 +50,12 @@ class SyncStatus extends ConsumerWidget {
 
 String activityLabel(String type) => switch (type) {
   'pestsDisease' => 'Pests / disease',
+  'budBreak' => 'Bud break',
+  'firstBloom' => 'First bloom',
+  'fullBloom' => 'Full bloom',
+  'petalFall' => 'Petal fall',
+  'fruitSet' => 'Fruit set',
+  'harvestStart' => 'Harvest start',
+  'harvestEnd' => 'Harvest end',
   _ => '${type[0].toUpperCase()}${type.substring(1)}',
 };
