@@ -27,8 +27,8 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 ### Plant records, archives and deletion
 
 - [ ] Archived plants never appear on the map, including when other filters change. Add a dedicated **Archived Plants** list page, without a map, where archived plants can be viewed, fully edited and unarchived.
-- [ ] Permanent deletion for a plant, area/bed or row, including its associated data. Plan the cascade for child sections, contained plants/crops, activities, harvests, tasks/completions, photos and stored files; show what will be removed before deletion. Remove orphaned references without deleting unrelated orchards, other plants' records or shared classification definitions.
-- [ ] Full plant editing: allow changes to all user-facing plant fields, including **Group, Type and Variety**, location, planting date, row/bed assignment and other metadata. Preserve plant identity and history, and keep linked planting activities, classification views and matching tasks consistent with edits.
+- [ ] Permanent deletion for a plant, area or row, including its associated data. Plan the cascade for child sections, contained plants/crops, activities, harvests, tasks/completions, photos and stored files; show what will be removed before deletion. Remove orphaned references without deleting unrelated orchards, other plants' records or shared classification definitions.
+- [ ] Full plant editing: allow changes to all user-facing plant fields, including **Group, Type and Variety**, location, planting date, row/area assignment and other metadata. Preserve plant identity and history, and keep linked planting activities, classification views and matching tasks consistent with edits.
 
 ### Tasks, recurrence and linked activities
 
@@ -44,19 +44,19 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 - [ ] Open an activity to edit its fields or delete it. Apply changes to plant history and derived harvest totals, including date/year and unit changes. Define how edits/deletion interact with a task-generated event and maintain consistent task/event links.
 - [ ] Classification overview pages for **Group, Type and Variety**: view the matching plants' tasks, events/activities, harvests and totals together within the selected orchard. For example, **Type = Apple** includes tasks, events and harvests for all apple varieties. Keep harvest units separate and support the same classification hierarchy in list filters.
 
-### Area versus Bed proposal — confirmation required before implementation
+### Single polygon type: Area — approved for future implementation
 
-- [ ] Review removing the separate **Area** type and keeping only **Bed** and **Row**. **Do not implement this specific change until the user explicitly confirms the proposal.**
-- Recommendation: use one polygon category labelled **Bed / Patch**, alongside **Row** for lines. Beds, raspberry patches and larger planting areas can share the same shape/nesting features, without two equivalent polygon types.
-- If approved, migrate existing Area records into the retained polygon category while preserving IDs, names, geometry, nesting, contained plants/crops, tasks, activities, colors/icons and other references. Do not delete existing areas or their records as part of this consolidation.
-- Confirmation still needed: approve this consolidation and the proposed **Bed / Patch** label, or choose **Bed** as the sole label instead. Existing Area/Bed behavior remains in place until that confirmation and a later implementation request.
+- [ ] Consolidate the equivalent area, bed and patch concepts into one polygon type named **Area**. Keep **Row** for lines. Remove the separate Bed type and do not introduce a separate Patch type.
+- The user has confirmed **Area** as the single word to use throughout the UI for this concept. The display label can be changed later without creating multiple types for the same concept.
+- [ ] Migrate existing Bed records to Area while preserving IDs, user-entered names, geometry, nesting, contained plants/crops, tasks, activities, colors/icons and other references. Existing Area records remain intact; patches are represented as Areas. This consolidation must not delete records or rename users' individual planting locations.
+- This design and terminology are approved. Implementation remains a backlog item; this approval does not start application changes.
 
 ### Other planned features
 
 - [ ] Filter row/area visibility by plant type: when a plant-type filter is active, hide a row's line or an area's shape (and any associated icon) if it contains no plants matching that type. Keep rows/areas containing matching plants visible, including matches within nested sections, and restore normal visibility when the filter is cleared.
 - [ ] Android immersive display: hide the bottom Android system navigation buttons/bar while OrchardAtlas is open, where supported by the Android version and navigation mode. Preserve the system gesture to temporarily reveal navigation controls and restore normal system navigation when leaving the app.
 - [ ] Simplify plant classification selectors to **Group → Type → Variety**: keep Group, rename Genus to Type and Species to Variety, and remove the Cultivar selector entirely. Plan how existing cultivar selections and custom taxonomy remain usable when moving to the three-level selection flow.
-- [ ] Areas, Beds & Rows page basemap: use Google Maps with the app's default satellite view beneath the orchard's area/bed polygons and row lines, so their full shapes are shown over geographic imagery.
+- [ ] Areas & Rows page basemap (currently Areas, Beds & Rows): use Google Maps with the app's default satellite view beneath the orchard's Area polygons and Row lines, so their full shapes are shown over geographic imagery.
 - [ ] Row and area colors: let users choose and save a color for each row and each area, while continuing to display the complete row line or area shape on the map.
 - [ ] Optional row/area icons: let users choose an optional icon displayed at the center of the row or area, in addition to its full colored line or shape.
 - [ ] Plant location in rows/areas: when adding a plant to a row or area, default its location to that row or area's location.
