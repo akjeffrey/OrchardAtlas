@@ -1,0 +1,7 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Photo capture is deferred; all Storage access is closed for V1.
+    match /{path=**} { allow read, write: if false; }
+  }
+}

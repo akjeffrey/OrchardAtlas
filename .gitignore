@@ -1,0 +1,40 @@
+# Flutter tooling
+.dart_tool/
+.packages
+.pub-cache/
+.flutter-plugins*
+build/
+coverage/
+*.iml
+.idea/
+.vscode/
+.DS_Store
+# Local SDK/native artifacts
+android/local.properties
+android/.gradle/
+android/gradle/wrapper/gradle-wrapper.jar
+android/gradlew
+android/gradlew.bat
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/ephemeral/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/Runner/GeneratedPluginRegistrant.*
+# Developer configuration and secrets
+config/*.json
+.env*
+**/google-services.json
+**/GoogleService-Info.plist
+lib/firebase_options.dart
+**/key.properties
+*.jks
+*.keystore
+*.p12
+*.mobileprovision
+**/service-account*.json
+ios/Flutter/Maps.local.xcconfig
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+node_modules/
