@@ -34,7 +34,7 @@ class LocalTrialRepository
   final SharedPreferences preferences;
   final String recordKey;
   final _children = <String, LocalTrialRepository>{};
-  final _childFailures = <StreamSubscription<WriteFailure>>[];
+  final _childFailures = <StreamSubscription<dynamic>>[];
   static const catalogKey = "orchard-atlas-trial-orchards";
   Place place;
   final _plans = <TaskPlan>[];
@@ -49,17 +49,35 @@ class LocalTrialRepository
   final _failures = StreamController<WriteFailure>.broadcast();
   Future<void> _writes = Future.value();
   int _pending = 0;
+  final _backupChanges = StreamController<void>.broadcast();
+  Stream<void> get backupChanges => _backupChanges.stream;
+  Future<void> flushForBackup() async {
+    if (preferences.getString(recordKey) == null) _persist(place.id);
+    await _writes;
+    if (_lastWriteError != null) {
+      throw StateError('Local writes have not saved');
+    }
+    for (final child in _children.values) {
+      await child.flushForBackup();
+    }
+    for (final p in recordKey == storageKey ? _places.skip(1) : <Place>[]) {
+      final key = '$storageKey:orchard:${p.id}';
+      if (preferences.getString(key) == null) await _for(p.id).flushForBackup();
+    }
+  }
+
   static const storageKey = 'orchard-atlas-phone-trial-v1';
   static const userId = 'local-phone-trial';
 
   static LocalTrialRepository open(
     SharedPreferences preferences, {
     Place? orchard,
+    String? snapshot,
   }) {
     final recordKey = orchard == null
         ? storageKey
         : "$storageKey:orchard:${orchard.id}";
-    final raw = preferences.getString(recordKey);
+    final raw = snapshot ?? preferences.getString(recordKey);
     final data = raw == null ? null : jsonDecode(raw) as Map<String, dynamic>;
     final place =
         orchard ??
@@ -243,6 +261,9 @@ class LocalTrialRepository
       if (target == null) throw ArgumentError('Unknown orchard');
       final child = LocalTrialRepository.open(preferences, orchard: target);
       _childFailures.add(child.writeFailures.listen(_failures.add));
+      _childFailures.add(
+        child.backupChanges.listen((_) => _backupChanges.add(null)),
+      );
       return child;
     });
   }
@@ -277,6 +298,7 @@ class LocalTrialRepository
       throw StateError('Could not save orchard');
     }
     _changes.add(null);
+    _backupChanges.add(null);
     return created;
   }
 
@@ -441,6 +463,7 @@ class LocalTrialRepository
           throw StateError('Device storage rejected write');
         }
         _lastWriteError = null;
+        _backupChanges.add(null);
       } catch (error) {
         _lastWriteError = error;
         _failures.add(

@@ -21,13 +21,17 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Restore optional stable trial signing identity
+      - name: Restore stable trial signing identity
         env:
           TRIAL_KEYSTORE: ${{ secrets.ANDROID_TRIAL_DEBUG_KEYSTORE_BASE64 }}
         run: |
           python3 - <<'PY'
           import base64, os, pathlib
           encoded = os.environ.get('TRIAL_KEYSTORE', '')
+          if not encoded:
+              print('::warning::Set ANDROID_TRIAL_DEBUG_KEYSTORE_BASE64 to publish an update-safe APK. This run compiles only; no temporary-key APK will be published.')
+          with open(os.environ['GITHUB_ENV'], 'a') as output:
+              output.write('TRIAL_SIGNING_READY=' + ('true' if encoded else 'false') + '\n')
           if encoded:
               target = pathlib.Path.home() / '.android' / 'debug.keystore'
               target.parent.mkdir(parents=True, exist_ok=True)
@@ -42,15 +46,18 @@ jobs:
             echo 'Missing repository Actions secret GOOGLE_MAPS_ANDROID_KEY.'
             exit 1
           fi
-          flutter build apk --debug --no-pub --dart-define=TRIAL_MODE=true
+          flutter build apk --debug --no-pub --dart-define=TRIAL_MODE=true --build-name="0.${{ github.run_number }}.0" --build-number="${{ github.run_number }}"
       - name: Prepare phone download
+        if: env.TRIAL_SIGNING_READY == 'true'
         run: |
           mkdir -p dist
           cp build/app/outputs/flutter-apk/app-debug.apk dist/OrchardAtlas-trial.apk
+          echo 'Version 0.${{ github.run_number }}.0 (${{ github.run_number }})' > dist/VERSION.txt
           keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | awk '/SHA1:|SHA256:/ {print}' > dist/SIGNING_CERTIFICATE.txt
           cd dist
           sha256sum OrchardAtlas-trial.apk > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
+        if: env.TRIAL_SIGNING_READY == 'true'
         with:
           name: OrchardAtlas-Android-trial
           path: dist/

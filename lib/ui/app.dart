@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import 'activity_screen.dart';
+import 'backup_screen.dart';
 import 'add_plant_screen.dart';
 import 'map_screen.dart';
 import 'plant_detail_screen.dart';
@@ -34,6 +35,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/backup', builder: (_, _) => const BackupScreen()),
       GoRoute(
         path: '/archived',
         builder: (_, _) => const ArchivedPlantsScreen(),
@@ -180,6 +182,7 @@ class OrchardAtlasApp extends ConsumerWidget {
         home: const Scaffold(body: Center(child: CircularProgressIndicator())),
       );
     }
+    if (trial) ref.watch(backupServiceProvider);
     ref.watch(taskMaterializerProvider);
     final failure = ref.watch(failuresProvider).valueOrNull;
     final dismissedFailure = ref.watch(dismissedFailureProvider);
@@ -197,7 +200,7 @@ class OrchardAtlasApp extends ConsumerWidget {
                 child: const Padding(
                   padding: EdgeInsets.all(8),
                   child: Text(
-                    'PHONE TRIAL · Data stays on this device · No cloud sync',
+                    'PHONE TRIAL · Local data · Drive backup in Orchard options',
                   ),
                 ),
               ),
