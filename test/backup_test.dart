@@ -265,6 +265,9 @@ void main() {
   testWidgets(
     'each edit resets the one-minute quiet period before an automatic push',
     (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      repo = LocalTrialRepository.open(prefs);
       final docs = _Documents();
       final service = BackupService(
         TrialBackupStore(prefs, repo),
@@ -303,10 +306,14 @@ void main() {
       );
       service.dispose();
     },
+    timeout: const Timeout(Duration(seconds: 20)),
   );
   testWidgets(
     'closing before a push retains local data and restart pushes without another edit',
     (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      repo = LocalTrialRepository.open(prefs);
       final docs = _Documents();
       final first = BackupService(
         TrialBackupStore(prefs, repo),
@@ -345,10 +352,14 @@ void main() {
       );
       second.dispose();
     },
+    timeout: const Timeout(Duration(seconds: 20)),
   );
   testWidgets('failed automatic push retries no faster than once a minute', (
     tester,
   ) async {
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
+    repo = LocalTrialRepository.open(prefs);
     final docs = _Documents();
     final service = BackupService(
       TrialBackupStore(prefs, repo),
@@ -369,10 +380,13 @@ void main() {
     expect(docs.attempts, 3);
     expect(service.error, isNull);
     service.dispose();
-  });
+  }, timeout: const Timeout(Duration(seconds: 20)));
   testWidgets(
     'edits during an in-flight write wait for the next minute instead of bursting',
     (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      repo = LocalTrialRepository.open(prefs);
       final docs = _Documents();
       final p = OrchardCommands(repo, starterTaxonomy).addPlant(
         place: repo.place,
@@ -408,5 +422,6 @@ void main() {
       );
       service.dispose();
     },
+    timeout: const Timeout(Duration(seconds: 20)),
   );
 }
