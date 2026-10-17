@@ -158,3 +158,11 @@ identity represents this phone, not a cloud account. Default map views are store
 through MapViewRepository and scoped by user ID and orchard ID. No Maps API key or
 Firebase credentials are part of these preferences. Physical-device offline restart
 and cloud reconnect acceptance checks still apply.
+
+## Trial 0.6 schema and rules
+
+Deploy both updated rule files before using the connected app. This release adds
+`taskPlans`, UUID5 generated assignments/events, editable activities, section style
+fields and owner-only permanent deletion. Legacy beds read as Areas and legacy
+cultivars appear under Variety; IDs and ownership do not change. See
+[release-0.6.md](release-0.6.md) for recurrence, deletion and phone acceptance steps.

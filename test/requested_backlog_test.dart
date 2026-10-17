@@ -321,4 +321,59 @@ void main() {
     await views.saveTaskSort('user', 'title');
     expect(await DeviceMapViewRepository(prefs).loadTaskSort('user'), 'title');
   });
+  test('deleting a section removes its plan and assignments after a plant moved out', () async {
+    SharedPreferences.setMockInitialValues({});
+    final prefs = await SharedPreferences.getInstance();
+    final repo = LocalTrialRepository.open(prefs);
+    final commands = OrchardCommands(repo, starterTaxonomy);
+    repo.saveSection(
+      OrchardSection(
+        id: 'row',
+        propertyId: repo.place.id,
+        name: 'Row',
+        kind: SectionKind.row,
+        vertices: [Coordinates(51, 1), Coordinates(51, 1.1)],
+        createdAt: date,
+      ),
+    );
+    final p = commands.addPlant(
+      place: repo.place,
+      name: 'Moved tree',
+      taxonId: variety.id,
+      location: Coordinates(51, 1),
+      sectionId: 'row',
+    );
+    final scoped = TaskPlan(
+      id: 'scoped',
+      propertyId: repo.place.id,
+      title: 'Prune row',
+      target: 'plants',
+      sectionId: 'row',
+      createdAt: date,
+      eventType: ActivityType.pruning,
+    );
+    repo.saveTaskPlan(scoped);
+    final task = expandPlans(
+      plans: [scoped],
+      existing: [],
+      plants: repo.plants,
+      sections: repo.sections,
+      crops: [],
+      taxonomy: starterTaxonomy,
+      now: date,
+    ).single;
+    repo.saveTask(task);
+    commands.changeTaskStatus(
+      task,
+      TaskStatus.completed,
+      LocalTrialRepository.userId,
+    );
+    repo.updatePlant(p.copyWith(clearSection: true));
+    await repo.deleteSection(repo.place.id, 'row');
+    expect(repo.plants.single.id, p.id);
+    expect(repo.tasks, isEmpty);
+    expect(repo.events, isEmpty);
+    expect(await repo.watchTaskPlans(repo.place.id).first, isEmpty);
+    expect(LocalTrialRepository.open(prefs).tasks, isEmpty);
+  });
 }

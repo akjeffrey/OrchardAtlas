@@ -367,6 +367,8 @@ class LocalTrialRepository
   @override
   Stream<WriteFailure> get writeFailures => _failures.stream;
 
+  Object? _lastWriteError;
+
   void _persist(String recordId) {
     final json = jsonEncode({
       'createdAt': place.createdAt.toIso8601String(),
@@ -438,7 +440,9 @@ class LocalTrialRepository
         if (!await preferences.setString(recordKey, json)) {
           throw StateError('Device storage rejected write');
         }
-      } catch (_) {
+        _lastWriteError = null;
+      } catch (error) {
+        _lastWriteError = error;
         _failures.add(
           WriteFailure(
             recordId,
@@ -790,7 +794,8 @@ class LocalTrialRepository
     );
     if (index < 0) throw StateError('Activity unavailable');
     if (events[index].taskId != event.taskId ||
-        events[index].authorId != event.authorId) {
+        events[index].authorId != event.authorId ||
+        events[index].recordedAt != event.recordedAt) {
       throw ArgumentError('Event identity is immutable');
     }
     events[index] = event;
@@ -821,6 +826,7 @@ class LocalTrialRepository
     _plans.removeWhere((p) => p.itemId == id);
     _persist(id);
     await _writes;
+    if (_lastWriteError != null) throw StateError('Could not persist deletion');
   }
 
   @override
@@ -839,8 +845,23 @@ class LocalTrialRepository
         .toSet();
     plants.removeWhere((p) => plantIds.contains(p.id));
     events.removeWhere((e) => plantIds.contains(e.itemId));
+    final deletedPlans = _plans
+        .where(
+          (p) =>
+              plantIds.contains(p.itemId) ||
+              ids.contains(p.sectionId) ||
+              cropIds.contains(p.cropId),
+        )
+        .map((p) => p.id)
+        .toSet();
+    final deletedTasks = tasks
+        .where((t) => deletedPlans.contains(t.planId))
+        .map((t) => t.id)
+        .toSet();
+    events.removeWhere((e) => deletedTasks.contains(e.taskId));
     tasks.removeWhere(
       (t) =>
+          deletedPlans.contains(t.planId) ||
           plantIds.contains(t.itemId) ||
           ids.contains(t.sectionId) ||
           cropIds.contains(t.cropId),
@@ -856,6 +877,7 @@ class LocalTrialRepository
     cropHarvests.removeWhere((h) => cropIds.contains(h.cropId));
     _persist(id);
     await _writes;
+    if (_lastWriteError != null) throw StateError('Could not persist deletion');
   }
 
   @override

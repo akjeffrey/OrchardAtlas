@@ -120,7 +120,10 @@ List<OrchardTask> expandPlans({
     final targets = <({String? plant, String? section, String? crop})>[];
     if (plan.target == 'plant') {
       if (plants.any(
-        (p) => p.id == plan.itemId && p.status == ItemStatus.active,
+        (p) =>
+            p.propertyId == plan.propertyId &&
+            p.id == plan.itemId &&
+            p.status == ItemStatus.active,
       )) {
         targets.add((plant: plan.itemId, section: null, crop: null));
       }
@@ -154,11 +157,15 @@ List<OrchardTask> expandPlans({
         targets.add((plant: null, section: null, crop: c.id));
       }
     } else if (plan.target == 'section') {
-      if (sections.any((s) => s.id == plan.sectionId)) {
+      if (sections.any(
+        (s) => s.propertyId == plan.propertyId && s.id == plan.sectionId,
+      )) {
         targets.add((plant: null, section: plan.sectionId, crop: null));
       }
     } else if (plan.target == 'crop') {
-      if (crops.any((c) => c.id == plan.cropId)) {
+      if (crops.any(
+        (c) => c.propertyId == plan.propertyId && c.id == plan.cropId,
+      )) {
         targets.add((plant: null, section: null, crop: plan.cropId));
       }
     } else {

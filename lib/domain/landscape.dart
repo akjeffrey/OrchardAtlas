@@ -20,6 +20,7 @@ class OrchardSection {
   }) : name = requiredText(name, 'Section name'),
        vertices = List.unmodifiable(vertices),
        notes = optionalText(notes, 10000) {
+    if (color < 0 || color > 0xffffffff) throw ArgumentError('Invalid color');
     validateGeometry(kind, vertices);
     if (parentId == id) throw ArgumentError('A section cannot contain itself');
   }

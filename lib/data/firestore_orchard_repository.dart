@@ -571,16 +571,33 @@ class FirestoreOrchardRepository
     Set<String> plantIds,
     Set<String> cropIds,
   ) async {
-    for (final collection in ['tasks', 'taskPlans', 'cropHarvests']) {
+    final deletedPlans = <String>{};
+    final deletedTasks = <String>{};
+    for (final collection in ['taskPlans', 'tasks', 'cropHarvests']) {
       final records = await _collection(
         propertyId,
         collection,
       ).get(const GetOptions(source: Source.server));
       for (final d in records.docs) {
         final v = d.data();
-        if (plantIds.contains(v['itemId']) ||
+        if (deletedPlans.contains(v['planId']) ||
+            plantIds.contains(v['itemId']) ||
             sectionIds.contains(v['sectionId']) ||
             cropIds.contains(v['cropId'])) {
+          if (collection == 'taskPlans') deletedPlans.add(d.id);
+          if (collection == 'tasks') {
+            deletedTasks.add(d.id);
+            if (v['itemId'] is String && !plantIds.contains(v['itemId'])) {
+              final linked = await _items(propertyId)
+                  .doc(v['itemId'] as String)
+                  .collection('events')
+                  .where('taskId', isEqualTo: d.id)
+                  .get(const GetOptions(source: Source.server));
+              for (final event in linked.docs) {
+                await event.reference.delete();
+              }
+            }
+          }
           await d.reference.delete();
         }
       }
@@ -603,7 +620,9 @@ class FirestoreOrchardRepository
     ).get(const GetOptions(source: Source.server));
     for (final d in remaining.docs) {
       final v = d.data();
-      if (plantIds.contains(v['itemId']) ||
+      if (deletedPlans.contains(v['planId']) ||
+          deletedTasks.contains(d.id) ||
+          plantIds.contains(v['itemId']) ||
           sectionIds.contains(v['sectionId']) ||
           cropIds.contains(v['cropId'])) {
         await d.reference.delete();
