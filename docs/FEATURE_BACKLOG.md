@@ -74,9 +74,11 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 - [ ] Richer harvest/yield reports and activity audit/recovery design.
 - [ ] Uploaded/custom map icons and a consistent accessible symbol catalog.
 - [ ] More map editing tools: move plants, split/join rows, vertex insertion and measurements.
-- [ ] Export/import/backup and recovery of local trial records before installation changes.
+- [x] Android trial JSON backup/restore through the system file picker, including Google Drive, all orchards, pre-restore recovery and default external-file retention. See drive-backup-and-updates.md.
+- [ ] Cross-platform backup and recovery beyond the Android local trial.
 - [ ] Connected account setup, sync/rejection recovery UI and multi-device acceptance testing.
-- [ ] Stable private trial signing, production signing/distribution and installable iOS trial.
+- [x] Update-safe Android trial signing pipeline and semantic 0.N.0 build versions. Publishing requires the one-time private signing secret described in drive-backup-and-updates.md.
+- [ ] Production signing/distribution and installable iOS trial.
 - [ ] Accessibility, field usability, small-screen and physical-device regression testing.
 
 ## Follow-up validation

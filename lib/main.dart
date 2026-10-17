@@ -15,6 +15,7 @@ import 'data/platform_repositories.dart';
 import 'data/map_services.dart';
 import 'data/map_view_repository.dart';
 import 'ui/app.dart';
+import 'data/trial_backup_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,6 +26,7 @@ Future<void> main() async {
     final mapsConfigured = await DeviceAddressSearchRepository.mapsConfigured();
     if (const bool.fromEnvironment('TRIAL_MODE')) {
       final preferences = await SharedPreferences.getInstance();
+      await TrialBackupStore.finishRestore(preferences);
       runApp(
         ProviderScope(
           overrides: [
@@ -36,8 +38,9 @@ Future<void> main() async {
               DeviceAddressSearchRepository(),
             ),
             trialModeProvider.overrideWithValue(true),
-            orchardRepositoryProvider.overrideWithValue(
-              LocalTrialRepository.open(preferences),
+            backupPreferencesProvider.overrideWithValue(preferences),
+            orchardRepositoryProvider.overrideWith(
+              (ref) => LocalTrialRepository.open(preferences),
             ),
             authRepositoryProvider.overrideWithValue(TrialAuthRepository()),
             locationRepositoryProvider.overrideWithValue(

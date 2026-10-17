@@ -1,3 +1,12 @@
+import '../domain/filters.dart';
+
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../data/local_trial_repository.dart';
+import '../data/trial_backup_store.dart';
+import '../data/backup_documents.dart';
+import 'backup_service.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -302,3 +311,25 @@ final allEventsProvider = Provider<AsyncValue<List<PlantEvent>>>((ref) {
   result.sort((a, b) => b.activityDate.compareTo(a.activityDate));
   return AsyncData(result);
 });
+
+final backupPreferencesProvider = Provider<SharedPreferences>(
+  (ref) => throw UnimplementedError(),
+);
+final plantFilterProvider = StateProvider<PlantFilter>(
+  (ref) => const PlantFilter(),
+);
+final backupServiceProvider = ChangeNotifierProvider<BackupService>(
+  (ref) => BackupService(
+    TrialBackupStore(
+      ref.watch(backupPreferencesProvider),
+      ref.watch(orchardRepositoryProvider) as LocalTrialRepository,
+    ),
+    AndroidBackupDocuments(),
+    onRestored: () {
+      ref.read(selectedOrchardProvider.notifier).state = null;
+      ref.read(submittedTaxaProvider.notifier).state = {};
+      ref.read(plantFilterProvider.notifier).state = const PlantFilter();
+      ref.invalidate(orchardRepositoryProvider);
+    },
+  ),
+);

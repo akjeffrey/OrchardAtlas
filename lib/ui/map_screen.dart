@@ -456,8 +456,9 @@ class _MapState extends ConsumerState<MapScreen>
                   if (v == 'archived') context.push('/archived');
                   if (v == 'classifications') context.push('/classifications');
                   if (v == 'logout') signOut();
+                  if (v == 'backup') context.push('/backup');
                 },
-                itemBuilder: (_) => const [
+                itemBuilder: (_) => [
                   PopupMenuItem(
                     value: 'orchards',
                     child: Text('Select orchard'),
@@ -472,6 +473,11 @@ class _MapState extends ConsumerState<MapScreen>
                     child: Text('Group / Type / Variety'),
                   ),
                   PopupMenuItem(value: 'layout', child: Text('Areas & Rows')),
+                  if (ref.read(trialModeProvider))
+                    PopupMenuItem(
+                      value: 'backup',
+                      child: Text('Backup & restore'),
+                    ),
                   PopupMenuItem(
                     value: 'logout',
                     child: Text('Sign out and clear device cache'),

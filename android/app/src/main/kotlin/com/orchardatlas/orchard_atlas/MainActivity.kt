@@ -12,6 +12,13 @@ import android.view.WindowInsetsController
 import java.util.Locale
 
 class MainActivity : FlutterActivity() {
+    private lateinit var backupChannel: BackupChannel
+    @Deprecated("Used by Android document providers on supported trial phones")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (::backupChannel.isInitialized && backupChannel.onActivityResult(requestCode, resultCode, data)) return
+        super.onActivityResult(requestCode, resultCode, data)
+    }
+
     override fun onResume() {
         super.onResume()
         window.decorView.post { hideNavigationBar() }
@@ -38,6 +45,8 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        backupChannel = BackupChannel(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/backup").setMethodCallHandler(backupChannel)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/map_services")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
