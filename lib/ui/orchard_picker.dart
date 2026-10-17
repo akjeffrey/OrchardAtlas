@@ -63,6 +63,61 @@ class _PickerState extends ConsumerState<_OrchardPicker> {
                       for (final place in places)
                         ListTile(
                           title: Text(place.name),
+                          trailing: IconButton(
+                            tooltip: 'Rename orchard',
+                            icon: const Icon(Icons.edit),
+                            onPressed: busy
+                                ? null
+                                : () async {
+                                    var value = place.name;
+                                    final yes = await showDialog<bool>(
+                                      context: context,
+                                      builder: (context) => AlertDialog(
+                                        title: const Text('Rename orchard'),
+                                        content: TextFormField(
+                                          initialValue: value,
+                                          onChanged: (v) => value = v,
+                                          decoration: const InputDecoration(
+                                            labelText: 'Orchard name',
+                                          ),
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, false),
+                                            child: const Text('Cancel'),
+                                          ),
+                                          FilledButton(
+                                            onPressed: () =>
+                                                Navigator.pop(context, true),
+                                            child: const Text('Save name'),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                    if (yes != true || !mounted) return;
+                                    try {
+                                      final directory = ref.read(
+                                        orchardDirectoryProvider,
+                                      );
+                                      final renamed = await directory
+                                          .renamePlace(
+                                            place.ownerId,
+                                            place.id,
+                                            value,
+                                          );
+                                      await directory.selectPlace(
+                                        place.ownerId,
+                                        place.id,
+                                      );
+                                      if (context.mounted) {
+                                        Navigator.pop(context, renamed);
+                                      }
+                                    } catch (e) {
+                                      if (mounted) setState(() => error = '$e');
+                                    }
+                                  },
+                          ),
                           leading: Icon(
                             place.id == ref.watch(placeProvider).valueOrNull?.id
                                 ? Icons.check_circle

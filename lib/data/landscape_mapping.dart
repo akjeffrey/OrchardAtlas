@@ -17,6 +17,8 @@ class LandscapeMapping {
     'schemaVersion': 1,
     'name': s.name,
     'kind': s.kind.name,
+    'color': s.color,
+    'symbol': s.symbol?.name,
     'parentId': s.parentId,
     'notes': s.notes,
     'createdAt': time(s.createdAt, native),
@@ -38,7 +40,13 @@ class LandscapeMapping {
       id: id,
       propertyId: propertyId,
       name: d['name'] as String,
-      kind: SectionKind.values.byName(d['kind'] as String),
+      kind: d['kind'] == 'bed'
+          ? SectionKind.area
+          : SectionKind.values.byName(d['kind'] as String),
+      color: (d['color'] as num?)?.toInt() ?? 0xff4caf50,
+      symbol: d['symbol'] == null
+          ? null
+          : PlantSymbol.values.byName(d['symbol'] as String),
       parentId: d['parentId'] as String?,
       notes: d['notes'] as String,
       createdAt: readTime(d['createdAt'] as Object),

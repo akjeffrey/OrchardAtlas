@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import 'common.dart';
+import 'events_table.dart';
+import 'delete_actions.dart';
 
 class PlantDetailScreen extends ConsumerStatefulWidget {
   const PlantDetailScreen(this.id, {super.key});
@@ -74,6 +76,11 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
               Wrap(
                 spacing: 8,
                 children: [
+                  TextButton(
+                    onPressed: () =>
+                        deletePlantWithConfirmation(context, ref, plant),
+                    child: const Text('Delete permanently'),
+                  ),
                   TextButton.icon(
                     onPressed: () => context.push('/plants/${plant.id}/edit'),
                     icon: const Icon(Icons.edit),
@@ -94,7 +101,7 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                             archive ? 'Archive plant?' : 'Restore plant?',
                           ),
                           content: const Text(
-                            'History and tasks are retained. Archived plants are hidden by the default map filter.',
+                            'History and tasks are retained. Archived plants never show on the map; find them in Archived Plants.',
                           ),
                           actions: [
                             TextButton(
@@ -218,20 +225,7 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                       ),
                       if (history.value.isEmpty)
                         const Text('No cached activities yet.'),
-                      for (final event in history.value)
-                        ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            '${activityLabel(event.type.name)} · ${event.activityDate}',
-                          ),
-                          subtitle: Text(
-                            [
-                              if (event.harvest != null)
-                                '${event.harvest!.quantity} ${event.harvest!.unit.name}',
-                              if (event.notes.isNotEmpty) event.notes,
-                            ].join('\n'),
-                          ),
-                        ),
+                      EventsTable(events: history.value),
                     ],
                   );
                 },

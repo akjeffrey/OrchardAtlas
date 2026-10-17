@@ -1,7 +1,10 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Photo capture is deferred; all Storage access is closed for V1.
+    // Photo capture remains deferred; owners may remove existing associated files.
+    match /properties/{propertyId}/{path=**} {
+      allow delete: if request.auth != null && firestore.get(/databases/(default)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+    }
     match /{path=**} { allow read, write: if false; }
   }
 }

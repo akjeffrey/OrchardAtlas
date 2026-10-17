@@ -68,6 +68,7 @@ class FirestoreMapping {
       id: id,
       propertyId: propertyId,
       sectionId: d['sectionId'] as String?,
+      rowOrder: (d['rowOrder'] as num?)?.toDouble(),
       plantedOn: d['plantedOn'] as String?,
       rootstock: d['rootstock'] as String? ?? '',
       nursery: d['nursery'] as String? ?? '',
@@ -84,6 +85,7 @@ class FirestoreMapping {
   static Map<String, dynamic> plantMetadataToMap(ManagedPlant p) => {
     if (p.sectionId != null) 'sectionId': p.sectionId,
     'plantedOn': p.plantedOn,
+    'rowOrder': p.rowOrder,
     'rootstock': p.rootstock,
     'nursery': p.nursery,
     'notes': p.notes,
@@ -92,6 +94,11 @@ class FirestoreMapping {
   };
   static Map<String, dynamic> editablePlantToMap(ManagedPlant p) => {
     'name': p.name,
+    'taxonId': p.taxonId,
+    'location': GeoPoint(p.location.latitude, p.location.longitude),
+    'plantedOn': p.plantedOn,
+    'accuracyMeters': p.accuracyMeters,
+    'rowOrder': p.rowOrder,
     'sectionId': p.sectionId,
     'rootstock': p.rootstock,
     'nursery': p.nursery,
@@ -104,6 +111,15 @@ class FirestoreMapping {
     if (t.groupId != null) 'groupId': t.groupId,
     if (t.groupScope.isNotEmpty) 'groupScope': t.groupScope,
     'completedOn': t.completedOn,
+    'planId': t.planId,
+    'occurrenceOn': t.occurrenceOn,
+    'eventType': t.eventType?.name,
+    'eventHarvest': t.eventHarvest == null
+        ? null
+        : {
+            'quantity': t.eventHarvest!.quantity,
+            'unit': t.eventHarvest!.unit.name,
+          },
   };
   static Map<String, dynamic> taskToMap(OrchardTask t) => {
     'schemaVersion': 1,
@@ -131,6 +147,17 @@ class FirestoreMapping {
       groupId: d['groupId'] as String?,
       groupScope: d['groupScope'] as String? ?? '',
       completedOn: d['completedOn'] as String?,
+      planId: d['planId'] as String?,
+      occurrenceOn: d['occurrenceOn'] as String?,
+      eventType: d['eventType'] == null
+          ? null
+          : ActivityType.values.byName(d['eventType'] as String),
+      eventHarvest: d['eventHarvest'] == null
+          ? null
+          : Harvest(
+              (d['eventHarvest']['quantity'] as num).toDouble(),
+              HarvestUnit.values.byName(d['eventHarvest']['unit'] as String),
+            ),
       itemId: d['itemId'] as String?,
       dueDate: d['dueDate'] as String?,
       status: TaskStatus.values.byName(d['status'] as String),
@@ -141,6 +168,7 @@ class FirestoreMapping {
   static Map<String, dynamic> eventToMap(PlantEvent e) => {
     'schemaVersion': 1,
     'authorId': e.authorId,
+    if (e.taskId != null) 'taskId': e.taskId,
     'type': e.type.name,
     'occurredAt': Timestamp.fromDate(e.occurredAt),
     'activityDate': e.activityDate,
@@ -165,6 +193,7 @@ class FirestoreMapping {
       propertyId: propertyId,
       itemId: itemId,
       authorId: d['authorId'] as String,
+      taskId: d['taskId'] as String?,
       type: ActivityType.values.byName(d['type'] as String),
       occurredAt: (d['occurredAt'] as Timestamp).toDate().toUtc(),
       activityDate: d['activityDate'] as String,

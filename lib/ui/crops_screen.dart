@@ -44,14 +44,14 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
   Future<void> variety() async {
     if (taxonId == null) return;
     final taxonomy = ref.read(taxonomyProvider);
-    final species = taxonomy
+    final type = taxonomy
         .ancestry(taxonId!)
-        .firstWhere((t) => t.rank == TaxonRank.species);
+        .firstWhere((t) => t.rank == TaxonRank.genus);
     var name = '';
     final result = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Add ${species.name} variety'),
+        title: Text('Add ${type.name} variety'),
         content: TextField(
           autofocus: true,
           maxLength: 500,
@@ -73,8 +73,8 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
     if (result == null || !mounted) return;
     try {
       final value = requiredText(result, 'Variety');
-      if (taxonomy
-          .children(species.id)
+      if (taxonomy.taxa
+          .where((t) => taxonomy.descendants(type.id).contains(t.id))
           .any((t) => t.name.toLowerCase() == value.toLowerCase())) {
         throw ArgumentError('Variety already exists');
       }
@@ -83,9 +83,9 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
       final taxon = Taxon(
         id: const Uuid().v4(),
         name: value,
-        rank: TaxonRank.cultivar,
-        parentId: species.id,
-        symbol: species.symbol,
+        rank: TaxonRank.species,
+        parentId: type.id,
+        symbol: type.symbol,
       );
       ref.read(orchardRepositoryProvider).saveTaxon(place.id, taxon);
       ref.read(submittedTaxaProvider.notifier).state = {
@@ -163,9 +163,7 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
                 ? taxonId
                 : null,
             isExpanded: true,
-            decoration: const InputDecoration(
-              labelText: 'Crop species / variety',
-            ),
+            decoration: const InputDecoration(labelText: 'Crop Variety'),
             items: [
               for (final t in identities)
                 DropdownMenuItem(
@@ -347,7 +345,7 @@ class CropDetailScreen extends ConsumerWidget {
                   children: [
                     TextButton(
                       onPressed: () => context.go('/sections/${c.sectionId}'),
-                      child: const Text('View bed / row'),
+                      child: const Text('View Area / Row'),
                     ),
                     TextButton(
                       onPressed: () => context.push('/crops/new', extra: c),

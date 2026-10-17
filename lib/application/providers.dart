@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import 'dart:async';
+
+import '../domain/work.dart';
+
 import '../domain/models.dart';
 import '../domain/landscape.dart';
 import '../domain/repositories.dart';
@@ -124,6 +128,7 @@ class OrchardCommands {
     String nursery = '',
     String notes = '',
     double? accuracyMeters,
+    double? rowOrder,
   }) {
     if (!taxonomy.isPlantIdentity(taxonId)) {
       throw ArgumentError('Select a species or cultivar');
@@ -136,6 +141,7 @@ class OrchardCommands {
       location: location,
       createdAt: DateTime.now().toUtc(),
       sectionId: sectionId,
+      rowOrder: rowOrder,
       plantedOn: plantingDate == null ? null : calendarDate(plantingDate),
       rootstock: rootstock,
       nursery: nursery,
@@ -159,6 +165,37 @@ class OrchardCommands {
           );
     repository.savePlant(plant, plantingEvent: plantingEvent);
     return plant;
+  }
+
+  void changeTaskStatus(OrchardTask old, TaskStatus status, String authorId) {
+    if (old.status == status) return;
+    final task = old.withStatus(status);
+    PlantEvent? event;
+    if (status == TaskStatus.completed &&
+        task.eventType != null &&
+        task.itemId != null) {
+      final now = DateTime.now();
+      event = PlantEvent(
+        id: linkedEventId(task.id),
+        propertyId: task.propertyId,
+        itemId: task.itemId!,
+        authorId: authorId,
+        type: task.eventType!,
+        occurredAt: now.toUtc(),
+        activityDate: calendarDate(now),
+        recordedAt: now.toUtc(),
+        notes: task.notes,
+        harvest: task.eventType == ActivityType.harvest
+            ? task.eventHarvest
+            : null,
+        taskId: task.id,
+      );
+    }
+    if (task.eventType == null) {
+      repository.saveTask(task);
+    } else {
+      repository.saveTaskWithEvent(task, event);
+    }
   }
 
   void record({
@@ -206,3 +243,62 @@ final cropHarvestsProvider =
       final place = await ref.watch(placeProvider.future);
       yield* repo.watchCropHarvests(place.id);
     });
+
+final taskPlansProvider = StreamProvider<List<TaskPlan>>((ref) async* {
+  final repository = ref.watch(orchardRepositoryProvider);
+  final place = await ref.watch(placeProvider.future);
+  yield* repository.watchTaskPlans(place.id);
+});
+final minuteClockProvider = Provider<DateTime>((ref) {
+  final timer = Timer(const Duration(minutes: 1), ref.invalidateSelf);
+  ref.onDispose(timer.cancel);
+  return DateTime.now();
+});
+final taskMaterializerProvider = Provider<int>((ref) {
+  final plans = ref.watch(taskPlansProvider).asData?.value;
+  final tasks = ref.watch(tasksProvider).asData?.value.value;
+  final plants = ref.watch(plantsProvider).asData?.value.value;
+  final sections = ref.watch(sectionsProvider).asData?.value.value;
+  final crops = ref.watch(cropsProvider).asData?.value.value;
+  final taxonomy = ref.watch(taxonomyProvider),
+      now = ref.watch(minuteClockProvider);
+  final repository = ref.watch(orchardRepositoryProvider);
+  if (plans == null ||
+      tasks == null ||
+      plants == null ||
+      sections == null ||
+      crops == null) {
+    return 0;
+  }
+  final pending = expandPlans(
+    plans: plans,
+    existing: tasks,
+    plants: plants,
+    sections: sections,
+    crops: crops,
+    taxonomy: taxonomy,
+    now: now,
+  );
+  if (pending.isNotEmpty) {
+    scheduleMicrotask(() {
+      for (final task in pending) {
+        repository.saveTask(task);
+      }
+    });
+  }
+  return pending.length;
+});
+final allEventsProvider = Provider<AsyncValue<List<PlantEvent>>>((ref) {
+  final plants = ref.watch(plantsProvider);
+  if (plants.hasError) return AsyncError(plants.error!, StackTrace.current);
+  if (plants.asData == null) return const AsyncLoading();
+  final result = <PlantEvent>[];
+  for (final plant in plants.value!.value) {
+    final events = ref.watch(eventsProvider(plant.id));
+    if (events.hasError) return AsyncError(events.error!, StackTrace.current);
+    if (events.asData == null) return const AsyncLoading();
+    result.addAll(events.value!.value);
+  }
+  result.sort((a, b) => b.activityDate.compareTo(a.activityDate));
+  return AsyncData(result);
+});

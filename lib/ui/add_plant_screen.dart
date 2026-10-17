@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import '../domain/taxonomy.dart';
+import '../domain/work.dart';
+import '../domain/landscape.dart';
 import 'plant_symbols.dart';
 import 'sections_screen.dart';
 
@@ -48,7 +50,13 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
       setCoordinates(widget.location!);
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) locate();
+        if (mounted) {
+          if (sectionId != null) {
+            useSection(sectionId);
+          } else {
+            locate();
+          }
+        }
       });
     }
   }
@@ -72,7 +80,28 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     for (var i = 0; i < path.length; i++) {
       selected[i] = path[i].id;
     }
+    if (path.length == 4) selected[2] = path.last.id;
     templateApplied = true;
+  }
+
+  Future<void> useSection(String? id) async {
+    final revision = ++locationRevision;
+    setState(() => sectionId = id);
+    if (id == null) return;
+    final sections = await ref.read(sectionsProvider.future);
+    if (!mounted || revision != locationRevision) return;
+    final section = sections.value.where((s) => s.id == id).firstOrNull;
+    if (section != null) {
+      setState(() {
+        setCoordinates(
+          section.kind == SectionKind.row
+              ? section.vertices.first
+              : sectionCenter(section),
+        );
+        accuracyMeters = null;
+        message = 'Using ${section.name} location';
+      });
+    }
   }
 
   void setCoordinates(Coordinates p) {
@@ -142,7 +171,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, update) => AlertDialog(
-          title: Text('Add ${TaxonRank.values[rank].name}'),
+          title: Text('Add ${['Group', 'Type', 'Variety'][rank]}'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -233,7 +262,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     try {
       final taxonId = selected[3] ?? selected[2];
       if (taxonId == null) {
-        throw ArgumentError('Select group, genus and species');
+        throw ArgumentError('Select Group, Type and Variety');
       }
       final position = Coordinates(
         double.parse(latitude.text),
@@ -257,6 +286,20 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             notes: notes.text,
             accuracyMeters: accuracyMeters,
             authorId: user.id,
+            rowOrder: sectionId == null
+                ? null
+                : (ref
+                          .read(plantsProvider)
+                          .valueOrNull
+                          ?.value
+                          .where((p) => p.sectionId == sectionId)
+                          .fold<double>(
+                            0,
+                            (n, p) => p.rowOrder != null && p.rowOrder! >= n
+                                ? p.rowOrder! + 1
+                                : n + 1,
+                          ) ??
+                      0),
           );
       final another = await showDialog<bool>(
         context: context,
@@ -286,7 +329,11 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
           locationRevision++;
           message = null;
         });
-        await locate();
+        if (sectionId != null) {
+          await useSection(sectionId);
+        } else {
+          await locate();
+        }
       } else {
         context.go('/', extra: plant.location);
       }
@@ -329,7 +376,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             const Text(
               'Saved taxonomy could not be loaded. Reconnect and retry before adding custom options.',
             ),
-          for (var i = 0; i < 4; i++)
+          for (var i = 0; i < 3; i++)
             if (i == 0 || selected[i - 1] != null)
               DropdownButtonFormField<String>(
                 key: ValueKey(
@@ -338,12 +385,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                 initialValue: selected[i],
                 isExpanded: true,
                 decoration: InputDecoration(
-                  labelText: [
-                    'Group',
-                    'Genus',
-                    'Species',
-                    'Cultivar (optional)',
-                  ][i],
+                  labelText: ['Group', 'Type', 'Variety'][i],
                 ),
                 items: [
                   if (i == 3)
@@ -351,9 +393,16 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                       value: '',
                       child: Text('Unspecified cultivar'),
                     ),
-                  for (final t in taxonomy.children(
-                    i == 0 ? null : selected[i - 1],
-                  ))
+                  for (final t
+                      in i == 2
+                          ? taxonomy.taxa.where(
+                              (t) =>
+                                  t.rank.index >= 2 &&
+                                  taxonomy
+                                      .ancestry(t.id)
+                                      .any((a) => a.id == selected[1]),
+                            )
+                          : taxonomy.children(i == 0 ? null : selected[i - 1]))
                     DropdownMenuItem(
                       value: t.id,
                       child: Text('${symbolLabels[t.symbol]} ${t.name}'),
@@ -406,10 +455,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                         : () => setState(() => plantingDate = null),
                   ),
           ),
-          SectionPicker(
-            value: sectionId,
-            onChanged: (id) => setState(() => sectionId = id),
-          ),
+          SectionPicker(value: sectionId, onChanged: (id) => useSection(id)),
           TextField(
             controller: rootstock,
             maxLength: 500,

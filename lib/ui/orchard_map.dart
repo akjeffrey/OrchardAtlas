@@ -7,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../application/providers.dart';
 import '../domain/landscape.dart';
 import '../domain/models.dart';
+import '../domain/work.dart';
 import 'layout_canvas.dart';
 import 'plant_symbols.dart';
 
@@ -47,6 +48,9 @@ class OrchardMap extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final visiblePlants = plants
+        .where((p) => p.status == ItemStatus.active && p.sectionId == null)
+        .toList();
     if (!ref.watch(mapsConfiguredProvider)) {
       return Column(
         children: [
@@ -60,7 +64,7 @@ class OrchardMap extends ConsumerWidget {
           Expanded(
             child: LayoutCanvas(
               sections: sections,
-              plants: plants,
+              plants: visiblePlants,
               draft: draft,
               center: center,
               selected: selected,
@@ -107,7 +111,7 @@ class OrchardMap extends ConsumerWidget {
           Polyline(
             polylineId: PolylineId(s.id),
             points: s.vertices.map(point).toList(),
-            color: Colors.lightBlueAccent,
+            color: Color(s.color),
             width: 4,
             consumeTapEvents: onSection != null,
             onTap: () => onSection?.call(s.id),
@@ -125,8 +129,8 @@ class OrchardMap extends ConsumerWidget {
           Polygon(
             polygonId: PolygonId(s.id),
             points: s.vertices.map(point).toList(),
-            fillColor: Colors.green.withValues(alpha: 0.2),
-            strokeColor: Colors.lightGreenAccent,
+            fillColor: Color(s.color).withValues(alpha: 0.2),
+            strokeColor: Color(s.color),
             strokeWidth: 2,
             consumeTapEvents: onSection != null,
             onTap: () => onSection?.call(s.id),
@@ -141,7 +145,36 @@ class OrchardMap extends ConsumerWidget {
           ),
       },
       markers: {
-        for (final p in plants)
+        for (final s in sections)
+          if (s.symbol != null)
+            Marker(
+              markerId: MarkerId('section-icon-${s.id}'),
+              position: point(sectionCenter(s)),
+              icon: symbols?[s.symbol] ?? BitmapDescriptor.defaultMarker,
+              infoWindow: InfoWindow(title: s.name),
+              onTap: () => onSection?.call(s.id),
+            ),
+        for (final s in sections.where((s) => s.kind == SectionKind.row)) ...[
+          Marker(
+            markerId: MarkerId('row-start-${s.id}'),
+            position: point(s.vertices.first),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueGreen,
+            ),
+            infoWindow: InfoWindow(title: '${s.name} · Start (1)'),
+            onTap: () => onSection?.call(s.id),
+          ),
+          Marker(
+            markerId: MarkerId('row-finish-${s.id}'),
+            position: point(s.vertices.last),
+            icon: BitmapDescriptor.defaultMarkerWithHue(
+              BitmapDescriptor.hueRed,
+            ),
+            infoWindow: InfoWindow(title: '${s.name} · Finish'),
+            onTap: () => onSection?.call(s.id),
+          ),
+        ],
+        for (final p in visiblePlants)
           Marker(
             markerId: MarkerId(p.id),
             position: point(p.location),

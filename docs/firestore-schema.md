@@ -1,5 +1,8 @@
 # Firestore schema (version 1)
 
+Trial 0.6 extends the foundation schema below; the current rules and release
+addendum at the end supersede the initial append-only and reserved-task policies.
+
 All records include `schemaVersion: 1`. Document IDs are UUID strings except user
 and membership IDs. Native Timestamp and GeoPoint stay in data mappers only.
 
@@ -75,3 +78,29 @@ All new records live under `properties/{propertyId}` and remain owner-only. `sec
 Task documents optionally add sectionId, cropId, groupId, groupScope and completedOn. Exactly one explicit target (plant/section/crop) or a whole-property task is allowed. Skipped is a supported status; completedOn is optional for legacy compatibility and only valid with completed status. Updates may change only status/completedOn. Group members share a UUID groupId and are created in one batch, then written independently. Group progress is derived from member tasks, not another stored total. To support up to 400 members without exceeding Firestore's batch rule document-access limit, group membership references are validated against property-scoped plant/section/crop snapshots by the application; rules validate UUID/owner scope and immutable member identity but do not perform individual existence lookups for grouped members. Such references never grant read access to another property. Direct tasks retain existence checks. This distinction is tested with a 25-distinct-plant batch and documented in ADR-003.
 
 Streams remain property-scoped with client-side descendant/status filters; no extra composite indexes are required. Cached queries can be incomplete, as in previous increments. Deploy the new rules before using the connected build.
+
+## Trial 0.6 addendum
+
+`properties/{propertyId}/taskPlans/{planId}` stores title, notes, createdAt, target
+(plant/plants/section/sections/crop/crops/property), optional itemId, sectionId,
+cropId, taxonId, sectionKind, dueDate, repeat (none/daily/weekly/monthly/yearly),
+eventType and eventHarvest. Zero matching records are valid for group criteria.
+
+Tasks add planId, occurrenceOn, eventType and eventHarvest to existing immutable
+target metadata. Assignment IDs are deterministic UUID5s of plan/occurrence/target.
+Completion updates status/completedOn. Linked events add taskId and use a stable
+UUID5 of that task ID. Completion/reopening batches the task with the event mutation.
+Event editors preserve authorId, recordedAt and taskId; owners may correct other
+fields or delete activities. Harvest totals always derive from current events.
+
+Sections add ARGB integer color and nullable supported-symbol name. Canonical kinds
+are area and row; compatibility readers map legacy bed to area. The first/last row
+vertices define start/finish. Managed plants add optional nonnegative rowOrder, and
+permit edits to classification, location, plantedOn, section assignment and accuracy.
+Identity/createdAt remain stable. No duplicate taxonomy migration is needed: old
+cultivar IDs are surfaced as Variety choices.
+
+All operations remain owner scoped. Permanent deletion enumerates server children
+and references before deleting parents, including item photo metadata and known
+Storage paths. It requires connectivity, is retryable, and is not a multi-device
+transaction. See release-0.6.md for operational limits.

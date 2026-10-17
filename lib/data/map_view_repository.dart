@@ -10,6 +10,16 @@ class DeviceMapViewRepository implements MapViewRepository {
   final SharedPreferences preferences;
   String _key(String user, String orchard) => 'map-default:$user:$orchard';
   @override
+  Future<String?> loadTaskSort(String userId) async =>
+      preferences.getString('task-sort:$userId');
+  @override
+  Future<void> saveTaskSort(String userId, String value) async {
+    if (!await preferences.setString('task-sort:$userId', value)) {
+      throw StateError('Could not save sort');
+    }
+  }
+
+  @override
   Future<OrchardMapView?> load(String userId, String orchardId) async {
     final raw = preferences.getString(_key(userId, orchardId));
     if (raw == null) return null;

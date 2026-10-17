@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'models.dart';
 import 'landscape.dart';
+import 'work.dart';
 
 class RepositorySnapshot<T> {
   const RepositorySnapshot(
@@ -46,6 +47,14 @@ abstract interface class OrchardRepository {
   );
   void appendCropHarvest(CropHarvest harvest);
   Stream<WriteFailure> get writeFailures;
+  Stream<List<TaskPlan>> watchTaskPlans(String propertyId);
+  void saveTaskPlan(TaskPlan plan);
+  void saveTaskWithEvent(OrchardTask task, PlantEvent? event);
+  void updateEvent(PlantEvent event);
+  void deleteEvent(PlantEvent event);
+  Future<void> deletePlant(String propertyId, String itemId);
+  Future<void> deleteSection(String propertyId, String sectionId);
+  void saveRowOrder(String propertyId, String sectionId, List<String> ids);
   Future<void> clearDeviceCache();
 }
 

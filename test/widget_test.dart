@@ -98,13 +98,13 @@ void main() {
       await tester.pumpAndSettle();
       await select(tester, 'Group', '🌳 Fruit trees');
       expect(await plantName(tester), 'Fruit trees');
-      await select(tester, 'Genus', '🍐 Pear (Pyrus)');
+      await select(tester, 'Type', '🍐 Pear (Pyrus)');
       expect(await plantName(tester), 'Pear (Pyrus)');
       await tester.enterText(
         find.byKey(const ValueKey('plant-name')),
         'My pear',
       );
-      await select(tester, 'Species', '🍐 European pear');
+      await select(tester, 'Variety', '🍐 European pear');
       expect(await plantName(tester), 'My pear');
       await tester.enterText(find.byKey(const ValueKey('plant-name')), '');
       await select(tester, '🍐 Pear (Pyrus)', '🍎 Apple (Malus)');
