@@ -74,7 +74,7 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 - [ ] Richer harvest/yield reports and activity audit/recovery design.
 - [ ] Uploaded/custom map icons and a consistent accessible symbol catalog.
 - [ ] More map editing tools: move plants, split/join rows, vertex insertion and measurements.
-- [x] Android trial JSON backup/restore through the system file picker, including Google Drive, all orchards, pre-restore recovery and default external-file retention. See drive-backup-and-updates.md.
+- [x] Android trial JSON backup/restore through the system file picker, including Google Drive, all orchards, pre-restore recovery and default external-file retention. Automatic writes wait for one minute without new edits (resetting after each edit), with local-first saves, failed-write retries and restart catch-up. See drive-backup-and-updates.md.
 - [ ] Cross-platform backup and recovery beyond the Android local trial.
 - [ ] Connected account setup, sync/rejection recovery UI and multi-device acceptance testing.
 - [x] Update-safe Android trial signing pipeline and semantic 0.N.0 build versions. Publishing requires the one-time private signing secret described in drive-backup-and-updates.md.

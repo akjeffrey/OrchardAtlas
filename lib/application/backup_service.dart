@@ -7,10 +7,18 @@ import '../domain/backup.dart';
 import '../data/trial_backup_store.dart';
 
 class BackupService extends ChangeNotifier {
-  BackupService(this.store, this.documents, {this.onRestored}) {
+  BackupService(
+    this.store,
+    this.documents, {
+    this.onRestored,
+    DateTime Function()? clock,
+  }) : _now = clock ?? DateTime.now {
     _subscription = store.repository.backupChanges.listen((_) => schedule());
-    if (connected) schedule();
+    if (connected) schedule(startup: true);
   }
+  final DateTime Function() _now;
+  static const automaticInterval = Duration(minutes: 1);
+  static const attemptKey = 'drive-backup-attempt-v1';
   final void Function()? onRestored;
   final TrialBackupStore store;
   final BackupDocuments documents;
@@ -38,17 +46,41 @@ class BackupService extends ChangeNotifier {
     changed();
   }
 
-  void schedule() {
+  void schedule({bool startup = false}) {
     if (!connected || paused || _disposed) return;
     _dirty = true;
+    // Each edit restarts the quiet period; local persistence is independent.
     _timer?.cancel();
-    _timer = Timer(const Duration(seconds: 2), () async {
+    _timer = null;
+    final raw = preferences.getString(attemptKey) ?? lastSaved;
+    final previous = raw == null ? null : DateTime.tryParse(raw);
+    var remaining = previous == null
+        ? Duration.zero
+        : automaticInterval - _now().difference(previous);
+    if (remaining.isNegative) remaining = Duration.zero;
+    if (remaining > automaticInterval) remaining = automaticInterval;
+    final delay = startup ? remaining : automaticInterval;
+    _timer = Timer(delay, () async {
+      _timer = null;
+      if (busy) {
+        schedule();
+        return;
+      }
       try {
         await save();
       } catch (_) {
-        /* Exposed in status, retry on next change/restart. */
+        /* Status remains visible; retry next minute. */
       }
     });
+  }
+
+  Future<void> _recordAttempt() async {
+    if (!await preferences.setString(
+      attemptKey,
+      _now().toUtc().toIso8601String(),
+    )) {
+      throw StateError('Could not save backup retry state');
+    }
   }
 
   Future<void> _run(Future<void> Function() action) async {
@@ -64,18 +96,22 @@ class BackupService extends ChangeNotifier {
     } finally {
       busy = false;
       changed();
+      if (_dirty) schedule();
     }
   }
 
   Future<void> connect() => _run(() async {
+    _timer?.cancel();
+    _timer = null;
     final document = await documents.create();
     if (document == null) return;
     final contents = await store.export();
+    await _recordAttempt();
     await documents.write(document, contents);
     if (!await preferences.setString(documentKey, document)) {
       throw StateError('Could not remember backup file');
     }
-    await preferences.setString(savedKey, DateTime.now().toIso8601String());
+    await preferences.setString(savedKey, _now().toUtc().toIso8601String());
     schedule();
   });
   Future<void> save() async {
@@ -83,27 +119,35 @@ class BackupService extends ChangeNotifier {
       _dirty = true;
       return;
     }
-    if (paused || !connected) return;
+    if (paused || !connected || _disposed) return;
+    _timer?.cancel();
+    _timer = null;
     await _run(() async {
-      do {
-        _dirty = false;
+      _dirty = false;
+      try {
+        await _recordAttempt();
         await documents.write(
           preferences.getString(documentKey)!,
           await store.export(),
         );
         if (!await preferences.setString(
           savedKey,
-          DateTime.now().toIso8601String(),
+          _now().toUtc().toIso8601String(),
         )) {
           throw StateError('Could not save backup status');
         }
-      } while (_dirty && !_disposed && !paused);
+      } catch (_) {
+        _dirty = true;
+        rethrow;
+      }
+      // Edits during this write are pushed on the next deadline, never in a burst.
     });
   }
 
   Future<bool> restore() async {
     var restored = false;
     _timer?.cancel();
+    _timer = null;
     paused = true;
     try {
       await _run(() async {
@@ -118,12 +162,17 @@ class BackupService extends ChangeNotifier {
     } finally {
       paused = false;
     }
-    if (restored) onRestored?.call();
+    if (restored) {
+      onRestored?.call();
+    } else {
+      schedule();
+    }
     return restored;
   }
 
   Future<void> undoRestore() async {
     _timer?.cancel();
+    _timer = null;
     paused = true;
     try {
       await _run(() async {

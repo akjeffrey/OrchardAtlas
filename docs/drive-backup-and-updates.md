@@ -12,11 +12,16 @@ and task sort preferences are included. Firebase credentials, authentication dat
 file-access grants and backup connection settings are excluded. Connected Firebase
 records and photo binaries are not part of this Android trial format.
 
-Changes trigger a debounced write while the app runs; opening the app retries the
-latest snapshot. **Back up now** explicitly writes before leaving. Status records a
+Edits save locally immediately; they do not wait for Drive. Automatic backup writes
+run after one minute without new edits while the app runs. Each edit resets that
+one-minute timer. Writes that arrive during a push wait for another quiet period;
+automatic attempts never run faster than once per minute.
+Opening the app queues the latest local snapshot again, respecting the last automatic
+attempt so repeated restarts do not cause upload bursts. **Back up now** explicitly
+writes immediately and bypasses the automatic interval. Status records a
 successful provider write, not proof that Drive has uploaded its local cache. Check
 Drive's upload status before uninstalling. Failed writes remain visible and are
-retried after another change or restart. There is no background upload guarantee.
+retried once a minute while the app is open and again after restart. There is no background upload guarantee.
 The app updates the selected file; keep independent copies for version history.
 A provider interruption during replacement can leave an incomplete file; malformed
 backups are rejected on restore, so verify a backup and keep another copy before
@@ -110,3 +115,8 @@ Physical-phone acceptance: Drive picker/grants, offline failure and retry, full
 multi-orchard restore after reinstall, interrupted restore, retention/deletion,
 Google Maps restrictions with the stable signer, and installing two sequential
 stable-key APKs while preserving data. iOS file backup is not implemented here.
+
+If the app closes before a push, orchard records remain in local storage. On the
+next launch, the latest saved state is pushed without needing a new edit. Drive
+provider uploads still depend on connectivity. Shared files are backups for manual
+restore, not concurrent editing or automatic merging between devices.
