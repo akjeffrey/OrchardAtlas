@@ -91,9 +91,6 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                       return;
                     }
                     if (await service.restore()) {
-                      ref.read(selectedOrchardProvider.notifier).state = null;
-                      ref.read(submittedTaxaProvider.notifier).state = {};
-                      ref.invalidate(orchardRepositoryProvider);
                       if (mounted) {
                         setState(
                           () => message = 'Backup restored. All orchards are available in the orchard selector. Set up a backup file to resume automatic backups.',
@@ -103,6 +100,26 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                   }),
             child: const Text('Restore from Drive or a backup file'),
           ),
+          if (service.canUndoRestore)
+            OutlinedButton(
+              onPressed: service.busy
+                  ? null
+                  : () => run(() async {
+                      if (!await confirm(
+                        'Undo the last restore?',
+                        'Replace phone data with the local recovery copy saved immediately before the last restore?',
+                      )) {
+                        return;
+                      }
+                      await service.undoRestore();
+                      if (mounted) {
+                        setState(
+                          () => message = 'Previous phone data restored. Set up a backup file to resume automatic backups.',
+                        );
+                      }
+                    }),
+              child: const Text('Undo last restore'),
+            ),
           const Divider(),
           SwitchListTile(
             title: const Text('Retain backup when preparing to uninstall'),

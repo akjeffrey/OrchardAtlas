@@ -1,3 +1,5 @@
+import '../domain/filters.dart';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/local_trial_repository.dart';
@@ -313,6 +315,9 @@ final allEventsProvider = Provider<AsyncValue<List<PlantEvent>>>((ref) {
 final backupPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError(),
 );
+final plantFilterProvider = StateProvider<PlantFilter>(
+  (ref) => const PlantFilter(),
+);
 final backupServiceProvider = ChangeNotifierProvider<BackupService>(
   (ref) => BackupService(
     TrialBackupStore(
@@ -320,5 +325,11 @@ final backupServiceProvider = ChangeNotifierProvider<BackupService>(
       ref.watch(orchardRepositoryProvider) as LocalTrialRepository,
     ),
     AndroidBackupDocuments(),
+    onRestored: () {
+      ref.read(selectedOrchardProvider.notifier).state = null;
+      ref.read(submittedTaxaProvider.notifier).state = {};
+      ref.read(plantFilterProvider.notifier).state = const PlantFilter();
+      ref.invalidate(orchardRepositoryProvider);
+    },
   ),
 );

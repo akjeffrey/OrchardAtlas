@@ -473,7 +473,7 @@ class _MapState extends ConsumerState<MapScreen>
                     child: Text('Group / Type / Variety'),
                   ),
                   PopupMenuItem(value: 'layout', child: Text('Areas & Rows')),
-                  if (ref.watch(trialModeProvider))
+                  if (ref.read(trialModeProvider))
                     PopupMenuItem(
                       value: 'backup',
                       child: Text('Backup & restore'),

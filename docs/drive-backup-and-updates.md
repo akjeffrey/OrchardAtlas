@@ -37,7 +37,7 @@ file**, approve replacing phone data, and select the JSON backup. Re-select a ne
 backup write target afterward; old write permissions are not restored.
 
 Restore validates every orchard snapshot before changing device records. A local
-recovery snapshot is retained. A pending restore journal is completed at startup if
+recovery snapshot is retained and accessible with **Undo last restore**. A pending restore journal is completed at startup if
 the process stops midway. Local copies and that journal are lost on uninstall;
 external backups must already be saved. Backups contain sensitive orchard locations
 and notes as readable JSON; use a private folder and protect copied files.

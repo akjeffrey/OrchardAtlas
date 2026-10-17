@@ -7,10 +7,11 @@ import '../domain/backup.dart';
 import '../data/trial_backup_store.dart';
 
 class BackupService extends ChangeNotifier {
-  BackupService(this.store, this.documents) {
+  BackupService(this.store, this.documents, {this.onRestored}) {
     _subscription = store.repository.backupChanges.listen((_) => schedule());
     if (connected) schedule();
   }
+  final void Function()? onRestored;
   final TrialBackupStore store;
   final BackupDocuments documents;
   SharedPreferences get preferences => store.preferences;
@@ -22,6 +23,8 @@ class BackupService extends ChangeNotifier {
   bool busy = false, _disposed = false, _dirty = false, paused = false;
   String? error;
   bool get connected => preferences.getString(documentKey) != null;
+  bool get canUndoRestore =>
+      preferences.containsKey(TrialBackupStore.recoveryKey);
   bool get retain => preferences.getBool(retainKey) ?? true;
   String? get lastSaved => preferences.getString(savedKey);
   void changed() {
@@ -73,6 +76,7 @@ class BackupService extends ChangeNotifier {
       throw StateError('Could not remember backup file');
     }
     await preferences.setString(savedKey, DateTime.now().toIso8601String());
+    schedule();
   });
   Future<void> save() async {
     if (busy) {
@@ -114,7 +118,24 @@ class BackupService extends ChangeNotifier {
     } finally {
       paused = false;
     }
+    if (restored) onRestored?.call();
     return restored;
+  }
+
+  Future<void> undoRestore() async {
+    _timer?.cancel();
+    paused = true;
+    try {
+      await _run(() async {
+        final raw = preferences.getString(TrialBackupStore.recoveryKey);
+        if (raw == null) throw StateError('No recovery copy available');
+        await store.restore(raw);
+        await preferences.remove(documentKey);
+      });
+    } finally {
+      paused = false;
+    }
+    onRestored?.call();
   }
 
   Future<void> deleteBackup() => _run(() async {

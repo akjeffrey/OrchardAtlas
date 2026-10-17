@@ -1,3 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:orchard_atlas/data/backup_documents.dart';
+import 'package:orchard_atlas/domain/filters.dart';
+
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -181,5 +185,78 @@ void main() {
       () => BackupArchive.decode(' ' * (BackupArchive.maximumBytes + 1)),
       throwsFormatException,
     );
+  });
+  test('undo restore returns the previous phone data without deleting Drive copies', () async {
+    final docs = _Documents();
+    final p = OrchardCommands(repo, starterTaxonomy).addPlant(
+      place: repo.place,
+      name: 'Original',
+      taxonId: taxon.id,
+      location: Coordinates(51, 1),
+    );
+    final service = BackupService(TrialBackupStore(prefs, repo), docs);
+    addTearDown(service.dispose);
+    await service.connect();
+    repo.updatePlant(p.copyWith(name: 'Before restore'));
+    await repo.flushForBackup();
+    expect(await service.restore(), isTrue);
+    expect(LocalTrialRepository.open(prefs).plants.single.name, 'Original');
+    expect(service.canUndoRestore, isTrue);
+    await service.undoRestore();
+    expect(
+      LocalTrialRepository.open(prefs).plants.single.name,
+      'Before restore',
+    );
+    expect(docs.files, isNotEmpty);
+  });
+  test('restore reloads the repository and clears stale filters without a mounted screen', () async {
+    final documents = <String, String>{};
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(AndroidBackupDocuments.channel, (call) async {
+          if (call.method == 'create' || call.method == 'select') {
+            return 'content://drive/test';
+          }
+          if (call.method == 'write') {
+            documents['file'] = call.arguments['contents'] as String;
+            return null;
+          }
+          if (call.method == 'read') return documents['file'];
+          return null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(AndroidBackupDocuments.channel, null),
+    );
+    final container = ProviderContainer(
+      overrides: [
+        backupPreferencesProvider.overrideWithValue(prefs),
+        orchardRepositoryProvider.overrideWith(
+          (ref) => LocalTrialRepository.open(prefs),
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    final current =
+        container.read(orchardRepositoryProvider) as LocalTrialRepository;
+    final p = OrchardCommands(current, starterTaxonomy).addPlant(
+      place: current.place,
+      name: 'Saved',
+      taxonId: taxon.id,
+      location: Coordinates(51, 1),
+    );
+    final service = container.read(backupServiceProvider);
+    await service.connect();
+    current.updatePlant(p.copyWith(name: 'Later'));
+    container.read(plantFilterProvider.notifier).state = const PlantFilter(
+      query: 'stale',
+    );
+    expect(await service.restore(), isTrue);
+    expect(
+      (container.read(
+        orchardRepositoryProvider,
+      ) as LocalTrialRepository).plants.single.name,
+      'Saved',
+    );
+    expect(container.read(plantFilterProvider).query, '');
   });
 }

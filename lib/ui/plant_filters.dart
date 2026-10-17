@@ -1,3 +1,5 @@
+export '../application/providers.dart' show plantFilterProvider;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,10 +7,6 @@ import '../application/providers.dart';
 import '../domain/models.dart';
 import '../domain/filters.dart';
 import 'sections_screen.dart';
-
-final plantFilterProvider = StateProvider<PlantFilter>(
-  (ref) => const PlantFilter(),
-);
 
 class PlantFilterBar extends ConsumerStatefulWidget {
   const PlantFilterBar({super.key});

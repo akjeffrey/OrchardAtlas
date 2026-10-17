@@ -12,7 +12,6 @@ import 'package:orchard_atlas/domain/orchards.dart';
 import 'package:orchard_atlas/domain/taxonomy.dart';
 import 'package:orchard_atlas/ui/map_screen.dart';
 import 'package:orchard_atlas/ui/orchard_map.dart';
-import 'package:orchard_atlas/ui/plant_filters.dart';
 
 void main() {
   testWidgets(
