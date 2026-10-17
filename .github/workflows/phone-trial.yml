@@ -26,8 +26,8 @@ jobs:
           TRIAL_KEYSTORE: ${{ secrets.ANDROID_TRIAL_DEBUG_KEYSTORE_BASE64 }}
         run: |
           python3 - <<'PY'
-          import base64, os, pathlib
-          encoded = os.environ.get('TRIAL_KEYSTORE', '')
+          import base64, binascii, os, pathlib, subprocess
+          encoded = ''.join(os.environ.get('TRIAL_KEYSTORE', '').strip().lstrip('\ufeff').split())
           if not encoded:
               print('::warning::Set ANDROID_TRIAL_DEBUG_KEYSTORE_BASE64 to publish an update-safe APK. This run compiles only; no temporary-key APK will be published.')
           with open(os.environ['GITHUB_ENV'], 'a') as output:
@@ -35,8 +35,19 @@ jobs:
           if encoded:
               target = pathlib.Path.home() / '.android' / 'debug.keystore'
               target.parent.mkdir(parents=True, exist_ok=True)
-              target.write_bytes(base64.b64decode(encoded, validate=True))
+              try:
+                  decoded = base64.b64decode(encoded + '=' * (-len(encoded) % 4), validate=True)
+              except (binascii.Error, ValueError):
+                  raise SystemExit('Signing secret is not valid Base64. Paste the full contents of orchardatlas.signing-secret.txt, without quotes or filenames.') from None
+              target.touch(mode=0o600, exist_ok=True)
               target.chmod(0o600)
+              target.write_bytes(decoded)
+              verified = subprocess.run(
+                  ['keytool', '-list', '-keystore', str(target), '-storepass', 'android', '-alias', 'androiddebugkey'],
+                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+              if verified.returncode != 0:
+                  target.unlink(missing_ok=True)
+                  raise SystemExit('Decoded signing secret is not a valid trial keystore with the expected alias and password. Use the complete generated signing-secret.txt file.')
           PY
       - name: Build signed debug APK with local trial data
         env:
