@@ -336,6 +336,7 @@ class LocalTrialRepository
       _children[placeId]?.place = renamed;
     }
     _changes.add(null);
+    _backupChanges.add(null);
     return renamed;
   }
 
@@ -346,6 +347,7 @@ class LocalTrialRepository
     if (!await preferences.setString('trial-selected:$userId', placeId)) {
       throw StateError('Could not save orchard selection');
     }
+    _backupChanges.add(null);
   }
 
   Stream<RepositorySnapshot<List<T>>> _watch<T>(List<T> Function() read) =>

@@ -18,7 +18,8 @@ class _Documents implements BackupDocuments {
   String? selected = 'content://drive/backup';
   final files = <String, String>{};
   bool failWrite = false;
-  int writes = 0;
+  int writes = 0, attempts = 0;
+  Future<void> Function()? onWrite;
   @override
   Future<String?> create() async => selected;
   @override
@@ -27,9 +28,11 @@ class _Documents implements BackupDocuments {
   Future<String> read(String document) async => files[document]!;
   @override
   Future<void> write(String document, String contents) async {
+    attempts++;
     if (failWrite) throw StateError('Offline');
     writes++;
     files[document] = contents;
+    await onWrite?.call();
   }
 
   @override
@@ -259,4 +262,166 @@ void main() {
     );
     expect(container.read(plantFilterProvider).query, '');
   });
+  testWidgets(
+    'each edit resets the one-minute quiet period before an automatic push',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      repo = LocalTrialRepository.open(prefs);
+      final docs = _Documents();
+      final service = BackupService(
+        TrialBackupStore(prefs, repo),
+        docs,
+        clock: tester.binding.clock.now,
+      );
+      await service.connect();
+      final p = OrchardCommands(repo, starterTaxonomy).addPlant(
+        place: repo.place,
+        name: 'A',
+        taxonId: taxon.id,
+        location: Coordinates(51, 1),
+      );
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(seconds: 10));
+        repo.updatePlant(p.copyWith(name: 'Edit $i'));
+        await repo.flushForBackup();
+      }
+      expect(docs.writes, 1);
+      await tester.pump(const Duration(seconds: 9));
+      expect(docs.writes, 1);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(docs.writes, 1);
+      await tester.pump(const Duration(seconds: 49));
+      expect(docs.writes, 1);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(docs.writes, 2);
+      expect(
+        jsonDecode(
+          BackupArchive.decode(docs.files.values.single)
+              .records[LocalTrialRepository.storageKey]!,
+        )['plants'].single['name'],
+        'Edit 4',
+      );
+      service.dispose();
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+  testWidgets(
+    'closing before a push retains local data and restart pushes without another edit',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      repo = LocalTrialRepository.open(prefs);
+      final docs = _Documents();
+      final first = BackupService(
+        TrialBackupStore(prefs, repo),
+        docs,
+        clock: tester.binding.clock.now,
+      );
+      await first.connect();
+      OrchardCommands(repo, starterTaxonomy).addPlant(
+        place: repo.place,
+        name: 'Pending local tree',
+        taxonId: taxon.id,
+        location: Coordinates(51, 1),
+      );
+      await repo.flushForBackup();
+      first.dispose();
+      await tester.pump(const Duration(seconds: 20));
+      expect(docs.writes, 1);
+      final restarted = LocalTrialRepository.open(prefs);
+      expect(restarted.plants.single.name, 'Pending local tree');
+      final second = BackupService(
+        TrialBackupStore(prefs, restarted),
+        docs,
+        clock: tester.binding.clock.now,
+      );
+      await tester.pump(const Duration(seconds: 39));
+      expect(docs.writes, 1);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(docs.writes, 2);
+      expect(
+        jsonDecode(
+          BackupArchive.decode(docs.files.values.single)
+              .records[LocalTrialRepository.storageKey]!,
+        )['plants'].single['name'],
+        'Pending local tree',
+      );
+      second.dispose();
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
+  testWidgets('failed automatic push retries no faster than once a minute', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    prefs = await SharedPreferences.getInstance();
+    repo = LocalTrialRepository.open(prefs);
+    final docs = _Documents();
+    final service = BackupService(
+      TrialBackupStore(prefs, repo),
+      docs,
+      clock: tester.binding.clock.now,
+    );
+    await service.connect();
+    docs.failWrite = true;
+    await tester.pump(const Duration(minutes: 1));
+    await tester.pump();
+    expect(docs.attempts, 2);
+    expect(service.error, isNotNull);
+    await tester.pump(const Duration(seconds: 59));
+    expect(docs.attempts, 2);
+    docs.failWrite = false;
+    await tester.pump(const Duration(seconds: 1));
+    await tester.pump();
+    expect(docs.attempts, 3);
+    expect(service.error, isNull);
+    service.dispose();
+  }, timeout: const Timeout(Duration(seconds: 20)));
+  testWidgets(
+    'edits during an in-flight write wait for the next minute instead of bursting',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      prefs = await SharedPreferences.getInstance();
+      repo = LocalTrialRepository.open(prefs);
+      final docs = _Documents();
+      final p = OrchardCommands(repo, starterTaxonomy).addPlant(
+        place: repo.place,
+        name: 'Before',
+        taxonId: taxon.id,
+        location: Coordinates(51, 1),
+      );
+      final service = BackupService(
+        TrialBackupStore(prefs, repo),
+        docs,
+        clock: tester.binding.clock.now,
+      );
+      await service.connect();
+      docs.onWrite = () async {
+        docs.onWrite = null;
+        repo.updatePlant(p.copyWith(name: 'During upload'));
+        await repo.flushForBackup();
+      };
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pump();
+      expect(docs.writes, 2);
+      await tester.pump(const Duration(seconds: 59));
+      expect(docs.writes, 2);
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump();
+      expect(docs.writes, 3);
+      expect(
+        jsonDecode(
+          BackupArchive.decode(docs.files.values.single)
+              .records[LocalTrialRepository.storageKey]!,
+        )['plants'].single['name'],
+        'During upload',
+      );
+      service.dispose();
+    },
+    timeout: const Timeout(Duration(seconds: 20)),
+  );
 }

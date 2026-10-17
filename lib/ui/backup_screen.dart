@@ -54,8 +54,8 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
           const SizedBox(height: 12),
           Text(
             service.connected
-                ? 'Backup file selected · saved changes are backed up while the app is running.'
-                : 'No backup file selected. Device data is lost on uninstall unless you create a backup.',
+                ? 'Backup file selected · saved changes are backed up at most once a minute while the app is running.'
+                : 'No backup file selected. Edits save locally. Device data is lost on uninstall unless you create a backup.',
           ),
           Text(
             service.lastSaved == null
