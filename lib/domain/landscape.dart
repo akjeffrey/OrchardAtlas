@@ -16,6 +16,7 @@ class OrchardSection {
     this.parentId,
     this.color = 0xff4caf50,
     this.symbol,
+    this.customIconId,
     String notes = '',
   }) : name = requiredText(name, 'Section name'),
        vertices = List.unmodifiable(vertices),
@@ -26,6 +27,7 @@ class OrchardSection {
   }
   final int color;
   final PlantSymbol? symbol;
+  final String? customIconId;
   final String id, propertyId, name, notes;
   final String? parentId;
   final SectionKind kind;
@@ -38,6 +40,8 @@ class OrchardSection {
     int? color,
     PlantSymbol? symbol,
     bool clearSymbol = false,
+    String? customIconId,
+    bool clearCustomIcon = false,
   }) => OrchardSection(
     id: id,
     propertyId: propertyId,
@@ -47,6 +51,7 @@ class OrchardSection {
     parentId: parentId,
     color: color ?? this.color,
     symbol: clearSymbol ? null : symbol ?? this.symbol,
+    customIconId: clearCustomIcon ? null : customIconId ?? this.customIconId,
     vertices: vertices,
     createdAt: createdAt,
   );

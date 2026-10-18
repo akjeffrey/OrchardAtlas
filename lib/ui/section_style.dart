@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
-import 'plant_symbols.dart';
+import 'icon_picker.dart';
 
 class SectionStyleFields extends StatelessWidget {
   const SectionStyleFields({
@@ -10,9 +10,13 @@ class SectionStyleFields extends StatelessWidget {
     required this.symbol,
     required this.onColor,
     required this.onSymbol,
+    this.customIconId,
+    this.onCustomIcon,
   });
   final int color;
   final PlantSymbol? symbol;
+  final String? customIconId;
+  final ValueChanged<String?>? onCustomIcon;
   final ValueChanged<int> onColor;
   final ValueChanged<PlantSymbol?> onSymbol;
   @override
@@ -54,19 +58,14 @@ class SectionStyleFields extends StatelessWidget {
         ],
         onChanged: (c) => onColor(c!),
       ),
-      DropdownButtonFormField<String>(
-        initialValue: symbol?.name ?? '',
-        decoration: const InputDecoration(labelText: 'Center icon (optional)'),
-        items: [
-          const DropdownMenuItem(value: '', child: Text('No icon')),
-          for (final s in PlantSymbol.values)
-            DropdownMenuItem(
-              value: s.name,
-              child: Text('${symbolLabels[s]} ${s.name}'),
-            ),
-        ],
-        onChanged: (s) =>
-            onSymbol(s == '' ? null : PlantSymbol.values.byName(s!)),
+      MapIconPicker(
+        symbol: symbol,
+        customIconId: customIconId,
+        optional: true,
+        onChanged: (s, id) {
+          onSymbol(s);
+          onCustomIcon?.call(id);
+        },
       ),
     ],
   );

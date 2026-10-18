@@ -205,6 +205,7 @@ class _MapState extends ConsumerState<MapScreen>
     var name = '', parent = '';
     var color = 0xff4caf50;
     PlantSymbol? symbol;
+    String? customIconId;
     final accepted = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -222,6 +223,8 @@ class _MapState extends ConsumerState<MapScreen>
               SectionStyleFields(
                 color: color,
                 symbol: symbol,
+                customIconId: customIconId,
+                onCustomIcon: (v) => customIconId = v,
                 onColor: (v) => color = v,
                 onSymbol: (v) => symbol = v,
               ),
@@ -276,6 +279,7 @@ class _MapState extends ConsumerState<MapScreen>
         kind: drawing!,
         color: color,
         symbol: symbol,
+        customIconId: customIconId,
         vertices: List.of(draft),
         parentId: parent.isEmpty ? null : parent,
         createdAt: DateTime.now().toUtc(),
@@ -453,6 +457,7 @@ class _MapState extends ConsumerState<MapScreen>
                   }
                   if (v == 'orchards') switchOrchard();
                   if (v == 'settings') mapSettings();
+                  if (v == 'app-settings') context.push('/settings');
                   if (v == 'archived') context.push('/archived');
                   if (v == 'classifications') context.push('/classifications');
                   if (v == 'logout') signOut();
@@ -464,6 +469,7 @@ class _MapState extends ConsumerState<MapScreen>
                     child: Text('Select orchard'),
                   ),
                   PopupMenuItem(value: 'settings', child: Text('Map settings')),
+                  PopupMenuItem(value: 'app-settings', child: Text('Settings')),
                   PopupMenuItem(
                     value: 'archived',
                     child: Text('Archived Plants'),

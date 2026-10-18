@@ -44,8 +44,8 @@ final markerSymbolsProvider =
         final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
         result[entry.key] = BitmapDescriptor.bytes(
           bytes!.buffer.asUint8List(),
-          width: 40,
-          height: 40,
+          width: 28,
+          height: 28,
         );
         image.dispose();
         picture.dispose();

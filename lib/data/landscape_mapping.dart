@@ -19,6 +19,7 @@ class LandscapeMapping {
     'kind': s.kind.name,
     'color': s.color,
     'symbol': s.symbol?.name,
+    'customIconId': s.customIconId,
     'parentId': s.parentId,
     'notes': s.notes,
     'createdAt': time(s.createdAt, native),
@@ -47,6 +48,7 @@ class LandscapeMapping {
       symbol: d['symbol'] == null
           ? null
           : PlantSymbol.values.byName(d['symbol'] as String),
+      customIconId: d['customIconId'] as String?,
       parentId: d['parentId'] as String?,
       notes: d['notes'] as String,
       createdAt: readTime(d['createdAt'] as Object),

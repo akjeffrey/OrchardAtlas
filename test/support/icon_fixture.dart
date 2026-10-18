@@ -1,0 +1,9 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
+Uint8List iconPng() => base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNQ2ODQAAADlQGRS0XanAAAAABJRU5ErkJggg==',
+);
+Uint8List wideIconPng() => base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGNQ2ODQAMIADWkDIQFeG0IAAAAASUVORK5CYII=',
+);

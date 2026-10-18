@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/providers.dart';
-import 'plant_symbols.dart';
+import 'icon_picker.dart';
 
 import '../domain/models.dart';
 import '../domain/landscape.dart';
+import '../domain/work.dart';
 
 class LayoutCanvas extends ConsumerWidget {
   const LayoutCanvas({
@@ -21,7 +22,9 @@ class LayoutCanvas extends ConsumerWidget {
     this.onTap,
     this.onSection,
     this.onPlant,
+    this.iconSize = 28,
   });
+  final double iconSize;
   final List<OrchardSection> sections;
   final List<ManagedPlant> plants;
   final List<Coordinates> draft;
@@ -31,6 +34,9 @@ class LayoutCanvas extends ConsumerWidget {
   final ValueChanged<String>? onSection, onPlant;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final taxonomy = ref.watch(taxonomyProvider);
+    Taxon? appearance(String id) =>
+        taxonomy.taxa.any((t) => t.id == id) ? taxonomy.iconFor(id) : null;
     final points = [
       ...sections.expand((s) => s.vertices),
       ...plants.map((p) => p.location),
@@ -138,18 +144,30 @@ class LayoutCanvas extends ConsumerWidget {
                     child: IconButton(
                       tooltip: p.name,
                       onPressed: onPlant == null ? null : () => onPlant!(p.id),
-                      icon: Text(
-                        symbolLabels[ref
-                                .watch(taxonomyProvider)
-                                .taxa
-                                .where((t) => t.id == p.taxonId)
-                                .firstOrNull
-                                ?.symbol ??
-                            PlantSymbol.tree]!,
-                        style: const TextStyle(fontSize: 26),
+                      icon: IconPreview(
+                        symbol: appearance(p.taxonId)?.symbol,
+                        customIconId: appearance(p.taxonId)?.customIconId,
+                        size: iconSize,
                       ),
                     ),
                   ),
+                for (final s in sections)
+                  if (s.symbol != null || s.customIconId != null)
+                    Positioned(
+                      left: pixel(sectionCenter(s)).dx - 24,
+                      top: pixel(sectionCenter(s)).dy - 24,
+                      child: IconButton(
+                        tooltip: s.name,
+                        onPressed: onSection == null
+                            ? null
+                            : () => onSection!(s.id),
+                        icon: IconPreview(
+                          symbol: s.symbol,
+                          customIconId: s.customIconId,
+                          size: iconSize,
+                        ),
+                      ),
+                    ),
                 if (selected != null)
                   Positioned(
                     left: pixel(selected!).dx - 12,

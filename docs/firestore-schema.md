@@ -104,3 +104,25 @@ All operations remain owner scoped. Permanent deletion enumerates server childre
 and references before deleting parents, including item photo metadata and known
 Storage paths. It requires connectivity, is retryable, and is not a multi-device
 transaction. See release-0.6.md for operational limits.
+
+## Classification edits and small icon assets
+
+Per-property `taxa/{taxonId}` documents can override starter catalog IDs for that
+orchard. Name, symbol and optional `customIconId`, `iconOverride` and scientific
+name metadata may update; rank and parentId remain immutable. The domain merges
+these records over the starter catalog, preserving plant/event/task references.
+`iconOverride` is nullable for compatibility: curated defaults inherit user-edited
+ancestor icons, while older user-created options keep their explicit icon choices.
+
+`properties/{propertyId}/icons/{iconId}` stores `{schemaVersion: 1, name, png}`. `png`
+is bounded base64 of a normalized PNG (≤32 KB, ≤96×96 pixels). Readers validate PNG
+chunk integrity and dimensions. Icons are owner-only under the current ACL, with
+immutable image payloads; deletion is disabled to protect references. New images
+use UUIDs. Taxa and sections can reference icons only within their property.
+Section updates allow optional `customIconId` in addition to existing symbol/color.
+
+The Android trial embeds the same asset mappings inside its orchard snapshot,
+which existing backup/export/restore includes without relying on external file
+paths. Firestore caches these small self-contained documents through its existing
+offline persistence. Deploy the updated Firestore rules before using the connected
+backend with these fields; local trial APKs do not require a Firebase deployment.

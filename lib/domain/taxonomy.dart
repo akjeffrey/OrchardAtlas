@@ -1,5 +1,7 @@
 import 'models.dart';
 
+final starterTaxonIds = starterTaxonomy.taxa.map((t) => t.id).toSet();
+
 class Taxonomy {
   Taxonomy(this.taxa) {
     if (taxa.map((t) => t.id).toSet().length != taxa.length) {
@@ -32,6 +34,25 @@ class Taxonomy {
     return path;
   }
 
+  Taxon iconFor(String id) {
+    final path = ancestry(id);
+    bool hasPolicy(Taxon t) =>
+        t.iconOverride != null ||
+        t.customIconId != null ||
+        !starterTaxonIds.contains(t.id);
+    Taxon resolve(int index) {
+      final t = path[index];
+      if (t.iconOverride == false && index > 0) return resolve(index - 1);
+      if (hasPolicy(t)) return t;
+      for (var parent = index - 1; parent >= 0; parent--) {
+        if (hasPolicy(path[parent])) return resolve(parent);
+      }
+      return t;
+    }
+
+    return resolve(path.length - 1);
+  }
+
   Set<String> descendants(String id) => taxa
       .where((t) => ancestry(t.id).any((a) => a.id == id))
       .map((t) => t.id)
@@ -39,6 +60,38 @@ class Taxonomy {
 
   bool isPlantIdentity(String id) =>
       byId(id).rank.index >= TaxonRank.species.index;
+}
+
+/// Merge orchard-specific labels/icons over stable starter IDs.
+Taxonomy orchardTaxonomy(Iterable<Taxon> saved) => Taxonomy(
+  {
+    for (final t in starterTaxonomy.taxa) t.id: t,
+    for (final t in saved) t.id: t,
+  }.values.toList(),
+);
+
+void validateTaxonEdit(Taxonomy current, Taxon proposed) {
+  requiredText(proposed.name, 'Option name');
+  final old = current.taxa.where((t) => t.id == proposed.id).firstOrNull;
+  if (old != null &&
+      (old.rank != proposed.rank || old.parentId != proposed.parentId)) {
+    throw ArgumentError('Keep the existing classification hierarchy');
+  }
+  if (current
+      .children(proposed.parentId)
+      .any(
+        (t) =>
+            t.id != proposed.id &&
+            t.name.trim().toLowerCase() == proposed.name.trim().toLowerCase(),
+      )) {
+    throw ArgumentError('This option already exists');
+  }
+  Taxonomy(
+    {
+      for (final t in current.taxa) t.id: t,
+      proposed.id: proposed,
+    }.values.toList(),
+  );
 }
 
 // Curated starter catalog. IDs are stable UUIDs; labels may evolve independently.

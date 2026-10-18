@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/models.dart';
+import '../domain/map_icons.dart';
+import 'icon_mapping.dart';
 import '../domain/orchards.dart';
 import '../domain/landscape.dart';
 import 'landscape_mapping.dart';
@@ -265,6 +267,24 @@ class FirestoreOrchardRepository
         .doc(taxon.id)
         .set(FirestoreMapping.taxonToMap(taxon)),
   );
+  @override
+  Stream<List<MapIcon>> watchIcons(String propertyId) => firestore
+      .collection('properties')
+      .doc(propertyId)
+      .collection('icons')
+      .snapshots(includeMetadataChanges: true)
+      .map((s) => s.docs.map((d) => IconMapping.read(d.id, d.data())).toList());
+  @override
+  void saveIcon(String propertyId, MapIcon icon) => _observe(
+    icon.id,
+    firestore
+        .collection('properties')
+        .doc(propertyId)
+        .collection('icons')
+        .doc(icon.id)
+        .set(IconMapping.write(icon)),
+  );
+
   @override
   void appendEvent(PlantEvent event) => _observe(
     event.id,

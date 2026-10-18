@@ -17,6 +17,7 @@ import 'sections_screen.dart';
 import 'crops_screen.dart';
 import 'archived_plants.dart';
 import 'classification_screen.dart';
+import 'settings_screen.dart';
 import '../domain/landscape.dart';
 
 final dismissedFailureProvider = StateProvider<String?>((ref) => null);
@@ -35,6 +36,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
+      GoRoute(path: '/settings', builder: (_, _) => const SettingsScreen()),
       GoRoute(path: '/backup', builder: (_, _) => const BackupScreen()),
       GoRoute(
         path: '/archived',

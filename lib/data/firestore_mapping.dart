@@ -9,6 +9,9 @@ class FirestoreMapping {
     'rank': t.rank.name,
     'parentId': t.parentId,
     'symbol': t.symbol.name,
+    'customIconId': t.customIconId,
+    'iconOverride': t.iconOverride,
+    'scientificName': t.scientificName,
   };
   static Taxon taxonFromMap(String id, Map<String, dynamic> d) {
     version(d);
@@ -18,6 +21,9 @@ class FirestoreMapping {
       rank: TaxonRank.values.byName(d['rank'] as String),
       parentId: d['parentId'] as String?,
       symbol: PlantSymbol.values.byName(d['symbol'] as String),
+      customIconId: d['customIconId'] as String?,
+      iconOverride: d['iconOverride'] as bool?,
+      scientificName: d['scientificName'] as String?,
     );
   }
 
