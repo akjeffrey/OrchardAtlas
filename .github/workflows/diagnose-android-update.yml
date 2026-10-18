@@ -1,0 +1,51 @@
+name: Diagnose Android update compatibility
+on:
+  push:
+    branches: ['diagnostic/android-update-compatibility']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 39083645513
+          artifact-ids: 12119144066
+          path: previous
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 39122705730
+          artifact-ids: 12134923127
+          path: latest
+      - name: Inspect actual APKs
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, subprocess, hashlib, re
+          tools = sorted((pathlib.Path(os.environ['ANDROID_HOME']) / 'build-tools').glob('*/apksigner'))
+          signer = tools[-1]
+          aapt = signer.parent / 'aapt'
+          results = {}
+          for label in ['previous', 'latest']:
+              apk = next(pathlib.Path(label).rglob('OrchardAtlas-trial.apk'))
+              print('PACKAGE ' + label)
+              print((apk.parent / 'VERSION.txt').read_text())
+              print((apk.parent / 'SIGNING_CERTIFICATE.txt').read_text())
+              expected = (apk.parent / 'SHA256SUMS.txt').read_text().split()[0]
+              actual = hashlib.sha256(apk.read_bytes()).hexdigest()
+              print('Artifact checksum valid:', expected == actual)
+              assert expected == actual
+              cert = subprocess.check_output([str(signer), 'verify', '--verbose', '--print-certs', str(apk)], text=True)
+              print(cert)
+              manifest = subprocess.check_output([str(aapt), 'dump', 'badging', str(apk)], text=True)
+              print('\n'.join(line for line in manifest.splitlines() if line.startswith(('package:', 'sdkVersion:', 'targetSdkVersion:', 'native-code:'))))
+              results[label] = re.search(r'Signer #1 certificate SHA-256 digest: (\S+)', cert).group(1)
+          print('ACTUAL_APK_SIGNERS_MATCH:', results['previous'] == results['latest'])
+          expected_signer = 'f197f6e853747a0c64d1871f47a295110c007a7e6844cf25b44b660529b65c5c'
+          print('LATEST_MATCHES_PERMANENT_KEY:', results['latest'].lower() == expected_signer)
+          PY
