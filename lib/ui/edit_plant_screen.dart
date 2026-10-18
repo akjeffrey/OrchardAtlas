@@ -7,6 +7,7 @@ import 'common.dart';
 import 'sections_screen.dart';
 import '../domain/models.dart';
 import 'classification_picker.dart';
+import 'plant_location_picker.dart';
 
 class EditPlantScreen extends ConsumerStatefulWidget {
   const EditPlantScreen(this.itemId, {super.key});
@@ -73,6 +74,37 @@ class _EditState extends ConsumerState<EditPlantScreen> {
                 ClassificationPicker(
                   value: taxonId,
                   onChanged: (id) => setState(() => taxonId = id),
+                ),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.edit_location_alt),
+                  label: const Text('Pick location on map'),
+                  onPressed: () async {
+                    // Invalid manual input must not prevent opening the picker.
+                    Coordinates initialLocation = plant.location;
+                    try {
+                      initialLocation = Coordinates(
+                        double.parse(latitude.text),
+                        double.parse(longitude.text),
+                      );
+                    } on ArgumentError {
+                      // Fall back to the saved location.
+                    } on FormatException {
+                      // Fall back to the saved location.
+                    }
+                    final location = await Navigator.of(context)
+                        .push<Coordinates>(
+                          MaterialPageRoute(
+                            builder: (_) => PlantLocationPicker(
+                              initialLocation: initialLocation,
+                            ),
+                          ),
+                        );
+                    if (location == null || !mounted) return;
+                    setState(() {
+                      latitude.text = location.latitude.toString();
+                      longitude.text = location.longitude.toString();
+                    });
+                  },
                 ),
                 TextField(
                   controller: latitude,

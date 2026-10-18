@@ -26,7 +26,7 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 
 ### Plant records, archives and deletion
 
-- [ ] Map-based plant location editing: add a **Pick location on map** action to the plant editor. Open Google Maps in satellite view centered on the plant's current position, let the user tap a new spot or drag its pin, and confirm the selection to update the editor's latitude and longitude. Save the new location with the plant's other edits; cancel keeps the previous coordinates. Preserve the plant's identity, history and Area/Row assignment.
+- [x] Map-based plant location editing: add a **Pick location on map** action to the plant editor. Open Google Maps in satellite view centered on the plant's current position, let the user tap a new spot or drag its pin, and confirm the selection to update the editor's latitude and longitude. Save the new location with the plant's other edits; cancel keeps the previous coordinates. Preserve the plant's identity, history and Area/Row assignment.
 
 - [x] Archived plants never appear on the map, including when other filters change. Add a dedicated **Archived Plants** list page, without a map, where archived plants can be viewed, fully edited and unarchived.
 - [x] Permanent deletion for a plant, area or row, including its associated data. Plan the cascade for child sections, contained plants/crops, activities, harvests, tasks/completions, photos and stored files; show what will be removed before deletion. Remove orphaned references without deleting unrelated orchards, other plants' records or shared classification definitions.

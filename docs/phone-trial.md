@@ -120,3 +120,20 @@ The launcher uses the supplied **OrchardAtlas Original Option 1** artwork on And
 6. Add a task and select **Group: all matching plants**. Choose Apple (includes varieties), and optionally an area/row (includes descendants). One submission creates a checklist for the matching active plants. Alternatively choose a group of areas/beds/rows or seasonal crops; selecting a garlic bed and row targets produces one checklist member per row. Open the group and complete, skip/cancel or reopen each plant independently. Completion dates and remaining work persist. Counts use the whole group even when the main list is filtered. Membership is captured at creation; later-added trees are not silently included. Maximum 400 members per group; split larger groups by area. Checking a task does not automatically create a pruning activity; tap the plant to record that separately.
 
 All additions use the trial's existing local storage and write queue. Existing plants, tasks and activities load with unassigned sections/no group IDs and empty layout/season collections. The debug signing limitation still applies: do not uninstall an old trial with valuable local records merely to resolve a certificate mismatch.
+
+## Map-based plant location editing
+
+Open a plant, choose **Edit**, then **Pick location on map**. The satellite map
+starts at the editor's current coordinates (or the saved plant position if the
+manual coordinates are invalid). Tap a new spot or drag the pin, then choose
+**Use this location**. Review any other edits and choose **Save changes** to persist
+the new position offline. Until saved, the plant's stored position is unchanged.
+**Cancel** or Back discards the picker selection; leaving the editor without saving
+discards confirmed draft changes too. Reopening the picker uses the editor's draft.
+
+Moving a plant preserves its identity, history, classification and Area/Row
+assignment, including row order. A changed position clears the old GPS accuracy
+claim. Plants assigned to an Area/Row remain hidden as individual map markers.
+Without a configured Google Maps key, the existing coordinate sketch supports
+tapping a location; manual latitude/longitude fields remain available. Satellite
+tiles require connectivity unless already cached; saving a position remains local.
