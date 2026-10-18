@@ -83,7 +83,9 @@ void main() {
         isTrue,
       );
       expect(service.connected, isFalse);
-      await tester.tap(find.text('Continue'));
+      await tester.tap(
+        find.byKey(const ValueKey('confirm-restore-backup-file')),
+      );
       await tester.pumpAndSettle();
       expect(
         repo.preferences.getString(BackupService.documentKey),

@@ -64,6 +64,7 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
               ),
               actions: [
                 FilledButton(
+                  key: const ValueKey('confirm-restore-backup-file'),
                   onPressed: () => Navigator.pop(context, useFile),
                   child: const Text('Continue'),
                 ),
