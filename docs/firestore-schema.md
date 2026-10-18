@@ -117,7 +117,8 @@ ancestor icons, while older user-created options keep their explicit icon choice
 `properties/{propertyId}/icons/{iconId}` stores `{schemaVersion: 1, name, png}`. `png`
 is bounded base64 of a normalized PNG (≤32 KB, ≤96×96 pixels). Readers validate PNG
 chunk integrity and dimensions. Icons are owner-only under the current ACL, with
-immutable image payloads; deletion is disabled to protect references. New images
+immutable active image payloads; deletion replaces the image with an irreversible
+reference-preserving tombstone (see below). New images
 use UUIDs. Taxa and sections can reference icons only within their property.
 Section updates allow optional `customIconId` in addition to existing symbol/color.
 

@@ -92,6 +92,25 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.text('Use this location'));
         await tester.pumpAndSettle();
+        // Choosing a map point must unblock saving even if GPS never responds.
+        await tester.scrollUntilVisible(
+          find.text('Save plant locally'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Save plant locally'),
+              )
+              .onPressed,
+          isNotNull,
+        );
+        await tester.scrollUntilVisible(
+          button,
+          -200,
+          scrollable: find.byType(Scrollable).first,
+        );
         // A late GPS result must not overwrite the chosen draft point.
         gps.fix.complete(LocationFix(Coordinates(53, 3), 4));
         await tester.pumpAndSettle();

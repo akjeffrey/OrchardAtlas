@@ -88,7 +88,10 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
 
   Future<void> useSection(String? id) async {
     final revision = ++locationRevision;
-    setState(() => sectionId = id);
+    setState(() {
+      sectionId = id;
+      locating = false;
+    });
     if (id == null) return;
     final sections = await ref.read(sectionsProvider.future);
     if (!mounted || revision != locationRevision) return;
@@ -158,13 +161,16 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
         );
       }
     } finally {
-      if (mounted) setState(() => locating = false);
+      if (mounted && revision == locationRevision) {
+        setState(() => locating = false);
+      }
     }
   }
 
   Future<void> pickLocation() async {
     // Invalidate any in-flight GPS/section lookup before opening the picker.
     locationRevision++;
+    setState(() => locating = false);
     Coordinates initial =
         widget.location ??
         widget.template?.location ??

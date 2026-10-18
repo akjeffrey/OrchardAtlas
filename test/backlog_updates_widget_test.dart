@@ -69,7 +69,10 @@ void main() {
       await tester.tap(find.text('Restore from Drive or a backup file'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
+      // Restore stays busy while the destination question is open, so its
+      // progress indicator deliberately keeps animating behind this dialog.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
       expect(find.text('Use this file for automatic backups?'), findsOneWidget);
       expect(
         tester

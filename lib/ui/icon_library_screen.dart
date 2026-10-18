@@ -79,6 +79,7 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
     final orchard = await ref.read(placeProvider.future);
     final plants = await ref.read(plantsProvider.future);
     final sections = await ref.read(sectionsProvider.future);
+    await ref.read(customTaxaProvider.future);
     final taxonomy = ref.read(taxonomyProvider);
     final plantCount = plants.value
         .where((p) => taxonomy.iconFor(p.taxonId).customIconId == icon.id)
