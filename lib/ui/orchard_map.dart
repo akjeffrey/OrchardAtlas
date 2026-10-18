@@ -30,6 +30,7 @@ class OrchardMap extends ConsumerWidget {
     this.onMoveVertex,
     this.initialCamera,
     this.onCameraChanged,
+    this.onSelectedMoved,
   });
   final List<OrchardSection> sections;
   final List<ManagedPlant> plants;
@@ -43,6 +44,7 @@ class OrchardMap extends ConsumerWidget {
   final void Function(int, Coordinates)? onMoveVertex;
   final CameraPosition? initialCamera;
   final ValueChanged<CameraPosition>? onCameraChanged;
+  final ValueChanged<Coordinates>? onSelectedMoved;
 
   LatLng point(Coordinates p) => LatLng(p.latitude, p.longitude);
 
@@ -196,6 +198,9 @@ class OrchardMap extends ConsumerWidget {
               BitmapDescriptor.hueAzure,
             ),
             infoWindow: const InfoWindow(title: 'Selected location'),
+            draggable: onSelectedMoved != null,
+            onDragEnd: (p) =>
+                onSelectedMoved?.call(Coordinates(p.latitude, p.longitude)),
           ),
         for (var i = 0; i < draft.length; i++)
           Marker(
