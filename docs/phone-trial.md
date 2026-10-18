@@ -137,3 +137,12 @@ claim. Plants assigned to an Area/Row remain hidden as individual map markers.
 Without a configured Google Maps key, the existing coordinate sketch supports
 tapping a location; manual latitude/longitude fields remain available. Satellite
 tiles require connectivity unless already cached; saving a position remains local.
+
+## Plant marker selection
+
+Tap a plant marker once to show its name on the map. Tap the same marker again
+to open Plant Detail. Selecting a different plant shows that plant's name first;
+tapping the map background clears the name selection. Returning from Plant Detail
+starts a fresh selection, and filtering a plant out clears its selection. This
+behavior also applies to the coordinate sketch when Maps is not configured.
+Plant list entries still open details directly. Area/Row navigation is unchanged.

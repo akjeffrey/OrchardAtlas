@@ -12,7 +12,7 @@ import 'layout_canvas.dart';
 import 'plant_symbols.dart';
 
 /// The same satellite map is used for browsing and for drawing orchard geometry.
-class OrchardMap extends ConsumerWidget {
+class OrchardMap extends ConsumerStatefulWidget {
   const OrchardMap({
     super.key,
     this.sections = const [],
@@ -46,15 +46,108 @@ class OrchardMap extends ConsumerWidget {
   final ValueChanged<CameraPosition>? onCameraChanged;
   final ValueChanged<Coordinates>? onSelectedMoved;
 
+  @override
+  ConsumerState<OrchardMap> createState() => _OrchardMapState();
+}
+
+class _OrchardMapState extends ConsumerState<OrchardMap> {
+  String? selectedPlantId;
+
+  bool visible(ManagedPlant plant) =>
+      plant.status == ItemStatus.active && plant.sectionId == null;
+
+  @override
+  void didUpdateWidget(covariant OrchardMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.onPlant == null ||
+        !widget.plants.any((p) => p.id == selectedPlantId && visible(p))) {
+      selectedPlantId = null;
+    }
+  }
+
+  void tapPlant(String id) {
+    if (widget.onPlant == null ||
+        !widget.plants.any((p) => p.id == id && visible(p))) {
+      return;
+    }
+    if (selectedPlantId == id) {
+      // Reset before navigation, including for a rapid sequence of tap events.
+      setState(() => selectedPlantId = null);
+      widget.onPlant!(id);
+    } else {
+      setState(() => selectedPlantId = id);
+    }
+  }
+
+  void tapMap(Coordinates point) {
+    if (selectedPlantId != null) setState(() => selectedPlantId = null);
+    widget.onTap?.call(point);
+  }
+
+  Widget withPlantName(Widget map) {
+    final plant = widget.plants
+        .where((p) => p.id == selectedPlantId && visible(p))
+        .firstOrNull;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        map,
+        if (plant != null)
+          Positioned(
+            top: 8,
+            left: 16,
+            right: 16,
+            child: IgnorePointer(
+              child: Center(
+                child: Card(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        plant.name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
   LatLng point(Coordinates p) => LatLng(p.latitude, p.longitude);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
+    final OrchardMap(
+      :sections,
+      :plants,
+      :draft,
+      :draftKind,
+      :center,
+      :selected,
+      :span,
+      :onPlant,
+      :onSection,
+      :onMapCreated,
+      :onCameraMove,
+      :onMoveVertex,
+      :initialCamera,
+      :onCameraChanged,
+      :onSelectedMoved,
+    ) = widget;
     final visiblePlants = plants
         .where((p) => p.status == ItemStatus.active && p.sectionId == null)
         .toList();
     if (!ref.watch(mapsConfiguredProvider)) {
-      return Column(
+      final sketch = Column(
         children: [
           const Padding(
             padding: EdgeInsets.all(6),
@@ -71,13 +164,14 @@ class OrchardMap extends ConsumerWidget {
               center: center,
               selected: selected,
               span: span,
-              onTap: onTap,
-              onPlant: onPlant,
+              onTap: tapMap,
+              onPlant: onPlant == null ? null : tapPlant,
               onSection: onSection,
             ),
           ),
         ],
       );
+      return withPlantName(sketch);
     }
     final symbols = ref.watch(markerSymbolsProvider).valueOrNull;
     final taxa = ref.watch(taxonomyProvider).taxa;
@@ -86,7 +180,7 @@ class OrchardMap extends ConsumerWidget {
         selected ??
         plants.firstOrNull?.location ??
         sections.firstOrNull?.vertices.first;
-    return GoogleMap(
+    final map = GoogleMap(
       mapType: MapType.satellite,
       initialCameraPosition:
           initialCamera ??
@@ -99,9 +193,7 @@ class OrchardMap extends ConsumerWidget {
         onCameraChanged?.call(p);
         onCameraMove?.call(Coordinates(p.target.latitude, p.target.longitude));
       },
-      onTap: onTap == null
-          ? null
-          : (p) => onTap!(Coordinates(p.latitude, p.longitude)),
+      onTap: (p) => tapMap(Coordinates(p.latitude, p.longitude)),
       // Drawing inside the section form must receive gestures before its ListView.
       gestureRecognizers: {
         Factory<OneSequenceGestureRecognizer>(() => EagerGestureRecognizer()),
@@ -188,12 +280,15 @@ class OrchardMap extends ConsumerWidget {
                     PlantSymbol.tree] ??
                 BitmapDescriptor.defaultMarker,
             infoWindow: InfoWindow(title: p.name),
-            onTap: () => onPlant?.call(p.id),
+            // Flutter shows the name consistently on native maps and sketches.
+            // Consume native taps so automatic info windows cannot navigate too.
+            consumeTapEvents: true,
+            onTap: () => tapPlant(p.id),
           ),
         if (selected != null)
           Marker(
             markerId: const MarkerId('selected-position'),
-            position: point(selected!),
+            position: point(selected),
             icon: BitmapDescriptor.defaultMarkerWithHue(
               BitmapDescriptor.hueAzure,
             ),
@@ -216,5 +311,6 @@ class OrchardMap extends ConsumerWidget {
           ),
       },
     );
+    return withPlantName(map);
   }
 }

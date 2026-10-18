@@ -1,14 +1,13 @@
 # OrchardAtlas feature backlog
 
-Keep this file current in each feature PR. `[ ]` is planned, `[~]` is in progress,
-and `[x]` is implemented. Implementation does not replace physical-device checks.
+GitHub issues are the source of truth for outstanding work: [open tickets](https://github.com/akjeffrey/OrchardAtlas/issues). This document keeps an issue-linked index and implementation history. Keep links and completed status current in each feature PR. `[ ]` is planned, `[~]` is in progress, and `[x]` is implemented. Implementation does not replace physical-device checks.
 
 ## Newly requested features
 
-- [ ] **Classification settings:** add a Settings page for editing the available **Group, Type and Variety** options, including their names and associated icons. Keep the hierarchy consistent and preserve stable option IDs so existing plants, task criteria, history and classification views continue to reference the edited options. This manages the options themselves, separately from changing a single plant's classification.
-- [ ] **Custom icon uploads:** let users import new icons from their device and select them wherever map icons are supported, including classification options and optional Area/Row icons. Normalize imported images to small thumbnails with bounded dimensions and file sizes, preserving transparency where present. Persist the icon library and assignments locally and include them in backup/restore so an imported icon remains usable after restart or device migration.
-- [ ] **Map icon sizing across zoom levels:** cap marker icons at a modest screen size, including imported icons, so large source images cannot create oversized markers. Keep icons small or reduce/simplify them as the map zooms out; they must not grow as more of the orchard becomes visible. Apply consistent sizing to plant and optional Area/Row icons, with usable tap targets and checks at close and wide zoom levels.
-- [ ] **Two-tap plant marker navigation:** the first tap on a plant marker shows only the plant's name without opening its detail page. A second tap on the same selected marker opens Plant Detail. Tapping a different marker starts with that plant's name; tapping the map background clears the selection. Coordinate marker and info-window callbacks to avoid opening details on the first tap or navigating twice.
+- [ ] [#20](https://github.com/akjeffrey/OrchardAtlas/issues/20) **Classification settings:** add a Settings page for editing the available **Group, Type and Variety** options, including their names and associated icons. Keep the hierarchy consistent and preserve stable option IDs so existing plants, task criteria, history and classification views continue to reference the edited options. This manages the options themselves, separately from changing a single plant's classification.
+- [ ] [#21](https://github.com/akjeffrey/OrchardAtlas/issues/21) **Custom icon uploads:** let users import new icons from their device and select them wherever map icons are supported, including classification options and optional Area/Row icons. Normalize imported images to small thumbnails with bounded dimensions and file sizes, preserving transparency where present. Persist the icon library and assignments locally and include them in backup/restore so an imported icon remains usable after restart or device migration.
+- [ ] [#22](https://github.com/akjeffrey/OrchardAtlas/issues/22) **Map icon sizing across zoom levels:** cap marker icons at a modest screen size, including imported icons, so large source images cannot create oversized markers. Keep icons small or reduce/simplify them as the map zooms out; they must not grow as more of the orchard becomes visible. Apply consistent sizing to plant and optional Area/Row icons, with usable tap targets and checks at close and wide zoom levels.
+- [x] [#23](https://github.com/akjeffrey/OrchardAtlas/issues/23) **Two-tap plant marker navigation:** the first tap on a plant marker shows only the plant's name without opening its detail page. A second tap on the same selected marker opens Plant Detail. Tapping a different marker starts with that plant's name; tapping the map background clears the selection. Coordinate marker and info-window callbacks to avoid opening details on the first tap or navigating twice.
 
 ## Current increment
 
@@ -46,7 +45,7 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 - [x] Repeating tasks: support yearly, monthly, weekly and other repeat schedules. Each occurrence starts with fresh per-plant completion state; retain all previous occurrences and their completion records instead of overwriting history.
 - [x] Optional task-to-activity link: when defining a plant task, optionally choose an activity/event type such as pruning. Completing that task also creates a linked event on the affected plant, visible in its activity history. Reopening the task removes its generated event. For group/repeating tasks, link completion and event per plant and occurrence; avoid duplicate events or removing unrelated/manual events. Reconcile these edit/removal requirements with the current append-oriented event model.
 - [x] Task and event/activity table filters: add filtering to both lists, with appropriate date, target and classification filters, task status and event type.
-- [ ] Task editing, reminders and notifications beyond the sorting, matching, recurrence and activity-link features above.
+- [ ] [#24](https://github.com/akjeffrey/OrchardAtlas/issues/24) Task editing, reminders and notifications beyond the sorting, matching, recurrence and activity-link features above.
 
 ### Activity editing and classification views
 
@@ -74,26 +73,31 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 - [x] Default plant ordering within a row: sequence newly added row plants from the start toward the finish.
 - [x] Manual row plant ordering: let users rearrange plants while viewing a row (for example, drag-and-drop or move up/down), and persist the revised order.
 - [x] Orchard naming: let users edit an orchard's name. On a fresh app install, name the automatically created first orchard "Home Orchard". Preserve existing orchard names and records during upgrades.
-- [ ] Orchard archive and explicit ownership transfer/deletion policies.
-- [ ] Sharing: invitations, owner/editor/viewer permissions and collaboration UI.
-- [ ] Foraging-resource entry, seasonality, observations and private/public visibility controls.
-- [ ] Photo capture/gallery/upload, thumbnails and a durable offline upload queue.
-- [ ] Richer harvest/yield reports and activity audit/recovery design.
-- [ ] Consistent accessible symbol catalog; custom icon imports and sizing are tracked under **Newly requested features**.
-- [ ] More map editing tools: move plants, split/join rows, vertex insertion and measurements.
+- [ ] [#25](https://github.com/akjeffrey/OrchardAtlas/issues/25) Orchard archive and explicit ownership transfer/deletion policies.
+- [ ] [#26](https://github.com/akjeffrey/OrchardAtlas/issues/26) Sharing: invitations, owner/editor/viewer permissions and collaboration UI.
+- [ ] [#27](https://github.com/akjeffrey/OrchardAtlas/issues/27) Foraging-resource entry, seasonality, observations and private/public visibility controls.
+- [ ] [#28](https://github.com/akjeffrey/OrchardAtlas/issues/28) Photo capture/gallery/upload, thumbnails and a durable offline upload queue.
+- [ ] [#29](https://github.com/akjeffrey/OrchardAtlas/issues/29) Richer harvest/yield reports and activity audit/recovery design.
+- [ ] [#30](https://github.com/akjeffrey/OrchardAtlas/issues/30) Consistent accessible symbol catalog; custom icon imports and sizing are tracked under **Newly requested features**.
+- [ ] [#31](https://github.com/akjeffrey/OrchardAtlas/issues/31) More map editing tools: split/join rows, vertex insertion and measurements. Plant movement via a map picker is already implemented.
 - [x] Android trial JSON backup/restore through the system file picker, including Google Drive, all orchards, pre-restore recovery and default external-file retention. Automatic writes wait for one minute without new edits (resetting after each edit), with local-first saves, failed-write retries and restart catch-up. See drive-backup-and-updates.md.
-- [ ] Cross-platform backup and recovery beyond the Android local trial.
-- [ ] Connected account setup, sync/rejection recovery UI and multi-device acceptance testing.
+- [ ] [#32](https://github.com/akjeffrey/OrchardAtlas/issues/32) Cross-platform backup and recovery beyond the Android local trial.
+- [ ] [#33](https://github.com/akjeffrey/OrchardAtlas/issues/33) Connected account setup, sync/rejection recovery UI and multi-device acceptance testing.
 - [x] Update-safe Android trial signing pipeline and semantic 0.N.0 build versions. Publishing requires the one-time private signing secret described in drive-backup-and-updates.md.
-- [ ] Production signing/distribution and installable iOS trial.
-- [ ] Accessibility, field usability, small-screen and physical-device regression testing.
+- [ ] [#34](https://github.com/akjeffrey/OrchardAtlas/issues/34) Production signing/distribution and installable iOS trial.
+- [ ] [#35](https://github.com/akjeffrey/OrchardAtlas/issues/35) Accessibility, field usability, small-screen and physical-device regression testing.
 
 ## Follow-up validation
 
-- [ ] Verify Google Maps key authorization and imagery on a physical phone.
-- [ ] Exercise GPS permission denial/approximate position and map-tile outages.
-- [ ] Verify offline create/switch/restart across two orchards on physical Android/iOS devices.
-- [ ] Verify Firestore reconnect, independent accounts, sign-out cache clearing and sync conflicts.
+- [ ] [#36](https://github.com/akjeffrey/OrchardAtlas/issues/36) Verify Google Maps key authorization and imagery on a physical phone.
+- [ ] [#37](https://github.com/akjeffrey/OrchardAtlas/issues/37) Exercise GPS permission denial/approximate position and map-tile outages.
+- [ ] [#38](https://github.com/akjeffrey/OrchardAtlas/issues/38) Verify offline create/switch/restart across two orchards on physical Android/iOS devices.
+- [ ] [#39](https://github.com/akjeffrey/OrchardAtlas/issues/39) Verify Firestore reconnect, independent accounts, sign-out cache clearing and sync conflicts.
 
-Large-scale taxonomy catalogs, public discovery and advanced analytics remain later
-work. Google satellite downloads/offline tile packs are not promised by this app.
+## Later-stage tickets
+
+- [ ] [#40](https://github.com/akjeffrey/OrchardAtlas/issues/40) Support large-scale taxonomy catalogs.
+- [ ] [#41](https://github.com/akjeffrey/OrchardAtlas/issues/41) Add public discovery with sanitized location visibility.
+- [ ] [#42](https://github.com/akjeffrey/OrchardAtlas/issues/42) Explore advanced orchard analytics.
+
+Google satellite downloads/offline tile packs are not promised by this app.
