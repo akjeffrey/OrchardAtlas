@@ -17,6 +17,7 @@ val orchardDartDefines = (project.findProperty("dart-defines") as? String).orEmp
     .split(",").filter { it.isNotEmpty() }
     .map { String(Base64.getDecoder().decode(it), Charsets.UTF_8) }
 val orchardTrialBuild = orchardDartDefines.contains("TRIAL_MODE=true")
+val orchardTrialKeystore = System.getenv("ORCHARD_TRIAL_KEYSTORE")?.takeIf { it.isNotBlank() }
 
 extensions.configure<ApplicationExtension> {
     namespace = "com.orchardatlas.orchard_atlas"
@@ -45,6 +46,20 @@ extensions.configure<ApplicationExtension> {
         versionName = flutter.versionName
         manifestPlaceholders["MAPS_API_KEY"] = System.getenv("GOOGLE_MAPS_ANDROID_API_KEY")
             ?.takeIf { it.isNotBlank() } ?: orchardLocalProperties.getProperty("MAPS_API_KEY", "")
+    }
+
+    // Select the restored signer explicitly. The runner's default debug key may
+    // live in a different Android user directory and is not an update identity.
+    if (orchardTrialBuild && orchardTrialKeystore != null) {
+        signingConfigs.getByName("debug") {
+            storeFile = file(orchardTrialKeystore)
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+        buildTypes.getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     // Production signing must be configured outside Git before distribution.

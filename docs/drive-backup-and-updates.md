@@ -49,9 +49,19 @@ and notes as readable JSON; use a private folder and protect copied files.
 
 ## One-time stable signing setup
 
-Future downloadable builds require the same private signing key. Random runner
-keys are no longer published. A missing signing secret still permits CI compile
-checks but skips the downloadable APK and emits a setup warning.
+Corrected downloadable builds starting with 0.39.0 explicitly use the same private
+signing key in Gradle. Before publication, `scripts/verify-trial-apk.py` verifies
+the finished APK's signature, compares its actual certificate to that key, and
+checks the package ID, version name and version code. A mismatch blocks publication.
+A missing signing secret permits CI compile checks but skips the downloadable APK.
+The artifact's certificate file is now generated from the verified APK, and
+`APK_IDENTITY.json` records its actual package, version, certificate and checksum.
+
+**Signing defect in earlier builds:** 0.35.0 and 0.37.0 were verified to contain
+different temporary debug signers even though their bundled certificate files
+listed the permanent key. Those certificate files were generated from a keystore
+that Gradle did not use. Treat trials through 0.38.0 as temporary-key installations;
+do not rely on their bundled certificate files to prove update compatibility.
 
 1. On your computer install a JDK (for `keytool`) and Python 3.
 2. From this repository run:
@@ -81,6 +91,24 @@ the downloadable artifact includes SIGNING_CERTIFICATE.txt.
 An old randomly signed APK cannot be upgraded with a different key. Android will
 reject the update; it cannot safely be bypassed. If the original private key is
 available, use it instead of generating a new one.
+
+For an installed trial with **Backup & restore**:
+
+1. Keep the installed app. Open **Backup & restore**, choose **Set up Drive backup**
+   if needed, and press **Back up now**. Resolve any backup error before proceeding.
+2. Leave **Retain backup when preparing to uninstall** on. Verify the JSON exists
+   outside app storage, confirm Drive has finished uploading it, and keep a second
+   copy. Do not uninstall while the backup is missing, incomplete or unverified.
+3. After confirming the backup, uninstall the temporary-key app and install the
+   corrected APK. This is the one-time transition to the permanent signer.
+4. Open **Backup & restore → Restore from Drive or a backup file**, select the JSON,
+   and verify all orchards and records. Set up the backup target again, since Android
+   removes its file-access grants on uninstall. Keep both backup copies until verified.
+
+After this transition, builds with the same verified signer and increasing version
+code can update in place. Do not recreate the permanent key. If a later installation
+fails, keep the app and record the installed version; `adb install -r APK_PATH`
+can expose Android's exact failure code without requesting data deletion.
 
 Before uninstalling an old trial that has no export screen, use a computer with
 Android Platform Tools, USB debugging enabled and the phone authorized:
