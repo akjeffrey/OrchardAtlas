@@ -64,7 +64,7 @@ void main() {
         'Domestic apple',
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Domestic apple'));
+      await tester.tap(find.widgetWithText(ListTile, 'Domestic apple'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.widgetWithText(TextField, 'Option name'),
@@ -73,7 +73,7 @@ void main() {
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
       expect(repo.taxa, isEmpty);
-      await tester.tap(find.text('Domestic apple'));
+      await tester.tap(find.widgetWithText(ListTile, 'Domestic apple'));
       await tester.pumpAndSettle();
       await tester.enterText(
         find.widgetWithText(TextField, 'Option name'),
