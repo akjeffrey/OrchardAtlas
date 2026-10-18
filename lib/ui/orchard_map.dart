@@ -54,7 +54,8 @@ class OrchardMap extends ConsumerStatefulWidget {
 }
 
 class _OrchardMapState extends ConsumerState<OrchardMap> {
-  String? selectedPlantId;
+  String? selectedPlantId, selectedSectionId;
+  GoogleMapController? controller;
   double? cameraZoom;
 
   bool visible(ManagedPlant plant) =>
@@ -67,6 +68,36 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
         !widget.plants.any((p) => p.id == selectedPlantId && visible(p))) {
       selectedPlantId = null;
     }
+    if (widget.onSection == null ||
+        !widget.sections.any((s) => s.id == selectedSectionId)) {
+      selectedSectionId = null;
+    }
+  }
+
+  String? get selectedMarker =>
+      selectedPlantId ??
+      (selectedSectionId == null ? null : 'section-label-$selectedSectionId');
+
+  Future<void> hideName() async {
+    final id = selectedMarker;
+    if (id != null && controller != null) {
+      try {
+        await controller!.hideMarkerInfoWindow(MarkerId(id));
+      } catch (_) {
+        /* The map may have been disposed during navigation. */
+      }
+    }
+  }
+
+  Future<void> showName() async {
+    final id = selectedMarker;
+    if (id != null && controller != null && mounted) {
+      try {
+        await controller!.showMarkerInfoWindow(MarkerId(id));
+      } catch (_) {
+        /* A remounted map will show its selected name when ready. */
+      }
+    }
   }
 
   void tapPlant(String id) {
@@ -74,56 +105,43 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
         !widget.plants.any((p) => p.id == id && visible(p))) {
       return;
     }
+    hideName();
     if (selectedPlantId == id) {
-      // Reset before navigation, including for a rapid sequence of tap events.
       setState(() => selectedPlantId = null);
       widget.onPlant!(id);
     } else {
-      setState(() => selectedPlantId = id);
+      setState(() {
+        selectedPlantId = id;
+        selectedSectionId = null;
+      });
+      showName();
+    }
+  }
+
+  void tapSection(String id) {
+    if (widget.onSection == null) return;
+    hideName();
+    if (selectedSectionId == id) {
+      setState(() => selectedSectionId = null);
+      widget.onSection!(id);
+    } else {
+      setState(() {
+        selectedSectionId = id;
+        selectedPlantId = null;
+      });
+      showName();
     }
   }
 
   void tapMap(Coordinates point) {
-    if (selectedPlantId != null) setState(() => selectedPlantId = null);
+    hideName();
+    if (selectedMarker != null) {
+      setState(() {
+        selectedPlantId = null;
+        selectedSectionId = null;
+      });
+    }
     widget.onTap?.call(point);
-  }
-
-  Widget withPlantName(Widget map) {
-    final plant = widget.plants
-        .where((p) => p.id == selectedPlantId && visible(p))
-        .firstOrNull;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        map,
-        if (plant != null)
-          Positioned(
-            top: 8,
-            left: 16,
-            right: 16,
-            child: IgnorePointer(
-              child: Center(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        plant.name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
   }
 
   LatLng point(Coordinates p) => LatLng(p.latitude, p.longitude);
@@ -179,12 +197,14 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
               iconSize: size,
               onTap: tapMap,
               onPlant: onPlant == null ? null : tapPlant,
-              onSection: onSection,
+              onSection: onSection == null ? null : tapSection,
+              selectedPlantId: selectedPlantId,
+              selectedSectionId: selectedSectionId,
             ),
           ),
         ],
       );
-      return withPlantName(sketch);
+      return sketch;
     }
     final symbols = ref.watch(markerSymbolsProvider).valueOrNull;
     final taxonomy = ref.watch(taxonomyProvider);
@@ -192,7 +212,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
     final customIcons = ref.watch(mapIconsProvider).valueOrNull ?? <MapIcon>[];
     BitmapDescriptor iconFor(PlantSymbol symbol, String? customId) {
       final custom = customIcons.where((i) => i.id == customId).firstOrNull;
-      if (custom != null) {
+      if (custom != null && !custom.deleted) {
         final dimensions = ByteData.sublistView(custom.png);
         final w = dimensions.getUint32(16), h = dimensions.getUint32(20);
         final longest = w > h ? w : h;
@@ -202,7 +222,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
           height: size * h / longest,
         );
       }
-      final builtIn = symbols?[symbol];
+      final builtIn = symbols?[customId != null ? PlantSymbol.unknown : symbol];
       if (builtIn is BytesMapBitmap) {
         return BitmapDescriptor.bytes(
           builtIn.byteData,
@@ -234,7 +254,11 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
             target: target == null ? const LatLng(0, 0) : point(target),
             zoom: target == null ? 2 : 19,
           ),
-      onMapCreated: onMapCreated,
+      onMapCreated: (mapController) {
+        controller = mapController;
+        onMapCreated?.call(mapController);
+        showName();
+      },
       onCameraMove: (p) {
         if (markerSizeForZoom(p.zoom) !=
             markerSizeForZoom(
@@ -264,7 +288,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
             color: Color(s.color),
             width: 4,
             consumeTapEvents: onSection != null,
-            onTap: () => onSection?.call(s.id),
+            onTap: () => tapSection(s.id),
           ),
         if (draft.length >= 2 && draftKind == SectionKind.row)
           Polyline(
@@ -283,7 +307,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
             strokeColor: Color(s.color),
             strokeWidth: 2,
             consumeTapEvents: onSection != null,
-            onTap: () => onSection?.call(s.id),
+            onTap: () => tapSection(s.id),
           ),
         if (draftKind != SectionKind.row && draft.length >= 2)
           Polygon(
@@ -295,6 +319,26 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
           ),
       },
       markers: {
+        // Native info windows remain attached while the map moves. A transparent
+        // anchor gives shapes without an optional icon the same name behavior.
+        for (final s in sections)
+          Marker(
+            markerId: MarkerId('section-label-${s.id}'),
+            position: point(sectionCenter(s)),
+            icon: BitmapDescriptor.bytes(
+              base64Decode(
+                'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
+              ),
+              width: 1,
+              height: 1,
+            ),
+            consumeTapEvents: true,
+            infoWindow: InfoWindow(
+              title: s.name,
+              onTap: () => tapSection(s.id),
+            ),
+            onTap: () => tapSection(s.id),
+          ),
         for (final s in sections)
           if (s.symbol != null || s.customIconId != null)
             Marker(
@@ -302,8 +346,12 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
               position: point(sectionCenter(s)),
               icon: iconFor(s.symbol ?? PlantSymbol.tree, s.customIconId),
               anchor: const Offset(.5, .5),
-              infoWindow: InfoWindow(title: s.name),
-              onTap: () => onSection?.call(s.id),
+              consumeTapEvents: true,
+              infoWindow: InfoWindow(
+                title: s.name,
+                onTap: () => tapSection(s.id),
+              ),
+              onTap: () => tapSection(s.id),
             ),
         for (final s in sections.where((s) => s.kind == SectionKind.row)) ...[
           Marker(
@@ -312,8 +360,12 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
             icon: BitmapDescriptor.defaultMarkerWithHue(
               BitmapDescriptor.hueGreen,
             ),
-            infoWindow: InfoWindow(title: '${s.name} · Start (1)'),
-            onTap: () => onSection?.call(s.id),
+            consumeTapEvents: true,
+            infoWindow: InfoWindow(
+              title: '${s.name} · Start (1)',
+              onTap: () => tapSection(s.id),
+            ),
+            onTap: () => tapSection(s.id),
           ),
           Marker(
             markerId: MarkerId('row-finish-${s.id}'),
@@ -321,8 +373,12 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
             icon: BitmapDescriptor.defaultMarkerWithHue(
               BitmapDescriptor.hueRed,
             ),
-            infoWindow: InfoWindow(title: '${s.name} · Finish'),
-            onTap: () => onSection?.call(s.id),
+            consumeTapEvents: true,
+            infoWindow: InfoWindow(
+              title: '${s.name} · Finish',
+              onTap: () => tapSection(s.id),
+            ),
+            onTap: () => tapSection(s.id),
           ),
         ],
         for (final p in visiblePlants)
@@ -334,9 +390,8 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
               appearance(p.taxonId)?.customIconId,
             ),
             anchor: const Offset(.5, .5),
-            infoWindow: InfoWindow(title: p.name),
-            // Flutter shows the name consistently on native maps and sketches.
-            // Consume native taps so automatic info windows cannot navigate too.
+            infoWindow: InfoWindow(title: p.name, onTap: () => tapPlant(p.id)),
+            // Explicit selection preserves first-tap names and second-tap navigation.
             consumeTapEvents: true,
             onTap: () => tapPlant(p.id),
           ),
@@ -366,6 +421,6 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
           ),
       },
     );
-    return withPlantName(map);
+    return map;
   }
 }

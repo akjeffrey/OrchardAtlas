@@ -9,6 +9,7 @@ import '../domain/taxonomy.dart';
 import '../domain/work.dart';
 import '../domain/landscape.dart';
 import 'icon_picker.dart';
+import 'plant_location_picker.dart';
 import 'sections_screen.dart';
 
 class AddPlantScreen extends ConsumerStatefulWidget {
@@ -46,8 +47,9 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     super.initState();
     sectionId = widget.sectionId;
     applyTemplate(ref.read(taxonomyProvider));
-    if (widget.location != null) {
-      setCoordinates(widget.location!);
+    final initialLocation = widget.location ?? widget.template?.location;
+    if (initialLocation != null) {
+      setCoordinates(initialLocation);
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -138,7 +140,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
 
   Future<void> locate() async {
     if (locating) return;
-    final revision = locationRevision;
+    final revision = ++locationRevision;
     setState(() => locating = true);
     try {
       final fix = await ref.read(locationRepositoryProvider).currentPosition();
@@ -158,6 +160,37 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     } finally {
       if (mounted) setState(() => locating = false);
     }
+  }
+
+  Future<void> pickLocation() async {
+    // Invalidate any in-flight GPS/section lookup before opening the picker.
+    locationRevision++;
+    Coordinates initial =
+        widget.location ??
+        widget.template?.location ??
+        ref.read(plantsProvider).valueOrNull?.value.firstOrNull?.location ??
+        Coordinates(0, 0);
+    try {
+      initial = Coordinates(
+        double.parse(latitude.text),
+        double.parse(longitude.text),
+      );
+    } on ArgumentError {
+      // Invalid manual input must not block the map picker.
+    } on FormatException {
+      // Start with a known location until the user chooses a point.
+    }
+    final location = await Navigator.of(context).push<Coordinates>(
+      MaterialPageRoute(
+        builder: (_) => PlantLocationPicker(initialLocation: initial),
+      ),
+    );
+    if (!mounted || location == null) return;
+    setState(() {
+      setCoordinates(location);
+      accuracyMeters = null;
+      message = 'Using location selected on map';
+    });
   }
 
   Future<void> addOption(int rank) async {
@@ -325,18 +358,13 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
       if (!mounted) return;
       if (another == true) {
         setState(() {
-          latitude.clear();
-          longitude.clear();
+          setCoordinates(plant.location);
           notes.clear();
           accuracyMeters = null;
           locationRevision++;
           message = null;
         });
-        if (sectionId != null) {
-          await useSection(sectionId);
-        } else {
-          await locate();
-        }
+        // A repeated entry starts at the plant just saved; GPS is opt-in.
       } else {
         context.go('/', extra: plant.location);
       }
@@ -363,7 +391,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
         children: [
           if (widget.template != null)
             const Text(
-              'Name, taxonomy, planting date, rootstock and source copied. Fetching a fresh position.',
+              'Name, taxonomy, planting date, rootstock, source and location copied. Choose a different spot if needed.',
             ),
           TextField(
             key: const ValueKey('plant-name'),
@@ -480,6 +508,11 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             decoration: const InputDecoration(
               labelText: 'Plant notes (optional)',
             ),
+          ),
+          OutlinedButton.icon(
+            onPressed: busy ? null : pickLocation,
+            icon: const Icon(Icons.edit_location_alt),
+            label: const Text('Pick location on map'),
           ),
           OutlinedButton.icon(
             onPressed: locating || busy ? null : locate,

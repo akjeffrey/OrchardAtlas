@@ -15,6 +15,7 @@ const symbolLabels = {
   PlantSymbol.citrus: '🍊',
   PlantSymbol.nut: '🌰',
   PlantSymbol.vine: '🍇',
+  PlantSymbol.unknown: '?',
 };
 final markerSymbolsProvider =
     FutureProvider<Map<PlantSymbol, BitmapDescriptor>>((ref) async {

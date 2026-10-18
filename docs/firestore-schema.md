@@ -126,3 +126,8 @@ which existing backup/export/restore includes without relying on external file
 paths. Firestore caches these small self-contained documents through its existing
 offline persistence. Deploy the updated Firestore rules before using the connected
 backend with these fields; local trial APKs do not require a Firebase deployment.
+
+
+### Deleted custom icons
+
+Icon deletion is an owner-only, irreversible update to `{schemaVersion: 1, name: 'Deleted icon', png: '', deleted: true}`. It removes image bytes while retaining the UUID for existing and delayed offline references; physical document deletion and tombstone resurrection are denied. Readers accept legacy image records without `deleted`. Library/picker choices exclude tombstones, but assignments continue to resolve to an explicit **question mark**, including inherited taxon icons and optional Area/Row icons. Tombstones persist in local snapshots and backups and do not count toward the 128 active-image limit. Plant data and history are untouched. `unknown` is the built-in question-mark symbol; normal icon size tiers also apply to it.

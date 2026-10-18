@@ -75,6 +75,62 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
     }
   }
 
+  Future<void> deleteIcon(MapIcon icon) async {
+    final orchard = await ref.read(placeProvider.future);
+    final plants = await ref.read(plantsProvider.future);
+    final sections = await ref.read(sectionsProvider.future);
+    final taxonomy = ref.read(taxonomyProvider);
+    final plantCount = plants.value
+        .where((p) => taxonomy.iconFor(p.taxonId).customIconId == icon.id)
+        .length;
+    final sectionCount = sections.value
+        .where((s) => s.customIconId == icon.id)
+        .length;
+    final optionCount = taxonomy.taxa
+        .where((t) => t.customIconId == icon.id)
+        .length;
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete ${icon.name}?'),
+        content: Text(
+          'Used by $plantCount plants, $sectionCount Areas/Rows and $optionCount classification options. Affected items will show a question mark. Their data will be kept.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete icon'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    if ((await ref.read(placeProvider.future)).id != orchard.id) {
+      throw StateError('Orchard changed; try again');
+    }
+    ref.read(orchardRepositoryProvider).deleteIcon(orchard.id, icon.id);
+  }
+
+  Future<void> remove(MapIcon icon) async {
+    if (busy) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      await deleteIcon(icon);
+    } catch (e) {
+      if (mounted) setState(() => error = 'Could not delete icon: $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Custom icons')),
@@ -94,11 +150,11 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
               .when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => ErrorPanel(e),
-                data: (icons) => icons.isEmpty
+                data: (icons) => icons.where((i) => !i.deleted).isEmpty
                     ? const Center(child: Text('No custom icons yet.'))
                     : ListView(
                         children: [
-                          for (final icon in icons)
+                          for (final icon in icons.where((i) => !i.deleted))
                             ListTile(
                               leading: Image.memory(
                                 icon.png,
@@ -109,6 +165,11 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
                                     const Icon(Icons.broken_image_outlined),
                               ),
                               title: Text(icon.name),
+                              trailing: IconButton(
+                                tooltip: 'Delete ${icon.name}',
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: busy ? null : () => remove(icon),
+                              ),
                             ),
                         ],
                       ),

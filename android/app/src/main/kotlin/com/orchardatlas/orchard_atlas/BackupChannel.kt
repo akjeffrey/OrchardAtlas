@@ -51,9 +51,8 @@ class BackupChannel(private val activity: Activity) : MethodChannel.MethodCallHa
                 val intent = Intent(if (creating) Intent.ACTION_CREATE_DOCUMENT else Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
                     type = "application/json"
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
                     if (creating) {
-                        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
                         putExtra(Intent.EXTRA_TITLE, "OrchardAtlas-backup.json")
                     }
                 }
@@ -62,11 +61,20 @@ class BackupChannel(private val activity: Activity) : MethodChannel.MethodCallHa
                     activity.startActivityForResult(intent, if (creating) createCode else selectCode)
                 } catch (_: Exception) { pending = null; result.error("picker_failed", "Could not open the file picker", null) }
             }
-            "read", "write", "delete" -> worker.execute {
+            "read", "write", "delete", "retainForBackup" -> worker.execute {
                 try {
                     val uri = Uri.parse(call.argument<String>("uri") ?: error("Missing document"))
                     require(uri.scheme == "content") { "Select a document using the file picker" }
                     when (call.method) {
+                        "retainForBackup" -> {
+                            val grant = activity.contentResolver.persistedUriPermissions.firstOrNull { it.uri == uri }
+                            check(grant != null && grant.isReadPermission && grant.isWritePermission) { "Persistent write access is unavailable" }
+                            // Probe write access without truncating or modifying the backup.
+                            activity.contentResolver.openFileDescriptor(uri, "rw").use { descriptor ->
+                                requireNotNull(descriptor) { "Backup is read-only" }
+                            }
+                            activity.runOnUiThread { result.success(null) }
+                        }
                         "read" -> {
                             val bytes = ByteArrayOutputStream()
                             activity.contentResolver.openInputStream(uri).use { stream ->
@@ -154,9 +162,12 @@ class BackupChannel(private val activity: Activity) : MethodChannel.MethodCallHa
             return true
         }
         try {
-            if (requestCode == createCode) {
-                val flags = (data?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            val flags = (data?.flags ?: 0) and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            try {
                 activity.contentResolver.takePersistableUriPermission(uri, flags)
+            } catch (e: Exception) {
+                // A read-only/nonpersistent document can still be restored once.
+                if (requestCode == createCode) throw e
             }
             result.success(uri.toString())
         } catch (_: Exception) { result.error("permission_failed", "Choose a provider that supports persistent backup access", null) }

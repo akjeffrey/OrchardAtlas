@@ -144,7 +144,7 @@ class BackupService extends ChangeNotifier {
     });
   }
 
-  Future<bool> restore() async {
+  Future<bool> restore({Future<bool> Function()? useRestoredFile}) async {
     var restored = false;
     _timer?.cancel();
     _timer = null;
@@ -155,17 +155,30 @@ class BackupService extends ChangeNotifier {
         if (document == null) return;
         final contents = await documents.read(document);
         await store.restore(contents);
-        // A restored file is not an automatic write target until explicitly selected as a new backup.
-        await preferences.remove(documentKey);
         restored = true;
+        // Keep automatic writes paused until the user has chosen a destination.
+        // The current repository is stale after restore; only the rebuilt service
+        // may export data into the selected file.
+        if (useRestoredFile != null && await useRestoredFile()) {
+          try {
+            await documents.retainForBackup(document);
+            if (!await preferences.setString(documentKey, document)) {
+              throw StateError('Could not remember backup file');
+            }
+            await preferences.remove(savedKey);
+            await preferences.remove(attemptKey);
+          } catch (e) {
+            error =
+                'Data restored, but this file could not be set up for automatic backup. Choose a writable backup file. $e';
+          }
+        }
       });
     } finally {
       paused = false;
+      if (!restored) schedule();
     }
     if (restored) {
       onRestored?.call();
-    } else {
-      schedule();
     }
     return restored;
   }

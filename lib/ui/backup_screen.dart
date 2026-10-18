@@ -39,6 +39,41 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
         ),
       ) ??
       false;
+  Future<bool> chooseRestoredBackupFile() async {
+    if (!mounted) return false;
+    var useFile = true;
+    return await showDialog<bool>(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => StatefulBuilder(
+            builder: (context, update) => AlertDialog(
+              title: const Text('Use this file for automatic backups?'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Future saved changes will update the file you just restored from. Your data also stays saved on this phone.',
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Use restored file'),
+                    value: useFile,
+                    onChanged: (value) => update(() => useFile = value),
+                  ),
+                ],
+              ),
+              actions: [
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, useFile),
+                  child: const Text('Continue'),
+                ),
+              ],
+            ),
+          ),
+        ) ??
+        false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = ref.watch(backupServiceProvider);
@@ -90,10 +125,16 @@ class _BackupScreenState extends ConsumerState<BackupScreen> {
                     )) {
                       return;
                     }
-                    if (await service.restore()) {
+                    if (await service.restore(
+                      useRestoredFile: chooseRestoredBackupFile,
+                    )) {
                       if (mounted) {
                         setState(
-                          () => message = 'Backup restored. All orchards are available in the orchard selector. Set up a backup file to resume automatic backups.',
+                          () => message =
+                              service.error ??
+                              (service.connected
+                                  ? 'Backup restored. Automatic backups will use the selected backup destination.'
+                                  : 'Backup restored. Set up a backup file to enable automatic backups.'),
                         );
                       }
                     }

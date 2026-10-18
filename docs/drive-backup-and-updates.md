@@ -40,8 +40,11 @@ first writes the latest snapshot. Turning retention off does not silently remove
 files: that action asks for explicit confirmation before deleting the selected
 backup. Other copies remain. Uninstalling directly through Android always leaves
 external copies alone. After reinstall, choose **Restore from Drive or a backup
-file**, approve replacing phone data, and select the JSON backup. Re-select a new
-backup write target afterward; old write permissions are not restored.
+file**, approve replacing phone data, and select the JSON backup. After successful
+restore, the app asks whether to use that file for automatic backups, defaulting to
+Yes. It requests and verifies new persistent read/write access without overwriting
+the file during setup. Declining keeps the previous destination; a read-only or
+nonpersistent source still restores but needs a writable destination for backups.
 
 Restore validates every orchard snapshot before changing device records. A local
 recovery snapshot is retained and accessible with **Undo last restore**. A pending restore journal is completed at startup if
@@ -104,8 +107,9 @@ For an installed trial with **Backup & restore**:
 3. After confirming the backup, uninstall the temporary-key app and install the
    corrected APK. This is the one-time transition to the permanent signer.
 4. Open **Backup & restore → Restore from Drive or a backup file**, select the JSON,
-   and verify all orchards and records. Set up the backup target again, since Android
-   removes its file-access grants on uninstall. Keep both backup copies until verified.
+   and verify all orchards and records. Accept the default offer to use the restored
+   file for automatic backups, or choose a different writable destination. Android
+   removes old file-access grants on uninstall. Keep both backup copies until verified.
 
 After this transition, builds with the same verified signer and increasing version
 code can update in place. Do not recreate the permanent key. If a later installation

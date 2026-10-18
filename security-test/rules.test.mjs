@@ -87,7 +87,7 @@ test('custom taxonomy edits remain owner scoped with immutable hierarchy', async
   const option = { schemaVersion: 1, name: 'Conference', rank: 'cultivar', parentId: taxon, symbol: 'pear' };
   await assertFails(setDoc(doc(db('bob'), path), option));
   await assertFails(setDoc(doc(db(), path), option));
-  await assertFails(setDoc(doc(db('alice'), path), { ...option, symbol: 'unknown' }));
+  await assertFails(setDoc(doc(db('alice'), path), { ...option, symbol: 'invalid' }));
   await assertFails(setDoc(doc(db('alice'), path), { ...option, parentId: 'bad' }));
   await assertSucceeds(setDoc(doc(db('alice'), path), option));
   await assertSucceeds(getDoc(doc(db('alice'), path)));
@@ -317,4 +317,23 @@ test('icon assets and references are bounded and owner scoped', async () => {
   await assertSucceeds(setDoc(doc(db('alice'), `${propertyPath}/taxa/${item}`), option));
   await assertFails(updateDoc(doc(db('alice'), `${propertyPath}/taxa/${item}`), { customIconId: property }));
   await assertFails(deleteDoc(doc(db('alice'), iconPath)));
+});
+
+
+test('icon deletion removes image data, preserves references and cannot be reversed or forged', async () => {
+  const path = `${propertyPath}/icons/${event}`;
+  const icon = { schemaVersion: 1, name: 'Pear', png: 'iVBORw0KGgoSample' };
+  const tombstone = { schemaVersion: 1, name: 'Deleted icon', png: '', deleted: true };
+  await assertSucceeds(setDoc(doc(db('alice'), path), icon));
+  await assertFails(updateDoc(doc(db('bob'), path), tombstone));
+  await assertFails(updateDoc(doc(db(), path), tombstone));
+  await assertFails(updateDoc(doc(db('alice'), path), {deleted: true}));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), tombstone));
+  await assertFails(setDoc(doc(db('alice'), path), icon));
+  await assertFails(updateDoc(doc(db('alice'), path), {name: 'Revived'}));
+  await assertSucceeds(setDoc(doc(db('alice'), `${propertyPath}/taxa/${item}`), {
+    schemaVersion: 1, name: 'Old offline assignment', rank: 'species', parentId: taxon,
+    symbol: 'unknown', customIconId: event, iconOverride: true,
+  }));
+  await assertFails(deleteDoc(doc(db('alice'), path)));
 });

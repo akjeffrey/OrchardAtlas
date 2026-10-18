@@ -9,6 +9,9 @@ class AndroidBackupDocuments implements BackupDocuments {
   @override
   Future<String?> select() => channel.invokeMethod<String>('select');
   @override
+  Future<void> retainForBackup(String document) =>
+      channel.invokeMethod<void>('retainForBackup', {'uri': document});
+  @override
   Future<String> read(String document) async =>
       (await channel.invokeMethod<String>('read', {'uri': document}))!;
   @override

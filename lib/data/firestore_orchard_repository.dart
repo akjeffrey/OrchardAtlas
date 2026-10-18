@@ -286,6 +286,17 @@ class FirestoreOrchardRepository
   );
 
   @override
+  void deleteIcon(String propertyId, String iconId) => _observe(
+    iconId,
+    firestore
+        .collection('properties')
+        .doc(propertyId)
+        .collection('icons')
+        .doc(iconId)
+        .update(IconMapping.write(MapIcon.deleted(id: iconId))),
+  );
+
+  @override
   void appendEvent(PlantEvent event) => _observe(
     event.id,
     _items(event.propertyId)

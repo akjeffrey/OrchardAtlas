@@ -23,10 +23,12 @@ class IconPreview extends ConsumerWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: icon == null
+      child: icon == null || icon.deleted
           ? Center(
               child: Text(
-                symbolLabels[symbol ?? PlantSymbol.tree]!,
+                symbolLabels[customIconId != null
+                    ? PlantSymbol.unknown
+                    : symbol ?? PlantSymbol.tree]!,
                 style: TextStyle(fontSize: size * .8),
               ),
             )
@@ -87,15 +89,16 @@ class MapIconPicker extends ConsumerWidget {
                 value: 'builtin:${s.name}',
                 child: label(s.name, s, null),
               ),
-            for (final icon in icons)
+            for (final icon in icons.where((i) => !i.deleted))
               DropdownMenuItem(
                 value: 'custom:${icon.id}',
                 child: label(icon.name, null, icon.id),
               ),
-            if (customIconId != null && !icons.any((i) => i.id == customIconId))
+            if (customIconId != null &&
+                !icons.any((i) => i.id == customIconId && !i.deleted))
               DropdownMenuItem(
                 value: value,
-                child: const Text('Saved icon (loading or unavailable)'),
+                child: const Text('? Deleted or unavailable icon'),
               ),
           ],
           onChanged: (v) {

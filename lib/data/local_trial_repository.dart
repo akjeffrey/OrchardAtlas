@@ -223,7 +223,7 @@ class LocalTrialRepository
           Map<String, dynamic>.from(icon as Map),
         ),
     ]);
-    if (repo.icons.length > MapIcon.maxPerOrchard ||
+    if (repo.icons.where((i) => !i.deleted).length > MapIcon.maxPerOrchard ||
         repo.icons.map((i) => i.id).toSet().length != repo.icons.length) {
       throw const FormatException('Invalid icon library');
     }
@@ -564,13 +564,27 @@ class LocalTrialRepository
     if (propertyId != place.id) {
       return _for(propertyId).saveIcon(propertyId, icon);
     }
+    if (icons.any((i) => i.id == icon.id && i.deleted)) {
+      throw StateError('Deleted icon IDs cannot be reused');
+    }
     if (!icons.any((i) => i.id == icon.id) &&
-        icons.length >= MapIcon.maxPerOrchard) {
+        icons.where((i) => !i.deleted).length >= MapIcon.maxPerOrchard) {
       throw StateError('An orchard can contain up to 128 custom icons');
     }
     icons.removeWhere((i) => i.id == icon.id);
     icons.add(icon);
     _persist(icon.id);
+  }
+
+  @override
+  void deleteIcon(String propertyId, String iconId) {
+    if (propertyId != place.id) {
+      return _for(propertyId).deleteIcon(propertyId, iconId);
+    }
+    if (!icons.any((i) => i.id == iconId)) throw ArgumentError('Unknown icon');
+    icons.removeWhere((i) => i.id == iconId);
+    icons.add(MapIcon.deleted(id: iconId));
+    _persist(iconId);
   }
 
   @override

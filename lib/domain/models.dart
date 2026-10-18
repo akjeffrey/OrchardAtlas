@@ -1,6 +1,16 @@
 enum TaxonRank { group, genus, species, cultivar }
 
-enum PlantSymbol { tree, apple, pear, berry, flower, citrus, nut, vine }
+enum PlantSymbol {
+  tree,
+  apple,
+  pear,
+  berry,
+  flower,
+  citrus,
+  nut,
+  vine,
+  unknown,
+}
 
 enum ItemStatus { active, archived }
 
@@ -154,6 +164,7 @@ class ManagedPlant extends TrackedItem {
   PlantTemplate get template => PlantTemplate(
     name: name,
     taxonId: taxonId,
+    location: location,
     plantedOn: plantedOn,
     sectionId: sectionId,
     rootstock: rootstock,
@@ -173,6 +184,7 @@ class ManagedPlant extends TrackedItem {
     return PlantTemplate(
       name: name,
       taxonId: taxonId,
+      location: location,
       rootstock: rootstock,
       nursery: nursery,
       sectionId: sectionId,
@@ -243,6 +255,7 @@ class PlantTemplate {
   const PlantTemplate({
     required this.name,
     required this.taxonId,
+    this.location,
     this.plantedOn,
     this.sectionId,
     this.rootstock = '',
@@ -251,6 +264,7 @@ class PlantTemplate {
   final String name;
   final String taxonId;
   final String? plantedOn, sectionId;
+  final Coordinates? location;
   final String rootstock, nursery;
 }
 

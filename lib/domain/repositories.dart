@@ -34,6 +34,9 @@ abstract interface class OrchardRepository {
   void saveTaxon(String propertyId, Taxon taxon);
   Stream<List<MapIcon>> watchIcons(String propertyId);
   void saveIcon(String propertyId, MapIcon icon);
+
+  /// Remove image content, keeping a tombstone for existing/offline references.
+  void deleteIcon(String propertyId, String iconId);
   void appendEvent(PlantEvent event);
   void updatePlant(ManagedPlant plant);
   Stream<RepositorySnapshot<List<OrchardTask>>> watchTasks(String propertyId);

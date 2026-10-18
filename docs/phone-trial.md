@@ -70,7 +70,7 @@ coordinate-sketch-only map behavior when Google Maps is configured.
 - Open the marker or use the **Plants** tab, record care and harvest activities,
   and inspect annual mass/count totals.
 - Choose **Add another** after saving, or **Add Another Like This** from detail.
-  Verify the taxonomy/name carry over and a fresh GPS position is fetched.
+  Verify the taxonomy/name and previous plant location carry over. Use GPS or the map picker explicitly to choose a different spot.
 - Wait for **Saved on this phone**, close/reopen the app and verify your records.
   Airplane mode does not prevent local recording; GPS still depends on signal.
 
@@ -182,3 +182,14 @@ these tiers. Shapes remain complete and colors are unchanged; custom images reta
 their aspect ratio. The coordinate sketch also caps icon visuals and uses normal
 48-pixel button targets. Physical-phone selection and visual checks remain tracked
 in issue #35.
+
+
+## Map locations, anchored names, icon deletion and restore destinations
+
+- **Add Plant → Pick location on map** opens the same satellite picker as Edit Plant. Confirming changes the draft coordinates; Cancel leaves them alone. Saving is still required. A late GPS result cannot replace a chosen map point.
+- **Add another** after saving and **Add Another Like This** from detail both copy the previous plant's location and planting-date default. The next plant has its own UUID. Choose GPS or the map picker to move it, or select another Area/Row to use that section's location.
+- First tap on a plant, Area or Row shows its name in a native map callout anchored to that feature. Pan/zoom keeps the name attached. Second tap on the same feature or its name opens detail; tapping a different feature changes selection, and tapping the background clears it. Offline sketches use feature-relative labels too.
+- **Settings → Custom icons → Delete** shows usage and asks for confirmation. Cancel preserves the icon. Deletion removes the image and library choice; plants using it directly or through classification inheritance show **?**, as do Areas/Rows using it. Records and classification remain intact. A small irreversible deletion marker is retained in backups and Firestore so offline assignments stay valid and cannot revive an image. Import again to create a new icon and explicitly assign it if desired.
+- After restoring a backup, **Use this file for automatic backups?** defaults on. Continue checks persistent write access before selecting that file for future backups, without immediately overwriting it. Turn the choice off to retain the previous backup destination. Read-only sources can still restore; choose a writable file if backup setup fails.
+
+Physical-device checks: confirm first-tap callouts without first entering Edit; pan/zoom and second-tap behavior for all three feature kinds; pick and cancel a new plant position; add another at the saved point; delete an inherited icon, restart and restore its backup; restore a writable Drive file with the default choice and verify the next edited data reaches that same file after a one-minute quiet period. Also restore a read-only/shared file and check setup failure is visible without losing the restored records.

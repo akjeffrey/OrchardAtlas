@@ -62,7 +62,7 @@ service cloud.firestore {
         && d.schemaVersion==1 && text(d.name)
         && d.rank in ['group','genus','species','cultivar']
         && ((d.rank=='group' && d.parentId==null) || (d.rank!='group' && d.parentId is string && uuid(d.parentId)))
-        && d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine']
+        && d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine','unknown']
         && (d.get('scientificName',null)==null || (d.scientificName is string && d.scientificName.size()<=500))
         && (d.get('iconOverride',null)==null || d.iconOverride is bool)
         && validIconRef(d, propertyId);
@@ -72,7 +72,7 @@ service cloud.firestore {
         && d.keys().hasOnly(['schemaVersion','name','kind','parentId','notes','createdAt','vertices','color','symbol','customIconId'])
         && d.schemaVersion == 1 && text(d.name) && d.notes is string && d.notes.size() <= 10000 && d.createdAt is timestamp
         && (d.get('color',null)==null || (d.color is int && d.color >= 0 && d.color <= 4294967295))
-        && (d.get('symbol',null)==null || d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine'])
+        && (d.get('symbol',null)==null || d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine','unknown'])
         && validIconRef(d, propertyId)
         && d.kind in ['area','row'] && d.vertices is list && d.vertices.size() <= 40
         && d.vertices.size() >= (d.kind == 'row' ? 2 : 3)
@@ -222,8 +222,12 @@ service cloud.firestore {
           && request.resource.data.schemaVersion==1 && text(request.resource.data.name)
           && request.resource.data.png is string && request.resource.data.png.size()<=43692
           && request.resource.data.png.matches('iVBORw0KGgo.*');
-        allow update: if owner(propertyId) && text(request.resource.data.name)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
+        allow update: if owner(propertyId) && resource.data.get('deleted',false)==false
+          && ((text(request.resource.data.name)
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']))
+          || (request.resource.data.keys().hasOnly(['schemaVersion','name','png','deleted'])
+            && request.resource.data.schemaVersion==1 && request.resource.data.deleted==true
+            && request.resource.data.name=='Deleted icon' && request.resource.data.png==''));
         allow delete: if false;
       }
       match /taxa/{taxonId} {
