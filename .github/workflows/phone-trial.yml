@@ -48,6 +48,8 @@ jobs:
               if verified.returncode != 0:
                   target.unlink(missing_ok=True)
                   raise SystemExit('Decoded signing secret is not a valid trial keystore with the expected alias and password. Use the complete generated signing-secret.txt file.')
+              with open(os.environ['GITHUB_ENV'], 'a') as output:
+                  output.write('ORCHARD_TRIAL_KEYSTORE=' + str(target) + '\n')
           PY
       - name: Build signed debug APK with local trial data
         env:
@@ -58,15 +60,17 @@ jobs:
             exit 1
           fi
           flutter build apk --debug --no-pub --dart-define=TRIAL_MODE=true --build-name="0.${{ github.run_number }}.0" --build-number="${{ github.run_number }}"
-      - name: Prepare phone download
+      - name: Verify actual APK identity and prepare phone download
         if: env.TRIAL_SIGNING_READY == 'true'
         run: |
-          mkdir -p dist
-          cp build/app/outputs/flutter-apk/app-debug.apk dist/OrchardAtlas-trial.apk
-          echo 'Version 0.${{ github.run_number }}.0 (${{ github.run_number }})' > dist/VERSION.txt
-          keytool -list -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey | awk '/SHA1:|SHA256:/ {print}' > dist/SIGNING_CERTIFICATE.txt
-          cd dist
-          sha256sum OrchardAtlas-trial.apk > SHA256SUMS.txt
+          python3 -m unittest discover -s scripts -p 'test_verify_trial_apk.py'
+          python3 scripts/verify-trial-apk.py \
+            --apk build/app/outputs/flutter-apk/app-debug.apk \
+            --keystore "$ORCHARD_TRIAL_KEYSTORE" \
+            --build-tools "$ANDROID_HOME/build-tools" \
+            --version-name "0.${{ github.run_number }}.0" \
+            --version-code "${{ github.run_number }}" \
+            --output dist
       - uses: actions/upload-artifact@v4
         if: env.TRIAL_SIGNING_READY == 'true'
         with:
