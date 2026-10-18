@@ -225,6 +225,62 @@ void main() {
       expect(legacy.customIconId, isNull);
     },
   );
+  test('deletion tombstones preserve inherited assignments and all records through restore', () async {
+    final plant = OrchardCommands(repo, starterTaxonomy).addPlant(
+      place: repo.place,
+      name: 'Apple',
+      taxonId: variety.id,
+      location: Coordinates(51, 1),
+      plantingDate: DateTime(2020),
+      authorId: LocalTrialRepository.userId,
+    );
+    repo.saveIcon(
+      repo.place.id,
+      MapIcon(id: 'icon', name: 'Apple icon', png: iconPng()),
+    );
+    repo.saveTaxon(repo.place.id, edited(type, icon: 'icon', override: true));
+    repo.saveSection(
+      OrchardSection(
+        id: 'row',
+        propertyId: repo.place.id,
+        name: 'Row',
+        kind: SectionKind.row,
+        vertices: [Coordinates(51, 1), Coordinates(51, 1.01)],
+        createdAt: DateTime(2026),
+        customIconId: 'icon',
+      ),
+    );
+    repo.deleteIcon(repo.place.id, 'icon');
+    expect(repo.icons.single.deleted, isTrue);
+    expect(repo.icons.single.png, isEmpty);
+    expect(orchardTaxonomy(repo.taxa).iconFor(variety.id).customIconId, 'icon');
+    expect(repo.plants.single.id, plant.id);
+    expect(repo.events.single.type, ActivityType.planting);
+    expect(
+      () => repo.saveIcon(
+        repo.place.id,
+        MapIcon(id: 'icon', name: 'Revive', png: iconPng()),
+      ),
+      throwsStateError,
+    );
+    final backup = await TrialBackupStore(prefs, repo).export();
+    await TrialBackupStore(prefs, repo).restore(backup);
+    final reopened = LocalTrialRepository.open(prefs);
+    expect(reopened.icons.single.deleted, isTrue);
+    expect(reopened.icons.single.png, isEmpty);
+    expect(reopened.sections.single.customIconId, 'icon');
+    expect(reopened.plants.single.id, plant.id);
+    expect(reopened.events.single.type, ActivityType.planting);
+    expect(
+      () => IconMapping.read('icon', {
+        'schemaVersion': 1,
+        'name': 'Deleted icon',
+        'deleted': true,
+        'png': base64Encode(iconPng()),
+      }),
+      throwsFormatException,
+    );
+  });
   test('Firestore adapter updates stable taxonomy IDs and streams self-contained icon data', () async {
     final firestore = FakeFirebaseFirestore();
     final repository = FirestoreOrchardRepository(firestore, prefs);
@@ -232,6 +288,10 @@ void main() {
     final icon = MapIcon(id: 'icon', name: 'Pear', png: iconPng());
     repository.saveIcon(place.id, icon);
     expect((await repository.watchIcons(place.id).first).single.png, iconPng());
+    repository.deleteIcon(place.id, icon.id);
+    final deleted = (await repository.watchIcons(place.id).first).single;
+    expect(deleted.deleted, isTrue);
+    expect(deleted.png, isEmpty);
     repository.saveTaxon(
       place.id,
       edited(variety, name: 'Renamed', icon: icon.id, override: true),

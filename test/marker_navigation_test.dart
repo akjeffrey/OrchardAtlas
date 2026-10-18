@@ -89,7 +89,7 @@ void main() {
           final map = tester.widget<GoogleMap>(find.byType(GoogleMap));
           final marker = map.markers.singleWhere((m) => m.markerId.value == id);
           expect(marker.consumeTapEvents, isTrue);
-          expect(marker.infoWindow.onTap, isNull);
+          expect(marker.infoWindow.title, 'Plant $id');
           marker.onTap!();
         } else {
           await tester.tap(find.byTooltip('Plant $id'));
@@ -111,11 +111,20 @@ void main() {
       }
 
       await tapPlant('A');
-      expect(find.text('Plant A'), findsOneWidget);
+      if (native) {
+        expect(platform.shownNames.last.value, 'A');
+        expect(find.byType(Card), findsNothing);
+      } else {
+        expect(find.text('Plant A'), findsOneWidget);
+      }
       expect(navigations, 0);
       await tapPlant('B');
       expect(find.text('Plant A'), findsNothing);
-      expect(find.text('Plant B'), findsOneWidget);
+      if (native) {
+        expect(platform.shownNames.last.value, 'B');
+      } else {
+        expect(find.text('Plant B'), findsOneWidget);
+      }
       expect(navigations, 0);
       await tapPlant('A');
       expect(navigations, 0);

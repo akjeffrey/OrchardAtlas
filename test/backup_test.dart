@@ -17,13 +17,20 @@ import 'package:orchard_atlas/domain/taxonomy.dart';
 class _Documents implements BackupDocuments {
   String? selected = 'content://drive/backup';
   final files = <String, String>{};
-  bool failWrite = false;
+  bool failWrite = false, failRetain = false;
+  final retained = <String>[];
   int writes = 0, attempts = 0;
   Future<void> Function()? onWrite;
   @override
   Future<String?> create() async => selected;
   @override
   Future<String?> select() async => selected;
+  @override
+  Future<void> retainForBackup(String document) async {
+    if (failRetain) throw StateError('Read-only file');
+    retained.add(document);
+  }
+
   @override
   Future<String> read(String document) async => files[document]!;
   @override
@@ -51,6 +58,78 @@ void main() {
     repo = LocalTrialRepository.open(prefs);
   });
   final taxon = starterTaxonomy.taxa.firstWhere((t) => t.name == 'Honeycrisp');
+  test('restore can adopt its file without overwriting it; decline keeps the existing destination', () async {
+    final docs = _Documents();
+    final store = TrialBackupStore(prefs, repo);
+    final archive = await store.export();
+    docs.files['content://restore'] = archive;
+    await prefs.setString(BackupService.documentKey, 'content://old');
+    docs.selected = 'content://restore';
+    final service = BackupService(store, docs);
+    addTearDown(service.dispose);
+    var prompts = 0;
+    expect(
+      await service.restore(
+        useRestoredFile: () async {
+          prompts++;
+          return false;
+        },
+      ),
+      isTrue,
+    );
+    expect(prefs.getString(BackupService.documentKey), 'content://old');
+    expect(docs.retained, isEmpty);
+    expect(
+      await service.restore(
+        useRestoredFile: () async {
+          prompts++;
+          return true;
+        },
+      ),
+      isTrue,
+    );
+    expect(prompts, 2);
+    expect(prefs.getString(BackupService.documentKey), 'content://restore');
+    expect(docs.retained, ['content://restore']);
+    expect(docs.writes, 0);
+    expect(docs.files['content://restore'], archive);
+    final restarted = BackupService(
+      TrialBackupStore(prefs, LocalTrialRepository.open(prefs)),
+      docs,
+    );
+    expect(restarted.connected, isTrue);
+    restarted.dispose();
+  });
+  test('cancelled, invalid or read-only restore never claims a new backup destination', () async {
+    final docs = _Documents()..selected = null;
+    final store = TrialBackupStore(prefs, repo);
+    final archive = await store.export();
+    await prefs.setString(BackupService.documentKey, 'content://old');
+    var prompts = 0, reloads = 0;
+    final service = BackupService(store, docs, onRestored: () => reloads++);
+    addTearDown(service.dispose);
+    Future<bool> choose() async {
+      prompts++;
+      return true;
+    }
+
+    expect(await service.restore(useRestoredFile: choose), isFalse);
+    docs.selected = 'content://restore';
+    docs.files[docs.selected!] = '{}';
+    await expectLater(
+      service.restore(useRestoredFile: choose),
+      throwsFormatException,
+    );
+    expect(prompts, 0);
+    expect(prefs.getString(BackupService.documentKey), 'content://old');
+    docs.files[docs.selected!] = archive;
+    docs.failRetain = true;
+    expect(await service.restore(useRestoredFile: choose), isTrue);
+    expect(reloads, 1);
+    expect(service.error, contains('Choose a writable backup file'));
+    expect(prefs.getString(BackupService.documentKey), 'content://old');
+    expect(docs.writes, 0);
+  });
   test('all orchard records restore while secrets and document grants stay excluded', () async {
     final second = await repo.createPlace(LocalTrialRepository.userId, 'North');
     final commands = OrchardCommands(repo, starterTaxonomy);
@@ -253,7 +332,7 @@ void main() {
     container.read(plantFilterProvider.notifier).state = const PlantFilter(
       query: 'stale',
     );
-    expect(await service.restore(), isTrue);
+    expect(await service.restore(useRestoredFile: () async => true), isTrue);
     expect(
       (container.read(
         orchardRepositoryProvider,
@@ -261,6 +340,17 @@ void main() {
       'Saved',
     );
     expect(container.read(plantFilterProvider).query, '');
+    // The next backup must use the reloaded repository, not the pre-restore one.
+    final resumed = container.read(backupServiceProvider);
+    await resumed.save();
+    final written = BackupArchive.decode(documents['file']!);
+    expect(
+      jsonDecode(
+        written.records[LocalTrialRepository.storageKey]!,
+      )['plants'].single['name'],
+      'Saved',
+    );
+    expect(prefs.getString(BackupService.documentKey), 'content://drive/test');
   });
   testWidgets(
     'each edit resets the one-minute quiet period before an automatic push',

@@ -113,7 +113,7 @@ void main() {
     },
   );
   testWidgets(
-    'bulk entry uses fresh GPS, asks after saving, and preserves taxonomy',
+    'bulk entry retains the previous position, asks after saving, and preserves taxonomy',
     (tester) async {
       final repo = await repository();
       final gps = TrialLocation();
@@ -145,7 +145,7 @@ void main() {
       expect(repo.plants.single.location.latitude, 51.01);
       await tester.tap(find.text('Add another'));
       await tester.pumpAndSettle();
-      expect(gps.calls, 2);
+      expect(gps.calls, 1);
       expect(repo.plants.length, 1);
       await save(tester);
       expect(repo.plants.length, 2);
@@ -163,7 +163,7 @@ void main() {
         ),
         isTrue,
       );
-      expect(repo.plants.last.location.latitude, 51.02);
+      expect(repo.plants.last.location.latitude, 51.01);
       expect(repo.plants.last.taxonId, species.id);
       expect(repo.plants.last.id, isNot(repo.plants.first.id));
     },

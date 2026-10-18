@@ -6,7 +6,15 @@ import 'models.dart';
 class MapIcon {
   MapIcon({required this.id, required String name, required Uint8List png})
     : name = requiredText(name, 'Icon name'),
+      deleted = false,
       png = validatedCopy(png);
+
+  MapIcon.deleted({required this.id})
+    : name = 'Deleted icon',
+      deleted = true,
+      png = Uint8List(0).asUnmodifiableView();
+
+  final bool deleted;
 
   static Uint8List validatedCopy(Uint8List bytes) {
     validatePng(bytes);

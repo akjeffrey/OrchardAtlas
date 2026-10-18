@@ -23,8 +23,11 @@ class LayoutCanvas extends ConsumerWidget {
     this.onSection,
     this.onPlant,
     this.iconSize = 28,
+    this.selectedPlantId,
+    this.selectedSectionId,
   });
   final double iconSize;
+  final String? selectedPlantId, selectedSectionId;
   final List<OrchardSection> sections;
   final List<ManagedPlant> plants;
   final List<Coordinates> draft;
@@ -125,15 +128,18 @@ class LayoutCanvas extends ConsumerWidget {
                 ),
                 for (final s in sections)
                   Positioned(
-                    left: pixel(s.vertices.first).dx - 12,
-                    top: pixel(s.vertices.first).dy - 18,
-                    child: TextButton(
+                    left: pixel(sectionCenter(s)).dx - 24,
+                    top: pixel(sectionCenter(s)).dy - 24,
+                    child: IconButton(
+                      tooltip: s.name,
                       onPressed: onSection == null
                           ? null
                           : () => onSection!(s.id),
-                      child: Text(
-                        s.name,
-                        style: const TextStyle(backgroundColor: Colors.white70),
+                      icon: Icon(
+                        s.kind == SectionKind.row
+                            ? Icons.timeline
+                            : Icons.crop_square,
+                        size: iconSize,
                       ),
                     ),
                   ),
@@ -168,6 +174,39 @@ class LayoutCanvas extends ConsumerWidget {
                         ),
                       ),
                     ),
+                for (final feature in [
+                  for (final p in plants.where((p) => p.id == selectedPlantId))
+                    (p.name, p.location),
+                  for (final s in sections.where(
+                    (s) => s.id == selectedSectionId,
+                  ))
+                    (s.name, sectionCenter(s)),
+                ])
+                  Positioned(
+                    left: pixel(feature.$2).dx,
+                    top: pixel(feature.$2).dy - 24,
+                    child: FractionalTranslation(
+                      translation: const Offset(-.5, -1),
+                      child: IgnorePointer(
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 200),
+                              child: Text(
+                                feature.$1,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 if (selected != null)
                   Positioned(
                     left: pixel(selected!).dx - 12,

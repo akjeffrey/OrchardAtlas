@@ -9,6 +9,24 @@ class RecordingMapPlatform extends GoogleMapsFlutterPlatform {
   // Create the future inside the widget test zone, not its outer setUp zone.
   late final initialize = Completer<void>();
   final cameras = <Object>[];
+  final shownNames = <MarkerId>[];
+  final hiddenNames = <MarkerId>[];
+  @override
+  Future<void> showMarkerInfoWindow(
+    MarkerId markerId, {
+    required int mapId,
+  }) async {
+    shownNames.add(markerId);
+  }
+
+  @override
+  Future<void> hideMarkerInfoWindow(
+    MarkerId markerId, {
+    required int mapId,
+  }) async {
+    hiddenNames.add(markerId);
+  }
+
   final disposed = <int>[];
   final created = <int>{};
   final pendingViews = <int, PlatformViewCreatedCallback>{};

@@ -198,7 +198,9 @@ void main() {
           CameraPosition(target: const LatLng(51, 1), zoom: entry.$1),
         );
         await tester.pumpAndSettle();
-        for (final marker in map().markers) {
+        for (final marker in map().markers.where(
+          (m) => !m.markerId.value.startsWith('section-label-'),
+        )) {
           final bitmap = marker.icon as BytesMapBitmap;
           expect(bitmap.width, entry.$2);
           expect(bitmap.height, entry.$2 / 2);

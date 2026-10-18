@@ -38,6 +38,9 @@ class BackupArchive {
 abstract interface class BackupDocuments {
   Future<String?> create();
   Future<String?> select();
+
+  /// Verify persistent read/write access without overwriting the selected file.
+  Future<void> retainForBackup(String document);
   Future<String> read(String document);
   Future<void> write(String document, String contents);
   Future<void> delete(String document);

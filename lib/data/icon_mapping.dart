@@ -7,11 +7,18 @@ class IconMapping {
     'schemaVersion': 1,
     'name': icon.name,
     'png': base64Encode(icon.png),
+    if (icon.deleted) 'deleted': true,
   };
   static MapIcon read(String id, Map<String, dynamic> data) {
     final raw = data['png'];
     if (data['schemaVersion'] != 1 || raw is! String || raw.length > 43692) {
       throw const FormatException('Invalid icon record');
+    }
+    if (data['deleted'] == true) {
+      if (raw.isNotEmpty) {
+        throw const FormatException('Deleted icons cannot contain image data');
+      }
+      return MapIcon.deleted(id: id);
     }
     return MapIcon(
       id: id,
