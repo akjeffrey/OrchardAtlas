@@ -539,10 +539,11 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
               decimal: true,
               signed: true,
             ),
-            onChanged: (_) {
+            onChanged: (_) => setState(() {
               locationRevision++;
+              locating = false;
               accuracyMeters = null;
-            },
+            }),
           ),
           TextField(
             controller: longitude,
@@ -553,10 +554,11 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
               decimal: true,
               signed: true,
             ),
-            onChanged: (_) {
+            onChanged: (_) => setState(() {
               locationRevision++;
+              locating = false;
               accuracyMeters = null;
-            },
+            }),
           ),
           if (message != null)
             Padding(padding: const EdgeInsets.all(8), child: Text(message!)),
