@@ -75,6 +75,9 @@ void main() {
         find.widgetWithText(TextField, 'Plant name'),
         'Draft name',
       );
+      final draftName = tester
+          .widget<TextField>(find.widgetWithText(TextField, 'Plant name'))
+          .controller!;
       if (outcome == 'invalid input') {
         await tester.enterText(
           find.widgetWithText(TextField, 'Latitude'),
@@ -112,7 +115,7 @@ void main() {
           .text;
       expect(field('Latitude'), confirmed ? '51.02' : '51.0');
       expect(field('Longitude'), confirmed ? '1.02' : '1.0');
-      expect(field('Plant name'), 'Draft name');
+      expect(draftName.text, 'Draft name');
       expect(repo.plants.single.location.latitude, 51);
       // Reopening starts at the editor's draft, not the old saved point.
       await tester.tap(find.text('Pick location on map'));
