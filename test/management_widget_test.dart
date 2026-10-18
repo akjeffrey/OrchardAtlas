@@ -135,6 +135,11 @@ void main() {
         find.widgetWithText(TextField, 'Plant name'),
         'Apple 12',
       );
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextField, 'Rootstock'),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.enterText(
         find.widgetWithText(TextField, 'Rootstock'),
         'M.111',

@@ -44,6 +44,7 @@ void main() {
         location: Coordinates(51, 1),
         accuracyMeters: 5,
         plantingDate: DateTime(2022, 4, 10),
+        authorId: LocalTrialRepository.userId,
         sectionId: 'row',
       );
       final events = repo.events.map((e) => e.id).toList();
