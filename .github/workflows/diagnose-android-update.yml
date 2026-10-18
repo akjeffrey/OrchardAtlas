@@ -44,7 +44,7 @@ jobs:
               print(cert)
               manifest = subprocess.check_output([str(aapt), 'dump', 'badging', str(apk)], text=True)
               print('\n'.join(line for line in manifest.splitlines() if line.startswith(('package:', 'sdkVersion:', 'targetSdkVersion:', 'native-code:'))))
-              results[label] = re.search(r'Signer #1 certificate SHA-256 digest: (\S+)', cert).group(1)
+              results[label] = re.search(r'certificate SHA-256 digest: (\S+)', cert).group(1)
           print('ACTUAL_APK_SIGNERS_MATCH:', results['previous'] == results['latest'])
           expected_signer = 'f197f6e853747a0c64d1871f47a295110c007a7e6844cf25b44b660529b65c5c'
           print('LATEST_MATCHES_PERMANENT_KEY:', results['latest'].lower() == expected_signer)
