@@ -118,6 +118,7 @@ void main() {
       expect(draftName.text, 'Draft name');
       expect(repo.plants.single.location.latitude, 51);
       // Reopening starts at the editor's draft, not the old saved point.
+      await tester.ensureVisible(find.text('Pick location on map'));
       await tester.tap(find.text('Pick location on map'));
       await tester.pumpAndSettle();
       platform.attachPendingViews();
@@ -137,6 +138,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Changes saved'), findsOneWidget);
       final saved = LocalTrialRepository.open(preferences).plants.single;
+      expect(saved.name, 'Draft name');
       expect(saved.location.latitude, confirmed ? 51.02 : 51);
       expect(saved.location.longitude, confirmed ? 1.02 : 1);
       expect(saved.accuracyMeters, confirmed ? isNull : 5);
