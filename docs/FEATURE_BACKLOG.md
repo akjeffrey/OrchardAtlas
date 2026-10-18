@@ -3,6 +3,13 @@
 Keep this file current in each feature PR. `[ ]` is planned, `[~]` is in progress,
 and `[x]` is implemented. Implementation does not replace physical-device checks.
 
+## Newly requested features
+
+- [ ] **Classification settings:** add a Settings page for editing the available **Group, Type and Variety** options, including their names and associated icons. Keep the hierarchy consistent and preserve stable option IDs so existing plants, task criteria, history and classification views continue to reference the edited options. This manages the options themselves, separately from changing a single plant's classification.
+- [ ] **Custom icon uploads:** let users import new icons from their device and select them wherever map icons are supported, including classification options and optional Area/Row icons. Normalize imported images to small thumbnails with bounded dimensions and file sizes, preserving transparency where present. Persist the icon library and assignments locally and include them in backup/restore so an imported icon remains usable after restart or device migration.
+- [ ] **Map icon sizing across zoom levels:** cap marker icons at a modest screen size, including imported icons, so large source images cannot create oversized markers. Keep icons small or reduce/simplify them as the map zooms out; they must not grow as more of the orchard becomes visible. Apply consistent sizing to plant and optional Area/Row icons, with usable tap targets and checks at close and wide zoom levels.
+- [ ] **Two-tap plant marker navigation:** the first tap on a plant marker shows only the plant's name without opening its detail page. A second tap on the same selected marker opens Plant Detail. Tapping a different marker starts with that plant's name; tapping the map background clears the selection. Coordinate marker and info-window callbacks to avoid opening details on the first tap or navigating twice.
+
 ## Current increment
 
 - [x] Multiple user-owned orchards: create/select, remember selection, isolate all records.
@@ -72,7 +79,7 @@ and `[x]` is implemented. Implementation does not replace physical-device checks
 - [ ] Foraging-resource entry, seasonality, observations and private/public visibility controls.
 - [ ] Photo capture/gallery/upload, thumbnails and a durable offline upload queue.
 - [ ] Richer harvest/yield reports and activity audit/recovery design.
-- [ ] Uploaded/custom map icons and a consistent accessible symbol catalog.
+- [ ] Consistent accessible symbol catalog; custom icon imports and sizing are tracked under **Newly requested features**.
 - [ ] More map editing tools: move plants, split/join rows, vertex insertion and measurements.
 - [x] Android trial JSON backup/restore through the system file picker, including Google Drive, all orchards, pre-restore recovery and default external-file retention. Automatic writes wait for one minute without new edits (resetting after each edit), with local-first saves, failed-write retries and restart catch-up. See drive-backup-and-updates.md.
 - [ ] Cross-platform backup and recovery beyond the Android local trial.
