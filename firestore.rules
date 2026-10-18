@@ -52,12 +52,28 @@ service cloud.firestore {
         || (d.itemId == null && section == null && crop is string && uuid(crop) && (d.get('groupId', null) != null || exists(/databases/$(database)/documents/properties/$(propertyId)/crops/$(crop))));
     }
     function pointAt(points, index) { return points.size() <= index || points[index] is latlng; }
+    function validIconRef(d, propertyId) {
+      return d.get('customIconId',null)==null || (d.customIconId is string && uuid(d.customIconId)
+        && exists(/databases/$(database)/documents/properties/$(propertyId)/icons/$(d.customIconId)));
+    }
+    function validTaxon(d, propertyId) {
+      return d.keys().hasAll(['schemaVersion','name','rank','parentId','symbol'])
+        && d.keys().hasOnly(['schemaVersion','name','rank','parentId','symbol','customIconId','scientificName','iconOverride'])
+        && d.schemaVersion==1 && text(d.name)
+        && d.rank in ['group','genus','species','cultivar']
+        && ((d.rank=='group' && d.parentId==null) || (d.rank!='group' && d.parentId is string && uuid(d.parentId)))
+        && d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine']
+        && (d.get('scientificName',null)==null || (d.scientificName is string && d.scientificName.size()<=500))
+        && (d.get('iconOverride',null)==null || d.iconOverride is bool)
+        && validIconRef(d, propertyId);
+    }
     function validSection(d, propertyId) {
       return d.keys().hasAll(['schemaVersion','name','kind','parentId','notes','createdAt','vertices'])
-        && d.keys().hasOnly(['schemaVersion','name','kind','parentId','notes','createdAt','vertices','color','symbol'])
+        && d.keys().hasOnly(['schemaVersion','name','kind','parentId','notes','createdAt','vertices','color','symbol','customIconId'])
         && d.schemaVersion == 1 && text(d.name) && d.notes is string && d.notes.size() <= 10000 && d.createdAt is timestamp
         && (d.get('color',null)==null || (d.color is int && d.color >= 0 && d.color <= 4294967295))
         && (d.get('symbol',null)==null || d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine'])
+        && validIconRef(d, propertyId)
         && d.kind in ['area','row'] && d.vertices is list && d.vertices.size() <= 40
         && d.vertices.size() >= (d.kind == 'row' ? 2 : 3)
         && (d.parentId == null || (d.parentId is string && uuid(d.parentId)
@@ -163,7 +179,7 @@ service cloud.firestore {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(sectionId) && request.resource.data.parentId != sectionId && validSection(request.resource.data, propertyId);
         allow update: if owner(propertyId) && validSection(request.resource.data, propertyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','notes','vertices','color','symbol','kind'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','notes','vertices','color','symbol','customIconId','kind'])
           && (request.resource.data.kind == resource.data.kind || (resource.data.kind=='bed' && request.resource.data.kind=='area'));
         allow delete: if owner(propertyId);
       }
@@ -199,17 +215,23 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedOn']);
         allow delete: if owner(propertyId);
       }
+      match /icons/{iconId} {
+        allow read: if owner(propertyId);
+        allow create: if owner(propertyId) && uuid(iconId)
+          && request.resource.data.keys().hasOnly(['schemaVersion','name','png'])
+          && request.resource.data.schemaVersion==1 && text(request.resource.data.name)
+          && request.resource.data.png is string && request.resource.data.png.size()<=43692
+          && request.resource.data.png.matches('iVBORw0KGgo.*');
+        allow update: if owner(propertyId) && text(request.resource.data.name)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
+        allow delete: if false;
+      }
       match /taxa/{taxonId} {
         allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(taxonId)
-          && request.resource.data.keys().hasAll(['schemaVersion', 'name', 'rank', 'parentId', 'symbol'])
-          && request.resource.data.keys().hasOnly(['schemaVersion', 'name', 'rank', 'parentId', 'symbol'])
-          && request.resource.data.schemaVersion == 1 && text(request.resource.data.name)
-          && request.resource.data.rank in ['group', 'genus', 'species', 'cultivar']
-          && ((request.resource.data.rank == 'group' && request.resource.data.parentId == null)
-            || (request.resource.data.rank != 'group' && request.resource.data.parentId is string && uuid(request.resource.data.parentId)))
-          && request.resource.data.symbol in ['tree', 'apple', 'pear', 'berry', 'flower', 'citrus', 'nut', 'vine'];
-        allow update, delete: if false;
+        allow create: if owner(propertyId) && uuid(taxonId) && validTaxon(request.resource.data,propertyId);
+        allow update: if owner(propertyId) && validTaxon(request.resource.data,propertyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','symbol','customIconId','scientificName','iconOverride']);
+        allow delete: if false;
       }
       match /items/{itemId} {
         allow read: if owner(propertyId);

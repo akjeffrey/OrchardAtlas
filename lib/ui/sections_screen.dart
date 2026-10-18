@@ -150,6 +150,7 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
   SectionKind kind = SectionKind.area;
   int color = 0xff4caf50;
   PlantSymbol? symbol;
+  String? customIconId;
   String? parentId, error;
   Coordinates? center;
   double span = 0.0005;
@@ -289,6 +290,7 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
         kind: kind,
         color: color,
         symbol: symbol,
+        customIconId: customIconId,
         parentId: parentId,
         notes: notes.text,
         vertices: points,
@@ -377,6 +379,7 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
               kind = old.kind;
               color = old.color;
               symbol = old.symbol;
+              customIconId = old.customIconId;
               parentId = old.parentId;
               points.addAll(old.vertices);
               center = points.first;
@@ -442,6 +445,8 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
               SectionStyleFields(
                 color: color,
                 symbol: symbol,
+                customIconId: customIconId,
+                onCustomIcon: (v) => setState(() => customIconId = v),
                 onColor: (v) => setState(() => color = v),
                 onSymbol: (v) => setState(() => symbol = v),
               ),

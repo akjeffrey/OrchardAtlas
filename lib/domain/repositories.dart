@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'models.dart';
+import 'map_icons.dart';
 import 'landscape.dart';
 import 'work.dart';
 
@@ -31,6 +32,8 @@ abstract interface class OrchardRepository {
   void savePlant(ManagedPlant plant, {PlantEvent? plantingEvent});
   Stream<List<Taxon>> watchTaxa(String propertyId);
   void saveTaxon(String propertyId, Taxon taxon);
+  Stream<List<MapIcon>> watchIcons(String propertyId);
+  void saveIcon(String propertyId, MapIcon icon);
   void appendEvent(PlantEvent event);
   void updatePlant(ManagedPlant plant);
   Stream<RepositorySnapshot<List<OrchardTask>>> watchTasks(String propertyId);

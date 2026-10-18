@@ -219,7 +219,7 @@ void main() {
       find.widgetWithText(TextField, 'Option name'),
       'Trial nut trees',
     );
-    await select(tester, '🌳 tree', '🌰 nut');
+    await select(tester, 'tree', 'nut');
     await tester.tap(find.text('Add option'));
     await tester.pumpAndSettle();
     expect(repo.taxa.single.name, 'Trial nut trees');

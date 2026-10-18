@@ -8,7 +8,9 @@ document providers also work. This is file backup, not live multi-device sync.
 
 All local orchard snapshots, custom taxonomy, plants, sections, crops, harvests,
 activity and task histories, recurrence definitions, orchard selection, map defaults
-and task sort preferences are included. Firebase credentials, authentication data,
+and task sort preferences are included. Imported custom icon PNGs and their
+classification/Area/Row assignments are embedded in each orchard snapshot; file
+paths and image-picker grants are not required on the restoring device. Firebase credentials, authentication data,
 file-access grants and backup connection settings are excluded. Connected Firebase
 records and photo binaries are not part of this Android trial format.
 

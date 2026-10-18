@@ -82,6 +82,8 @@ class Taxon {
     this.parentId,
     this.scientificName,
     this.symbol = PlantSymbol.tree,
+    this.customIconId,
+    this.iconOverride,
   });
   final String id;
   final String name;
@@ -89,6 +91,8 @@ class Taxon {
   final String? parentId;
   final String? scientificName;
   final PlantSymbol symbol;
+  final String? customIconId;
+  final bool? iconOverride;
 }
 
 abstract class TrackedItem {

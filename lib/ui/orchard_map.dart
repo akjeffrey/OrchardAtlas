@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -7,6 +9,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../application/providers.dart';
 import '../domain/landscape.dart';
 import '../domain/models.dart';
+import '../domain/map_icons.dart';
 import '../domain/work.dart';
 import 'layout_canvas.dart';
 import 'plant_symbols.dart';
@@ -52,6 +55,7 @@ class OrchardMap extends ConsumerStatefulWidget {
 
 class _OrchardMapState extends ConsumerState<OrchardMap> {
   String? selectedPlantId;
+  double? cameraZoom;
 
   bool visible(ManagedPlant plant) =>
       plant.status == ItemStatus.active && plant.sectionId == null;
@@ -146,6 +150,14 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
     final visiblePlants = plants
         .where((p) => p.status == ItemStatus.active && p.sectionId == null)
         .toList();
+    final targetPoint =
+        center ??
+        selected ??
+        plants.firstOrNull?.location ??
+        sections.firstOrNull?.vertices.first;
+    final size = markerSizeForZoom(
+      cameraZoom ?? initialCamera?.zoom ?? (targetPoint == null ? 2 : 19),
+    );
     if (!ref.watch(mapsConfiguredProvider)) {
       final sketch = Column(
         children: [
@@ -164,6 +176,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
               center: center,
               selected: selected,
               span: span,
+              iconSize: size,
               onTap: tapMap,
               onPlant: onPlant == null ? null : tapPlant,
               onSection: onSection,
@@ -174,7 +187,40 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
       return withPlantName(sketch);
     }
     final symbols = ref.watch(markerSymbolsProvider).valueOrNull;
-    final taxa = ref.watch(taxonomyProvider).taxa;
+    final taxonomy = ref.watch(taxonomyProvider);
+    final taxa = taxonomy.taxa;
+    final customIcons = ref.watch(mapIconsProvider).valueOrNull ?? <MapIcon>[];
+    BitmapDescriptor iconFor(PlantSymbol symbol, String? customId) {
+      final custom = customIcons.where((i) => i.id == customId).firstOrNull;
+      if (custom != null) {
+        final dimensions = ByteData.sublistView(custom.png);
+        final w = dimensions.getUint32(16), h = dimensions.getUint32(20);
+        final longest = w > h ? w : h;
+        return BitmapDescriptor.bytes(
+          custom.png,
+          width: size * w / longest,
+          height: size * h / longest,
+        );
+      }
+      final builtIn = symbols?[symbol];
+      if (builtIn is BytesMapBitmap) {
+        return BitmapDescriptor.bytes(
+          builtIn.byteData,
+          width: size,
+          height: size,
+        );
+      }
+      return BitmapDescriptor.bytes(
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=',
+        ),
+        width: size,
+        height: size,
+      );
+    }
+
+    Taxon? appearance(String id) =>
+        taxa.any((t) => t.id == id) ? taxonomy.iconFor(id) : null;
     final target =
         center ??
         selected ??
@@ -190,6 +236,16 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
           ),
       onMapCreated: onMapCreated,
       onCameraMove: (p) {
+        if (markerSizeForZoom(p.zoom) !=
+            markerSizeForZoom(
+              cameraZoom ??
+                  initialCamera?.zoom ??
+                  (targetPoint == null ? 2 : 19),
+            )) {
+          setState(() => cameraZoom = p.zoom);
+        } else {
+          cameraZoom = p.zoom;
+        }
         onCameraChanged?.call(p);
         onCameraMove?.call(Coordinates(p.target.latitude, p.target.longitude));
       },
@@ -240,11 +296,12 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
       },
       markers: {
         for (final s in sections)
-          if (s.symbol != null)
+          if (s.symbol != null || s.customIconId != null)
             Marker(
               markerId: MarkerId('section-icon-${s.id}'),
               position: point(sectionCenter(s)),
-              icon: symbols?[s.symbol] ?? BitmapDescriptor.defaultMarker,
+              icon: iconFor(s.symbol ?? PlantSymbol.tree, s.customIconId),
+              anchor: const Offset(.5, .5),
               infoWindow: InfoWindow(title: s.name),
               onTap: () => onSection?.call(s.id),
             ),
@@ -272,13 +329,11 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
           Marker(
             markerId: MarkerId(p.id),
             position: point(p.location),
-            icon:
-                symbols?[taxa
-                        .where((t) => t.id == p.taxonId)
-                        .firstOrNull
-                        ?.symbol ??
-                    PlantSymbol.tree] ??
-                BitmapDescriptor.defaultMarker,
+            icon: iconFor(
+              appearance(p.taxonId)?.symbol ?? PlantSymbol.tree,
+              appearance(p.taxonId)?.customIconId,
+            ),
+            anchor: const Offset(.5, .5),
             infoWindow: InfoWindow(title: p.name),
             // Flutter shows the name consistently on native maps and sketches.
             // Consume native taps so automatic info windows cannot navigate too.

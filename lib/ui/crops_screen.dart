@@ -85,7 +85,9 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
         name: value,
         rank: TaxonRank.species,
         parentId: type.id,
-        symbol: type.symbol,
+        symbol: taxonomy.iconFor(type.id).symbol,
+        customIconId: taxonomy.iconFor(type.id).customIconId,
+        iconOverride: false,
       );
       ref.read(orchardRepositoryProvider).saveTaxon(place.id, taxon);
       ref.read(submittedTaxaProvider.notifier).state = {

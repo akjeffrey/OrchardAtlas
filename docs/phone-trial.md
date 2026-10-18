@@ -146,3 +146,39 @@ tapping the map background clears the name selection. Returning from Plant Detai
 starts a fresh selection, and filtering a plant out clears its selection. This
 behavior also applies to the coordinate sketch when Maps is not configured.
 Plant list entries still open details directly. Area/Row navigation is unchanged.
+
+## Classification settings and imported map icons
+
+Open **Orchard options → Settings → Group, Type & Variety options**. Search for
+an option and tap it to edit its name or icon. Changes are scoped to the selected
+orchard; existing plants, activities and task targets keep their identities. The
+parent and level stay fixed so edits cannot accidentally move existing plants
+into another branch. Existing legacy cultivar records appear as Varieties. New
+options can still be added through the Add Plant dropdowns.
+
+A Group/Type icon applies to its descendants unless a more specific option has an
+explicit icon. Use **Use parent icon** to return an option to inheritance. Renaming
+an option alone preserves its existing icon policy.
+
+Open **Settings → Custom icons → Import image**, select a raster image from Files
+or Drive, and name it. An **Import an icon** link is also available in the icon
+pickers. The imported image can be selected for classification options and optional
+Area/Row center icons. Choosing **No icon** on an Area/Row removes its center icon
+while retaining its complete colored geometry.
+
+Imports use native Android/iOS document pickers without broad library permissions.
+Source images are limited to 8 MB, 64 megapixels and 16,384 pixels per edge; decoding is downsampled before
+allocation of the final thumbnail. Images are re-encoded as PNGs at most 96×96
+pixels/32 KB (64-pixel fallback when necessary), preserving transparency and
+removing source metadata. Each orchard allows up to 128 custom icons. Icons are
+stored in the orchard records, so Android trial Drive backups include the images
+and assignments. Restore rejects corrupt PNGs, excessive dimensions and missing
+assigned assets before changing phone data. Existing backups without icons work.
+The existing total 20 MB backup limit still applies.
+
+Plant and optional Area/Row icons are capped at 28 logical screen pixels, shrink
+to 22 below zoom 16, and to 16 below zoom 13. The map is preserved while crossing
+these tiers. Shapes remain complete and colors are unchanged; custom images retain
+their aspect ratio. The coordinate sketch also caps icon visuals and uses normal
+48-pixel button targets. Physical-phone selection and visual checks remain tracked
+in issue #35.

@@ -2,10 +2,13 @@ import Flutter
 import UIKit
 import GoogleMaps
 import CoreLocation
+import ImageIO
+import UniformTypeIdentifiers
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let geocoder = CLGeocoder()
+  private let iconPicker = OrchardIconPicker()
   private var mapsConfigured = false
   override func application(
     _ application: UIApplication,
@@ -23,6 +26,11 @@ import CoreLocation
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "OrchardMapServices")!
     let channel = FlutterMethodChannel(name: "orchard_atlas/map_services", binaryMessenger: registrar.messenger())
+    let iconChannel = FlutterMethodChannel(name: "orchard_atlas/backup", binaryMessenger: registrar.messenger())
+    iconChannel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "importIcon", let self = self else { result(FlutterMethodNotImplemented); return }
+      self.iconPicker.open(result)
+    }
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { return }
       switch call.method {
@@ -53,6 +61,63 @@ import CoreLocation
           result(matches)
         }
       default: result(FlutterMethodNotImplemented)
+      }
+    }
+  }
+}
+
+
+private final class OrchardIconPicker: NSObject, UIDocumentPickerDelegate {
+  private var pending: FlutterResult?
+  func open(_ result: @escaping FlutterResult) {
+    guard pending == nil else { result(FlutterError(code: "busy", message: "An image picker is already open", details: nil)); return }
+    let roots = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+      .flatMap { $0.windows }.filter { $0.isKeyWindow }
+    guard var presenter = roots.first?.rootViewController else { result(FlutterError(code: "picker_failed", message: "Could not open image picker", details: nil)); return }
+    while let next = presenter.presentedViewController { presenter = next }
+    let picker: UIDocumentPickerViewController
+    if #available(iOS 14.0, *) {
+      picker = UIDocumentPickerViewController(forOpeningContentTypes: [.image], asCopy: false)
+    } else {
+      picker = UIDocumentPickerViewController(documentTypes: ["public.image"], in: .open)
+    }
+    pending = result
+    picker.delegate = self
+    picker.allowsMultipleSelection = false
+    presenter.present(picker, animated: true)
+  }
+  func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    let result = pending; pending = nil; result?(nil)
+  }
+  func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    guard let result = pending else { return }
+    pending = nil
+    guard let url = urls.first else { result(nil); return }
+    DispatchQueue.global(qos: .userInitiated).async {
+      let access = url.startAccessingSecurityScopedResource()
+      defer { if access { url.stopAccessingSecurityScopedResource() } }
+      do {
+        let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? Int.max
+        guard size <= 8 * 1024 * 1024,
+          let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
+          let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+          let width = props[kCGImagePropertyPixelWidth] as? Int,
+          let height = props[kCGImagePropertyPixelHeight] as? Int,
+          width > 0, height > 0, width <= 16384, height <= 16384, Int64(width) * Int64(height) <= 64000000 else { throw NSError(domain: "icon", code: 1) }
+        func thumbnail(_ pixels: Int) -> Data? {
+          guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: pixels,
+            kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else { return nil }
+          return UIImage(cgImage: image).pngData()
+        }
+        guard var png = thumbnail(96) else { throw NSError(domain: "icon", code: 2) }
+        if png.count > 32768 { guard let smaller = thumbnail(64) else { throw NSError(domain: "icon", code: 3) }; png = smaller }
+        guard png.count <= 32768 else { throw NSError(domain: "icon", code: 4) }
+        DispatchQueue.main.async { result(FlutterStandardTypedData(bytes: png)) }
+      } catch {
+        DispatchQueue.main.async { result(FlutterError(code: "icon_failed", message: "Choose a valid image under 8 MB (up to 64 megapixels).", details: nil)) }
       }
     }
   }

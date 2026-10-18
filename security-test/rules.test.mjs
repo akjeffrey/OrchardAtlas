@@ -82,7 +82,7 @@ test('plant and dated planting activity can be created atomically', async () => 
   batch.set(doc(store, `${newItem}/events/${item}`), { ...base, type: 'planting', activityDate: '2020-04-10' });
   await assertSucceeds(batch.commit());
 });
-test('custom taxonomy is owner scoped, append only and requires a supported icon', async () => {
+test('custom taxonomy edits remain owner scoped with immutable hierarchy', async () => {
   const path = `${propertyPath}/taxa/${event}`;
   const option = { schemaVersion: 1, name: 'Conference', rank: 'cultivar', parentId: taxon, symbol: 'pear' };
   await assertFails(setDoc(doc(db('bob'), path), option));
@@ -92,7 +92,10 @@ test('custom taxonomy is owner scoped, append only and requires a supported icon
   await assertSucceeds(setDoc(doc(db('alice'), path), option));
   await assertSucceeds(getDoc(doc(db('alice'), path)));
   await assertFails(getDoc(doc(db('bob'), path)));
-  await assertFails(updateDoc(doc(db('alice'), path), { name: 'Changed' }));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), { name: 'Changed', symbol: 'apple' }));
+  await assertFails(updateDoc(doc(db('alice'), path), { parentId: item }));
+  await assertFails(updateDoc(doc(db('alice'), path), { rank: 'species' }));
+  await assertFails(updateDoc(doc(db('bob'), path), { name: 'Stolen' }));
   await assertFails(deleteDoc(doc(db('alice'), path)));
 });
 
@@ -297,4 +300,21 @@ test('zero-match recurring plans and UUID5 linked task activities remain owner s
   await assertFails(deleteDoc(doc(db('bob'),planPath)));
   await assertSucceeds(deleteDoc(doc(store,path)));
   await assertSucceeds(deleteDoc(doc(store,planPath)));
+});
+
+test('icon assets and references are bounded and owner scoped', async () => {
+  const iconPath = `${propertyPath}/icons/${event}`;
+  const icon = { schemaVersion: 1, name: 'Pear icon', png: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGP4DwQACfsD/fteaysAAAAASUVORK5CYII=' };
+  await assertFails(setDoc(doc(db('bob'), iconPath), icon));
+  await assertFails(setDoc(doc(db(), iconPath), icon));
+  await assertFails(setDoc(doc(db('alice'), iconPath), { ...icon, png: 'x'.repeat(50000) }));
+  await assertFails(setDoc(doc(db('alice'), iconPath), { ...icon, extra: true }));
+  await assertSucceeds(setDoc(doc(db('alice'), iconPath), icon));
+  await assertSucceeds(getDoc(doc(db('alice'), iconPath)));
+  await assertFails(getDoc(doc(db('bob'), iconPath)));
+  await assertFails(updateDoc(doc(db('alice'), iconPath), { png: 'iVBORw0KGgoChanged' }));
+  const option = { schemaVersion: 1, name: 'New pear', rank: 'species', parentId: taxon, symbol: 'pear', customIconId: event, iconOverride: true };
+  await assertSucceeds(setDoc(doc(db('alice'), `${propertyPath}/taxa/${item}`), option));
+  await assertFails(updateDoc(doc(db('alice'), `${propertyPath}/taxa/${item}`), { customIconId: property }));
+  await assertFails(deleteDoc(doc(db('alice'), iconPath)));
 });

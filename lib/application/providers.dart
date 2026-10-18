@@ -15,6 +15,8 @@ import 'dart:async';
 import '../domain/work.dart';
 
 import '../domain/models.dart';
+import '../domain/map_icons.dart';
+import '../data/icon_importer.dart';
 import '../domain/landscape.dart';
 import '../domain/repositories.dart';
 import '../domain/taxonomy.dart';
@@ -65,6 +67,17 @@ final customTaxaProvider = StreamProvider<List<Taxon>>((ref) async* {
   final place = await ref.watch(placeProvider.future);
   yield* repository.watchTaxa(place.id);
 });
+final iconImporterProvider = Provider<IconImporter>(
+  (ref) => DeviceIconImporter(),
+);
+final mapIconsProvider = StreamProvider.autoDispose<List<MapIcon>>((
+  ref,
+) async* {
+  final repository = ref.watch(orchardRepositoryProvider);
+  final place = await ref.watch(placeProvider.future);
+  yield* repository.watchIcons(place.id);
+});
+
 final submittedTaxaProvider = StateProvider<Map<String, Taxon>>((ref) => {});
 final taxonomyProvider = Provider<Taxonomy>(
   (ref) => Taxonomy(

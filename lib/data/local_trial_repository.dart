@@ -8,6 +8,8 @@ import '../domain/orchards.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../domain/models.dart';
+import '../domain/map_icons.dart';
+import 'icon_mapping.dart';
 import '../domain/work.dart';
 import 'work_mapping.dart';
 import '../domain/landscape.dart';
@@ -41,6 +43,7 @@ class LocalTrialRepository
   final List<ManagedPlant> plants;
   final List<PlantEvent> events;
   final List<Taxon> taxa;
+  final icons = <MapIcon>[];
   final List<OrchardTask> tasks;
   final List<OrchardSection> sections;
   final List<CropPlanting> crops;
@@ -213,6 +216,28 @@ class LocalTrialRepository
           Map<String, dynamic>.from(p as Map),
         ),
     ]);
+    repo.icons.addAll([
+      for (final icon in data?['icons'] as List? ?? [])
+        IconMapping.read(
+          icon['id'] as String,
+          Map<String, dynamic>.from(icon as Map),
+        ),
+    ]);
+    if (repo.icons.length > MapIcon.maxPerOrchard ||
+        repo.icons.map((i) => i.id).toSet().length != repo.icons.length) {
+      throw const FormatException('Invalid icon library');
+    }
+    if (taxa.map((t) => t.id).toSet().length != taxa.length) {
+      throw const FormatException('Duplicate taxonomy IDs');
+    }
+    orchardTaxonomy(taxa);
+    final iconIds = repo.icons.map((i) => i.id).toSet();
+    if ([
+      ...taxa.map((t) => t.customIconId),
+      ...repo.sections.map((s) => s.customIconId),
+    ].whereType<String>().any((id) => !iconIds.contains(id))) {
+      throw const FormatException('Missing assigned icon');
+    }
     return repo;
   }
 
@@ -410,6 +435,9 @@ class LocalTrialRepository
         for (final h in cropHarvests)
           {'id': h.id, ...LandscapeMapping.harvest(h)},
       ],
+      'icons': [
+        for (final icon in icons) {'id': icon.id, ...IconMapping.write(icon)},
+      ],
       'taxa': [
         for (final t in taxa) {'id': t.id, ...FirestoreMapping.taxonToMap(t)},
       ],
@@ -517,9 +545,32 @@ class LocalTrialRepository
       return _for(propertyId).saveTaxon(propertyId, taxon);
     }
     if (propertyId != place.id) throw ArgumentError('Unknown property');
-    Taxonomy([...starterTaxonomy.taxa, ...taxa, taxon]);
+    validateTaxonEdit(orchardTaxonomy(taxa), taxon);
+    if (taxon.customIconId != null &&
+        !icons.any((i) => i.id == taxon.customIconId)) {
+      throw ArgumentError('Choose an available icon');
+    }
+    taxa.removeWhere((t) => t.id == taxon.id);
     taxa.add(taxon);
     _persist(taxon.id);
+  }
+
+  @override
+  Stream<List<MapIcon>> watchIcons(String propertyId) => propertyId != place.id
+      ? _for(propertyId).watchIcons(propertyId)
+      : _watch(() => List<MapIcon>.of(icons)).map((s) => s.value);
+  @override
+  void saveIcon(String propertyId, MapIcon icon) {
+    if (propertyId != place.id) {
+      return _for(propertyId).saveIcon(propertyId, icon);
+    }
+    if (!icons.any((i) => i.id == icon.id) &&
+        icons.length >= MapIcon.maxPerOrchard) {
+      throw StateError('An orchard can contain up to 128 custom icons');
+    }
+    icons.removeWhere((i) => i.id == icon.id);
+    icons.add(icon);
+    _persist(icon.id);
   }
 
   @override
@@ -692,6 +743,10 @@ class LocalTrialRepository
       return _for(section.propertyId).saveSection(section);
     }
     if (section.propertyId != place.id) throw ArgumentError('Unknown property');
+    if (section.customIconId != null &&
+        !icons.any((i) => i.id == section.customIconId)) {
+      throw ArgumentError('Choose an available icon');
+    }
     validateSectionParent(section, sections);
     final index = sections.indexWhere((s) => s.id == section.id);
     if (index >= 0) {

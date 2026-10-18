@@ -8,7 +8,7 @@ import '../domain/models.dart';
 import '../domain/taxonomy.dart';
 import '../domain/work.dart';
 import '../domain/landscape.dart';
-import 'plant_symbols.dart';
+import 'icon_picker.dart';
 import 'sections_screen.dart';
 
 class AddPlantScreen extends ConsumerStatefulWidget {
@@ -163,9 +163,13 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   Future<void> addOption(int rank) async {
     final parent = rank == 0 ? null : selected[rank - 1];
     var optionName = '';
+    var iconOverride = false;
     var symbol = parent == null
         ? PlantSymbol.tree
-        : ref.read(taxonomyProvider).byId(parent).symbol;
+        : ref.read(taxonomyProvider).iconFor(parent).symbol;
+    String? customIconId = parent == null
+        ? null
+        : ref.read(taxonomyProvider).iconFor(parent).customIconId;
     String? error;
     final result = await showDialog<Taxon>(
       context: context,
@@ -185,17 +189,14 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                     errorText: error,
                   ),
                 ),
-                DropdownButtonFormField<PlantSymbol>(
-                  initialValue: symbol,
-                  decoration: const InputDecoration(labelText: 'Map icon'),
-                  items: [
-                    for (final s in PlantSymbol.values)
-                      DropdownMenuItem(
-                        value: s,
-                        child: Text('${symbolLabels[s]} ${s.name}'),
-                      ),
-                  ],
-                  onChanged: (s) => symbol = s!,
+                MapIconPicker(
+                  symbol: symbol,
+                  customIconId: customIconId,
+                  onChanged: (s, id) => update(() {
+                    symbol = s!;
+                    customIconId = id;
+                    iconOverride = true;
+                  }),
                 ),
               ],
             ),
@@ -227,6 +228,8 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                     rank: TaxonRank.values[rank],
                     parentId: parent,
                     symbol: symbol,
+                    customIconId: customIconId,
+                    iconOverride: iconOverride,
                   ),
                 );
               },
@@ -405,7 +408,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                           : taxonomy.children(i == 0 ? null : selected[i - 1]))
                     DropdownMenuItem(
                       value: t.id,
-                      child: Text('${symbolLabels[t.symbol]} ${t.name}'),
+                      child: TaxonOptionLabel(taxon: t),
                     ),
                   const DropdownMenuItem(
                     value: '__add__',
