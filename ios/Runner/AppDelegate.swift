@@ -28,6 +28,12 @@ import UniformTypeIdentifiers
     let channel = FlutterMethodChannel(name: "orchard_atlas/map_services", binaryMessenger: registrar.messenger())
     let iconChannel = FlutterMethodChannel(name: "orchard_atlas/backup", binaryMessenger: registrar.messenger())
     iconChannel.setMethodCallHandler { [weak self] call, result in
+      if call.method == "version" {
+        let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development build"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "0"
+        result("\(name) (\(build))")
+        return
+      }
       guard call.method == "importIcon", let self = self else { result(FlutterMethodNotImplemented); return }
       self.iconPicker.open(result)
     }

@@ -286,6 +286,17 @@ class FirestoreOrchardRepository
   );
 
   @override
+  void renameIcon(String propertyId, String iconId, String name) => _observe(
+    iconId,
+    firestore
+        .collection('properties')
+        .doc(propertyId)
+        .collection('icons')
+        .doc(iconId)
+        .update({'name': requiredText(name, 'Icon name')}),
+  );
+
+  @override
   void deleteIcon(String propertyId, String iconId) => _observe(
     iconId,
     firestore

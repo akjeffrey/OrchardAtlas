@@ -154,3 +154,8 @@ If the app closes before a push, orchard records remain in local storage. On the
 next launch, the latest saved state is pushed without needing a new edit. Drive
 provider uploads still depend on connectivity. Shared files are backups for manual
 restore, not concurrent editing or automatic merging between devices.
+
+
+## Versioned downloads and app labels
+
+New builds use the **Android app** workflow and publish artifacts named `OrchardAtlas-0.<build>.0` (downloaded as a ZIP), containing `OrchardAtlas-0.<build>.0.apk`. The launcher says OrchardAtlas and screens show the installed version. The package ID remains `com.orchardatlas.orchard_atlas.trial`, and the existing signing secret remains `ANDROID_TRIAL_DEBUG_KEYSTORE_BASE64`: these internal compatibility identifiers must not change when removing visible trial wording. Existing data and in-place updates are preserved. Custom icon name changes and new classification options are part of orchard snapshots and are included in the same backups.

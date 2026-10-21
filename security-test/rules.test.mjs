@@ -337,3 +337,17 @@ test('icon deletion removes image data, preserves references and cannot be rever
   }));
   await assertFails(deleteDoc(doc(db('alice'), path)));
 });
+
+
+test('custom icon names can change without modifying images or permissions', async () => {
+  const path = `${propertyPath}/icons/${event}`;
+  const icon = {schemaVersion: 1, name: 'Before', png: 'iVBORw0KGgoSample'};
+  await assertSucceeds(setDoc(doc(db('alice'), path), icon));
+  await assertFails(updateDoc(doc(db('bob'), path), {name: 'Stolen'}));
+  await assertFails(updateDoc(doc(db(), path), {name: 'Anonymous'}));
+  await assertFails(updateDoc(doc(db('alice'), path), {name: ''}));
+  await assertFails(updateDoc(doc(db('alice'), path), {name: 'x'.repeat(501)}));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), {name: 'After'}));
+  const stored = (await getDoc(doc(db('alice'), path))).data();
+  if (stored.png !== icon.png) throw new Error('Renaming changed the image');
+});

@@ -23,10 +23,11 @@ class LayoutCanvas extends ConsumerWidget {
     this.onSection,
     this.onPlant,
     this.iconSize = 28,
+    this.endpointSize = 10,
     this.selectedPlantId,
     this.selectedSectionId,
   });
-  final double iconSize;
+  final double iconSize, endpointSize;
   final String? selectedPlantId, selectedSectionId;
   final List<OrchardSection> sections;
   final List<ManagedPlant> plants;
@@ -207,6 +208,42 @@ class LayoutCanvas extends ConsumerWidget {
                       ),
                     ),
                   ),
+                for (final row in sections.where(
+                  (s) => s.kind == SectionKind.row,
+                ))
+                  for (final start in [true, false])
+                    Positioned(
+                      left:
+                          pixel(start ? row.vertices.first : row.vertices.last)
+                              .dx -
+                          24,
+                      top:
+                          pixel(start ? row.vertices.first : row.vertices.last)
+                              .dy -
+                          24,
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: IconButton(
+                          tooltip:
+                              '${row.name} · ${start ? 'Start (1)' : 'Finish'}',
+                          onPressed: onSection == null
+                              ? null
+                              : () => onSection!(row.id),
+                          icon: Container(
+                            width: endpointSize,
+                            height: endpointSize,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: start
+                                  ? Colors.green.shade800
+                                  : Colors.red.shade800,
+                              border: Border.all(color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                 if (selected != null)
                   Positioned(
                     left: pixel(selected!).dx - 12,

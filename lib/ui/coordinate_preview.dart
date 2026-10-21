@@ -31,7 +31,7 @@ class CoordinatePreview extends ConsumerWidget {
         child: Padding(
           padding: EdgeInsets.all(24),
           child: Text(
-            'Use Current GPS location, or Add Plant and enter coordinates.\n\nTrial coordinate preview has no satellite/map imagery.',
+            'Use Current GPS location, or Add Plant and enter coordinates.\n\nCoordinate preview has no satellite/map imagery.',
             textAlign: TextAlign.center,
           ),
         ),

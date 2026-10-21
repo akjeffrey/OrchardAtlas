@@ -390,7 +390,7 @@ class _TasksState extends ConsumerState<TasksPane> {
         label: const Text('Add task'),
       ),
       const Text(
-        'Due dates are recorded; no background reminders in this trial.',
+        'Due dates are recorded; background reminders are not available yet.',
       ),
       Expanded(
         child: ref
