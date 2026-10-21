@@ -33,7 +33,7 @@ extensions.configure<ApplicationExtension> {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.orchardatlas.orchard_atlas"
         if (orchardTrialBuild) applicationIdSuffix = ".trial"
-        manifestPlaceholders["APP_LABEL"] = if (orchardTrialBuild) "OrchardAtlas Trial" else "OrchardAtlas"
+        manifestPlaceholders["APP_LABEL"] = "OrchardAtlas"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = maxOf(flutter.minSdkVersion, 23)

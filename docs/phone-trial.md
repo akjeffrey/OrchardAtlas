@@ -1,14 +1,14 @@
-# Install the Android phone trial
+# Install the Android app
 
-The `Android phone trial` GitHub Actions workflow builds an installable debug APK
+The `Android app` GitHub Actions workflow builds an installable debug APK
 with `--dart-define=TRIAL_MODE=true`. It needs no Firebase account or Firebase keys.
 The workflow now reads the repository Actions secret `GOOGLE_MAPS_ANDROID_KEY`
 for Google Maps satellite imagery. See [developer setup](developer-setup.md) for
 SDK activation, billing and package/certificate restrictions. Signing credentials
 stay outside Git; an optional private debug keystore secret stabilizes trial updates.
 
-1. Open the successful **Android phone trial** run on GitHub Actions.
-2. Under **Artifacts**, download **OrchardAtlas-Android-trial** while signed in.
+1. Open the successful **Android app** run on GitHub Actions.
+2. Under **Artifacts**, download **OrchardAtlas-0.<build>.0** while signed in.
 3. Extract the ZIP and transfer `OrchardAtlas-trial.apk` to an Android phone.
 4. Open the APK using the phone's Files app. If Android asks, permit that installer
    to install unknown apps, then install it. You may disable that permission again.
@@ -193,3 +193,16 @@ in issue #35.
 - After restoring a backup, **Use this file for automatic backups?** defaults on. Continue checks persistent write access before selecting that file for future backups, without immediately overwriting it. Turn the choice off to retain the previous backup destination. Read-only sources can still restore; choose a writable file if backup setup fails.
 
 Physical-device checks: confirm first-tap callouts without first entering Edit; pan/zoom and second-tap behavior for all three feature kinds; pick and cancel a new plant position; add another at the saved point; delete an inherited icon, restart and restore its backup; restore a writable Drive file with the default choice and verify the next edited data reaches that same file after a one-minute quiet period. Also restore a read-only/shared file and check setup failure is visible without losing the restored records.
+
+
+## Classification creation, icon names and row dots
+
+Edit Plant now includes **+ Add new option…** in Group, Type and Variety. It uses the same creation dialog as Add Plant, including parent validation, duplicate-name checks and custom/built-in icon choices. A new catalog option is saved immediately for the current orchard and selected in the draft. Other plant edits remain in place. **Save changes** is still required to assign the new classification to the existing plant; cancelling the editor does not remove a catalog option already created.
+
+In **Settings → Custom icons**, tap an icon or its pencil to rename it. The current name is prefilled. Cancel leaves it alone; Save trims the name and requires 1–500 characters. Only the name changes: its image, UUID and all classification/Area/Row assignments remain intact. Deleted icons cannot be renamed. Names persist locally and in backups; Firebase submits a name-only update through the repository.
+
+Rows show green start and red finish dots with a white outline, centered on the endpoint. They are 10 logical pixels at close zoom, 8 at medium zoom, and 6 at wide zoom. Start/finish labels and two-tap section navigation remain available. Offline sketches also show small endpoint dots with usable tap targets.
+
+The launcher name is **OrchardAtlas**. A shared banner shows the installed version on app screens. GitHub's **Android app** workflow publishes **OrchardAtlas-0.<build>.0.zip**, containing **OrchardAtlas-0.<build>.0.apk**, checksums and verified signing metadata. The legacy internal `.trial` package suffix, local storage keys and signing secret names remain unchanged deliberately so existing installations can update without losing data.
+
+Device checks: create a new Group → Type → Variety while editing a plant, cancel another option and verify unsaved details remain; save and reopen the plant; rename an assigned icon, restart and restore its backup; zoom the map out and in and tap both row dots; confirm the version banner matches the ZIP/APK version.

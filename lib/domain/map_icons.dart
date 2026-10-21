@@ -16,6 +16,11 @@ class MapIcon {
 
   final bool deleted;
 
+  MapIcon renamed(String name) {
+    if (deleted) throw StateError('Deleted icons cannot be renamed');
+    return MapIcon(id: id, name: name, png: png);
+  }
+
   static Uint8List validatedCopy(Uint8List bytes) {
     validatePng(bytes);
     return Uint8List.fromList(bytes).asUnmodifiableView();
@@ -84,6 +89,13 @@ abstract interface class IconImporter {
 
 /// Logical screen pixels, never a geographic size. Discrete tiers avoid rerenders
 /// for each camera frame and shrink markers as more of the orchard is visible.
+/// Endpoint dots stay smaller than plant icons at every zoom level.
+double rowEndpointSizeForZoom(double zoom) => zoom < 13
+    ? 6
+    : zoom < 16
+    ? 8
+    : 10;
+
 double markerSizeForZoom(double zoom) => zoom < 13
     ? 16
     : zoom < 16

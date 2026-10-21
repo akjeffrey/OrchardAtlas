@@ -18,6 +18,7 @@ import 'crops_screen.dart';
 import 'archived_plants.dart';
 import 'classification_screen.dart';
 import 'settings_screen.dart';
+import 'app_version_banner.dart';
 import '../domain/landscape.dart';
 
 final dismissedFailureProvider = StateProvider<String?>((ref) => null);
@@ -194,19 +195,7 @@ class OrchardAtlasApp extends ConsumerWidget {
       routerConfig: ref.watch(routerProvider),
       builder: (context, child) => Column(
         children: [
-          if (trial)
-            SafeArea(
-              bottom: false,
-              child: Material(
-                color: theme.colorScheme.secondaryContainer,
-                child: const Padding(
-                  padding: EdgeInsets.all(8),
-                  child: Text(
-                    'PHONE TRIAL · Local data · Drive backup in Orchard options',
-                  ),
-                ),
-              ),
-            ),
+          const AppVersionBanner(),
           if (failure != null && dismissedFailure != failure.recordId)
             SafeArea(
               bottom: false,

@@ -75,6 +75,67 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
     }
   }
 
+  Future<void> rename(MapIcon icon) async {
+    if (busy) return;
+    setState(() {
+      busy = true;
+      error = null;
+    });
+    try {
+      final orchard = await ref.read(placeProvider.future);
+      if (!mounted) return;
+      var draft = icon.name;
+      String? validationError;
+      final name = await showDialog<String>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, update) => AlertDialog(
+            title: const Text('Rename icon'),
+            content: TextFormField(
+              initialValue: icon.name,
+              autofocus: true,
+              maxLength: 500,
+              onChanged: (value) => draft = value,
+              decoration: InputDecoration(
+                labelText: 'Icon name',
+                errorText: validationError,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () {
+                  try {
+                    Navigator.pop(context, icon.renamed(draft).name);
+                  } catch (_) {
+                    update(
+                      () => validationError =
+                          'Enter an icon name (1–500 characters)',
+                    );
+                  }
+                },
+                child: const Text('Save name'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (!mounted || name == null) return;
+      if ((await ref.read(placeProvider.future)).id != orchard.id) {
+        throw StateError('Orchard changed; try again');
+      }
+      if (!mounted) return;
+      ref.read(orchardRepositoryProvider).renameIcon(orchard.id, icon.id, name);
+    } catch (e) {
+      if (mounted) setState(() => error = 'Could not rename icon: $e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   Future<void> deleteIcon(MapIcon icon) async {
     final orchard = await ref.read(placeProvider.future);
     final plants = await ref.read(plantsProvider.future);
@@ -166,10 +227,21 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
                                     const Icon(Icons.broken_image_outlined),
                               ),
                               title: Text(icon.name),
-                              trailing: IconButton(
-                                tooltip: 'Delete ${icon.name}',
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: busy ? null : () => remove(icon),
+                              onTap: busy ? null : () => rename(icon),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  IconButton(
+                                    tooltip: 'Rename ${icon.name}',
+                                    icon: const Icon(Icons.edit_outlined),
+                                    onPressed: busy ? null : () => rename(icon),
+                                  ),
+                                  IconButton(
+                                    tooltip: 'Delete ${icon.name}',
+                                    icon: const Icon(Icons.delete_outline),
+                                    onPressed: busy ? null : () => remove(icon),
+                                  ),
+                                ],
                               ),
                             ),
                         ],

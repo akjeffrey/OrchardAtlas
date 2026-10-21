@@ -173,6 +173,9 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
         selected ??
         plants.firstOrNull?.location ??
         sections.firstOrNull?.vertices.first;
+    final zoom =
+        cameraZoom ?? initialCamera?.zoom ?? (targetPoint == null ? 2 : 19);
+    final endpointSize = rowEndpointSizeForZoom(zoom);
     final size = markerSizeForZoom(
       cameraZoom ?? initialCamera?.zoom ?? (targetPoint == null ? 2 : 19),
     );
@@ -198,6 +201,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
               onTap: tapMap,
               onPlant: onPlant == null ? null : tapPlant,
               onSection: onSection == null ? null : tapSection,
+              endpointSize: endpointSize,
               selectedPlantId: selectedPlantId,
               selectedSectionId: selectedSectionId,
             ),
@@ -206,6 +210,26 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
       );
       return sketch;
     }
+    final endpoints = ref.watch(rowEndpointSymbolsProvider).valueOrNull;
+    BitmapDescriptor endpointIcon(bool start) {
+      final icon = endpoints?[start];
+      if (icon is BytesMapBitmap) {
+        return BitmapDescriptor.bytes(
+          icon.byteData,
+          width: endpointSize,
+          height: endpointSize,
+        );
+      }
+      // Invisible until the raster is ready; never briefly display a native pin.
+      return BitmapDescriptor.bytes(
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgAAIAAAUAAXpeqz8AAAAASUVORK5CYII=',
+        ),
+        width: 1,
+        height: 1,
+      );
+    }
+
     final symbols = ref.watch(markerSymbolsProvider).valueOrNull;
     final taxonomy = ref.watch(taxonomyProvider);
     final taxa = taxonomy.taxa;
@@ -357,9 +381,8 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
           Marker(
             markerId: MarkerId('row-start-${s.id}'),
             position: point(s.vertices.first),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueGreen,
-            ),
+            icon: endpointIcon(true),
+            anchor: const Offset(.5, .5),
             consumeTapEvents: true,
             infoWindow: InfoWindow(
               title: '${s.name} · Start (1)',
@@ -370,9 +393,8 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
           Marker(
             markerId: MarkerId('row-finish-${s.id}'),
             position: point(s.vertices.last),
-            icon: BitmapDescriptor.defaultMarkerWithHue(
-              BitmapDescriptor.hueRed,
-            ),
+            icon: endpointIcon(false),
+            anchor: const Offset(.5, .5),
             consumeTapEvents: true,
             infoWindow: InfoWindow(
               title: '${s.name} · Finish',

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 
 import '../application/providers.dart';
 import '../domain/models.dart';
@@ -10,6 +9,7 @@ import '../domain/work.dart';
 import '../domain/landscape.dart';
 import 'icon_picker.dart';
 import 'plant_location_picker.dart';
+import 'taxon_creation_dialog.dart';
 import 'sections_screen.dart';
 
 class AddPlantScreen extends ConsumerStatefulWidget {
@@ -200,98 +200,18 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   }
 
   Future<void> addOption(int rank) async {
-    final parent = rank == 0 ? null : selected[rank - 1];
-    var optionName = '';
-    var iconOverride = false;
-    var symbol = parent == null
-        ? PlantSymbol.tree
-        : ref.read(taxonomyProvider).iconFor(parent).symbol;
-    String? customIconId = parent == null
-        ? null
-        : ref.read(taxonomyProvider).iconFor(parent).customIconId;
-    String? error;
-    final result = await showDialog<Taxon>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, update) => AlertDialog(
-          title: Text('Add ${['Group', 'Type', 'Variety'][rank]}'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  onChanged: (value) => optionName = value,
-                  autofocus: true,
-                  maxLength: 500,
-                  decoration: InputDecoration(
-                    labelText: 'Option name',
-                    errorText: error,
-                  ),
-                ),
-                MapIconPicker(
-                  symbol: symbol,
-                  customIconId: customIconId,
-                  onChanged: (s, id) => update(() {
-                    symbol = s!;
-                    customIconId = id;
-                    iconOverride = true;
-                  }),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final value = optionName.trim();
-                if (value.isEmpty) {
-                  update(() => error = 'Enter a name');
-                  return;
-                }
-                if (ref
-                    .read(taxonomyProvider)
-                    .children(parent)
-                    .any((t) => t.name.toLowerCase() == value.toLowerCase())) {
-                  update(() => error = 'This option already exists');
-                  return;
-                }
-                Navigator.pop(
-                  dialogContext,
-                  Taxon(
-                    id: const Uuid().v4(),
-                    name: value,
-                    rank: TaxonRank.values[rank],
-                    parentId: parent,
-                    symbol: symbol,
-                    customIconId: customIconId,
-                    iconOverride: iconOverride,
-                  ),
-                );
-              },
-              child: const Text('Add option'),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (mounted) setState(() => dropdownRevision++);
-    if (result == null || !mounted) return;
     try {
-      final place = await ref.read(placeProvider.future);
-      if (!mounted) return;
-      Taxonomy([...ref.read(taxonomyProvider).taxa, result]);
-      ref.read(orchardRepositoryProvider).saveTaxon(place.id, result);
-      ref.read(submittedTaxaProvider.notifier).state = {
-        ...ref.read(submittedTaxaProvider),
-        result.id: result,
-      };
-      choose(rank, result.id);
+      final result = await createTaxonOption(
+        context,
+        ref,
+        rank: rank,
+        parentId: rank == 0 ? null : selected[rank - 1],
+      );
+      if (result != null && mounted) choose(rank, result.id);
     } catch (e) {
       if (mounted) setState(() => message = 'Could not add option: $e');
+    } finally {
+      if (mounted) setState(() => dropdownRevision++);
     }
   }
 

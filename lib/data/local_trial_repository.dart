@@ -86,9 +86,7 @@ class LocalTrialRepository
         orchard ??
         Place(
           id: '38a0fbb0-6a36-4a48-8d17-000000000101',
-          name:
-              data?['name'] as String? ??
-              (data == null ? 'Home Orchard' : 'Trial orchard'),
+          name: data?['name'] as String? ?? 'Home Orchard',
           ownerId: userId,
           createdAt: data == null
               ? DateTime.now().toUtc()
@@ -264,7 +262,7 @@ class LocalTrialRepository
 
   void _owner(String userId) {
     if (userId != LocalTrialRepository.userId) {
-      throw StateError('Wrong trial user');
+      throw StateError('Wrong local user');
     }
   }
 
@@ -499,7 +497,7 @@ class LocalTrialRepository
         _failures.add(
           WriteFailure(
             recordId,
-            'Could not save trial data on this phone. Keep the app open and try again.',
+            'Could not save data on this phone. Keep the app open and try again.',
           ),
         );
       } finally {
@@ -516,7 +514,7 @@ class LocalTrialRepository
           .savePlant(plant, plantingEvent: plantingEvent);
     }
     if (plant.propertyId != place.id) {
-      throw ArgumentError('Unknown trial property');
+      throw ArgumentError('Unknown orchard');
     }
     if (plants.any((p) => p.id == plant.id)) {
       throw StateError('Plant already exists');
@@ -574,6 +572,17 @@ class LocalTrialRepository
     icons.removeWhere((i) => i.id == icon.id);
     icons.add(icon);
     _persist(icon.id);
+  }
+
+  @override
+  void renameIcon(String propertyId, String iconId, String name) {
+    if (propertyId != place.id) {
+      return _for(propertyId).renameIcon(propertyId, iconId, name);
+    }
+    final index = icons.indexWhere((i) => i.id == iconId);
+    if (index < 0) throw ArgumentError('Unknown icon');
+    icons[index] = icons[index].renamed(name);
+    _persist(iconId);
   }
 
   @override
@@ -1028,10 +1037,10 @@ class TrialAuthRepository implements AuthRepository {
       Stream.value(const OrchardUser(LocalTrialRepository.userId));
   @override
   Future<void> signIn(String email, String password) async =>
-      throw UnsupportedError('Trial uses local data');
+      throw UnsupportedError('This installation uses local data');
   @override
   Future<void> register(String email, String password) async =>
-      throw UnsupportedError('Trial uses local data');
+      throw UnsupportedError('This installation uses local data');
   @override
   Future<void> signOut() async {}
 }

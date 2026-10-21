@@ -23,9 +23,15 @@ class AndroidBackupDocuments implements BackupDocuments {
   static Future<String> appVersion() async {
     try {
       return await channel.invokeMethod<String>('version') ??
-          'Development build';
+          const String.fromEnvironment(
+            'APP_VERSION',
+            defaultValue: 'Development build',
+          );
     } on MissingPluginException {
-      return 'Development build';
+      return const String.fromEnvironment(
+        'APP_VERSION',
+        defaultValue: 'Development build',
+      );
     }
   }
 }

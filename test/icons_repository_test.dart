@@ -281,6 +281,48 @@ void main() {
       throwsFormatException,
     );
   });
+  test('rename preserves assignments and image through offline backup/restore and rejects deleted IDs', () async {
+    repo.saveIcon(
+      repo.place.id,
+      MapIcon(id: 'icon', name: 'Before', png: iconPng()),
+    );
+    repo.saveTaxon(repo.place.id, edited(type, icon: 'icon', override: true));
+    repo.saveSection(
+      OrchardSection(
+        id: 'row',
+        propertyId: repo.place.id,
+        name: 'Row',
+        kind: SectionKind.row,
+        vertices: [Coordinates(51, 1), Coordinates(51, 1.01)],
+        createdAt: DateTime(2026),
+        customIconId: 'icon',
+      ),
+    );
+    repo.renameIcon(repo.place.id, 'icon', '  After  ');
+    expect(repo.icons.single.name, 'After');
+    expect(repo.icons.single.png, iconPng());
+    expect(repo.taxa.single.customIconId, 'icon');
+    expect(repo.sections.single.customIconId, 'icon');
+    expect(
+      () => repo.renameIcon(repo.place.id, 'icon', ''),
+      throwsArgumentError,
+    );
+    expect(
+      () => repo.renameIcon(repo.place.id, 'icon', 'x' * 501),
+      throwsArgumentError,
+    );
+    final backup = await TrialBackupStore(prefs, repo).export();
+    await TrialBackupStore(prefs, repo).restore(backup);
+    final reopened = LocalTrialRepository.open(prefs);
+    expect(reopened.icons.single.name, 'After');
+    expect(reopened.icons.single.png, iconPng());
+    reopened.deleteIcon(reopened.place.id, 'icon');
+    expect(
+      () => reopened.renameIcon(reopened.place.id, 'icon', 'Revive'),
+      throwsStateError,
+    );
+    expect(reopened.icons.single.deleted, isTrue);
+  });
   test('Firestore adapter updates stable taxonomy IDs and streams self-contained icon data', () async {
     final firestore = FakeFirebaseFirestore();
     final repository = FirestoreOrchardRepository(firestore, prefs);
@@ -288,6 +330,10 @@ void main() {
     final icon = MapIcon(id: 'icon', name: 'Pear', png: iconPng());
     repository.saveIcon(place.id, icon);
     expect((await repository.watchIcons(place.id).first).single.png, iconPng());
+    repository.renameIcon(place.id, icon.id, '  Renamed  ');
+    final renamed = (await repository.watchIcons(place.id).first).single;
+    expect(renamed.name, 'Renamed');
+    expect(renamed.png, iconPng());
     repository.deleteIcon(place.id, icon.id);
     final deleted = (await repository.watchIcons(place.id).first).single;
     expect(deleted.deleted, isTrue);

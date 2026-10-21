@@ -35,7 +35,7 @@ class SyncStatus extends ConsumerWidget {
       ref.watch(trialModeProvider)
           ? (snapshot.hasPendingWrites
                 ? 'Saving on this phone…'
-                : 'Saved on this phone · Trial data')
+                : 'Saved on this phone')
           : snapshot.hasPendingWrites
           ? 'Saved locally · Pending sync'
           : snapshot.isFromCache

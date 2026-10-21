@@ -21,7 +21,7 @@ def validate_identity(report, badging, expected_digest, version_name, version_co
         raise ValueError('Cannot read APK package identity. APK publication refused.')
     package, code, name = match.groups()
     if (package, code, name) != (PACKAGE, str(version_code), version_name):
-        raise ValueError('Actual APK package/version does not match the requested trial build. APK publication refused.')
+        raise ValueError('Actual APK package/version does not match the requested app build. APK publication refused.')
     return {'package': package, 'versionCode': int(code), 'versionName': name,
             'certificateSha256': digests[0].lower()}
 
@@ -56,14 +56,15 @@ def main():
     identity['certificateSha1'] = sha1.group(1).lower()
     identity['apkSha256'] = hashlib.sha256(args.apk.read_bytes()).hexdigest()
     args.output.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(args.apk, args.output / 'OrchardAtlas-trial.apk')
+    apk_name = f"OrchardAtlas-{identity['versionName']}.apk"
+    shutil.copyfile(args.apk, args.output / apk_name)
     (args.output / 'VERSION.txt').write_text(f"Version {identity['versionName']} ({identity['versionCode']})\n")
     def colon_hex(value):
         return ':'.join(value[i:i+2].upper() for i in range(0, len(value), 2))
     (args.output / 'SIGNING_CERTIFICATE.txt').write_text(
         'Verified from the actual APK:\nSHA1: ' + colon_hex(identity['certificateSha1']) +
         '\nSHA256: ' + colon_hex(identity['certificateSha256']) + '\n')
-    (args.output / 'SHA256SUMS.txt').write_text(identity['apkSha256'] + '  OrchardAtlas-trial.apk\n')
+    (args.output / 'SHA256SUMS.txt').write_text(identity['apkSha256'] + '  ' + apk_name + '\n')
     (args.output / 'APK_IDENTITY.json').write_text(json.dumps(identity, indent=2) + '\n')
     (args.output / 'UPDATING.txt').write_text(
         'Keep the installed app until its orchard data is safely backed up.\n'

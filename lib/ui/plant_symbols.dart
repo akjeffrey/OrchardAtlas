@@ -53,3 +53,30 @@ final markerSymbolsProvider =
       }
       return result;
     });
+
+final rowEndpointSymbolsProvider = FutureProvider<Map<bool, BitmapDescriptor>>((
+  ref,
+) async {
+  final result = <bool, BitmapDescriptor>{};
+  for (final start in [true, false]) {
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawCircle(const Offset(16, 16), 15, Paint()..color = Colors.white);
+    canvas.drawCircle(
+      const Offset(16, 16),
+      11,
+      Paint()..color = start ? Colors.green.shade800 : Colors.red.shade800,
+    );
+    final picture = recorder.endRecording();
+    final image = await picture.toImage(32, 32);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    result[start] = BitmapDescriptor.bytes(
+      bytes!.buffer.asUint8List(),
+      width: 10,
+      height: 10,
+    );
+    image.dispose();
+    picture.dispose();
+  }
+  return result;
+});
