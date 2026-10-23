@@ -25,6 +25,9 @@ import 'package:orchard_atlas/ui/app_version_banner.dart';
 import 'support/recording_map_platform.dart';
 import 'support/icon_fixture.dart';
 
+void workflowTest(String name, Future<void> Function(WidgetTester) body) =>
+    testWidgets(name, body, timeout: const Timeout(Duration(seconds: 30)));
+
 void main() {
   Future<LocalTrialRepository> repository() async {
     SharedPreferences.setMockInitialValues({});
@@ -63,7 +66,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets(
+  workflowTest(
     'seasonal planting uses cascading selectors and can create a custom variety without losing its season or notes',
     (tester) async {
       final repo = await repository();
@@ -129,7 +132,7 @@ void main() {
     },
   );
   for (final depth in [1, 2, 3]) {
-    testWidgets(
+    workflowTest(
       'task target permits depth $depth without requiring further classification',
       (tester) async {
         final repo = await repository();
@@ -191,7 +194,7 @@ void main() {
       },
     );
   }
-  testWidgets(
+  workflowTest(
     'management conversion confirms season, can cancel and converts both record types back',
     (tester) async {
       final repo = await repository();
@@ -259,7 +262,7 @@ void main() {
       expect(repo.crops.single.lifeCycle, PlantLifeCycle.perennial);
     },
   );
-  testWidgets(
+  workflowTest(
     'plant list resolves inherited custom map icons for plants and seasonal records, including deletion fallback',
     (tester) async {
       final repo = await repository();
@@ -313,7 +316,7 @@ void main() {
       expect(find.text('?'), findsNWidgets(2));
     },
   );
-  testWidgets(
+  workflowTest(
     'Show on Map centers and names a grouped plant and Back restores unsaved edit fields',
     (tester) async {
       final previous = GoogleMapsFlutterPlatform.instance;
@@ -406,7 +409,7 @@ void main() {
       await tester.pumpAndSettle();
     },
   );
-  testWidgets(
+  workflowTest(
     'Version History shows installed version plus four prior feature updates',
     (tester) async {
       await tester.pumpWidget(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fake_cloud_firestore/fake_cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +14,9 @@ import 'package:orchard_atlas/domain/landscape.dart';
 import 'package:orchard_atlas/domain/plant_listing.dart';
 import 'package:orchard_atlas/domain/taxonomy.dart';
 import 'package:orchard_atlas/domain/work.dart';
+
+void managementTest(String name, FutureOr<void> Function() body) =>
+    test(name, body, timeout: const Timeout(Duration(seconds: 30)));
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -61,7 +66,7 @@ void main() {
     );
     repo.saveCrop(crop);
   });
-  test('annual/perennial management changes retain record IDs, all history, metadata and task targets through restore', () async {
+  managementTest('annual/perennial management changes retain record IDs, all history, metadata and task targets through restore', () async {
     final task = OrchardTask(
       id: 'task',
       propertyId: repo.place.id,
@@ -128,7 +133,7 @@ void main() {
     expect(restarted.tasks, hasLength(2));
     expect(restarted.events.single.id, originalEvent.id);
   });
-  test('ended seasons can change management without reopening or rewriting their history', () async {
+  managementTest('ended seasons can change management without reopening or rewriting their history', () async {
     repo.saveCrop(crop.finish(CropStatus.ended));
     final ended = repo.crops.single;
     repo.saveCrop(ended.withLifeCycle(PlantLifeCycle.perennial));
@@ -146,7 +151,7 @@ void main() {
     );
     expect(() => repo.saveCrop(crop), throwsArgumentError);
   });
-  test('native mappings keep lifecycle defaults backward compatible and preserve both conversion directions', () async {
+  managementTest('native mappings keep lifecycle defaults backward compatible and preserve both conversion directions', () async {
     final legacyPlant = FirestoreMapping.plantToMap(plant)
       ..remove('lifeCycle')
       ..remove('season');
@@ -179,7 +184,7 @@ void main() {
       PlantLifeCycle.perennial,
     );
   });
-  test('group/type matching includes perennial and seasonal plants, late arrivals and separate completion IDs', () {
+  managementTest('group/type matching includes perennial and seasonal plants, late arrivals and separate completion IDs', () {
     final group = starterTaxonomy.ancestry(apple.id).first;
     for (final taxonId in [group.id, apple.id, gala.id]) {
       final plan = TaskPlan(
