@@ -74,6 +74,10 @@ class FirestoreMapping {
       id: id,
       propertyId: propertyId,
       sectionId: d['sectionId'] as String?,
+      lifeCycle: PlantLifeCycle.values.byName(
+        d['lifeCycle'] as String? ?? 'perennial',
+      ),
+      season: d['season'] as String?,
       rowOrder: (d['rowOrder'] as num?)?.toDouble(),
       plantedOn: d['plantedOn'] as String?,
       rootstock: d['rootstock'] as String? ?? '',
@@ -91,6 +95,8 @@ class FirestoreMapping {
   static Map<String, dynamic> plantMetadataToMap(ManagedPlant p) => {
     if (p.sectionId != null) 'sectionId': p.sectionId,
     'plantedOn': p.plantedOn,
+    'lifeCycle': p.lifeCycle.name,
+    'season': p.season,
     'rowOrder': p.rowOrder,
     'rootstock': p.rootstock,
     'nursery': p.nursery,
@@ -103,6 +109,8 @@ class FirestoreMapping {
     'taxonId': p.taxonId,
     'location': GeoPoint(p.location.latitude, p.location.longitude),
     'plantedOn': p.plantedOn,
+    'lifeCycle': p.lifeCycle.name,
+    'season': p.season,
     'accuracyMeters': p.accuracyMeters,
     'rowOrder': p.rowOrder,
     'sectionId': p.sectionId,

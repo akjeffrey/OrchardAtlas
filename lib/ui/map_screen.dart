@@ -14,13 +14,16 @@ import 'common.dart';
 import 'location_search.dart';
 import 'orchard_map.dart';
 import 'plant_filters.dart';
-import 'plant_symbols.dart';
+import 'plants_list.dart';
+import 'plantings_screen.dart';
+import 'version_history_screen.dart';
 import 'sections_screen.dart';
 import 'tasks_screen.dart';
 import 'orchard_picker.dart';
 
 class OrchardHome extends ConsumerWidget {
-  const OrchardHome({super.key, this.focus});
+  const OrchardHome({super.key, this.focus, this.focusPlantId});
+  final String? focusPlantId;
   final Coordinates? focus;
   @override
   Widget build(BuildContext context, WidgetRef ref) => ref
@@ -34,9 +37,14 @@ class OrchardHome extends ConsumerWidget {
               data: (view) => MapScreen(
                 key: ValueKey(place.id),
                 focus: focus,
+                focusPlantId: focusPlantId,
                 initialView: view,
               ),
-              error: (_, _) => MapScreen(key: ValueKey(place.id), focus: focus),
+              error: (_, _) => MapScreen(
+                key: ValueKey(place.id),
+                focus: focus,
+                focusPlantId: focusPlantId,
+              ),
               loading: () => const Scaffold(
                 body: Center(child: CircularProgressIndicator()),
               ),
@@ -50,7 +58,8 @@ class OrchardHome extends ConsumerWidget {
 }
 
 class MapScreen extends ConsumerStatefulWidget {
-  const MapScreen({super.key, this.focus, this.initialView});
+  const MapScreen({super.key, this.focus, this.initialView, this.focusPlantId});
+  final String? focusPlantId;
   final OrchardMapView? initialView;
   final Coordinates? focus;
   @override
@@ -75,7 +84,7 @@ class _MapState extends ConsumerState<MapScreen>
     final view = widget.initialView;
     if (view != null) {
       fullScreen = view.fullScreen;
-      if (widget.focus == null) {
+      if (widget.focus == null && widget.focusPlantId == null) {
         cameraCenter = view.center;
         cameraPosition = CameraPosition(
           target: LatLng(view.center.latitude, view.center.longitude),
@@ -91,8 +100,9 @@ class _MapState extends ConsumerState<MapScreen>
         if (mounted) setState(() {});
       });
     if (widget.focus != null) {
-      locationMessage =
-          'Plant saved locally. Tap its marker to open Plant Detail.';
+      locationMessage = widget.focusPlantId == null
+          ? 'Plant saved locally. Tap its marker to open Plant Detail.'
+          : 'Showing saved plant location. Use Back to return to the editor.';
     }
   }
 
@@ -107,8 +117,9 @@ class _MapState extends ConsumerState<MapScreen>
     super.didUpdateWidget(oldWidget);
     if (widget.focus != null && widget.focus != oldWidget.focus) {
       selected = null;
-      locationMessage =
-          'Plant saved locally. Tap its marker to open Plant Detail.';
+      locationMessage = widget.focusPlantId == null
+          ? 'Plant saved locally. Tap its marker to open Plant Detail.'
+          : 'Showing saved plant location. Use Back to return to the editor.';
       moveTo(widget.focus!);
     }
   }
@@ -460,6 +471,20 @@ class _MapState extends ConsumerState<MapScreen>
                   if (v == 'app-settings') context.push('/settings');
                   if (v == 'archived') context.push('/archived');
                   if (v == 'classifications') context.push('/classifications');
+                  if (v == 'plantings') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PlantingsScreen(),
+                      ),
+                    );
+                  }
+                  if (v == 'versions') {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const VersionHistoryScreen(),
+                      ),
+                    );
+                  }
                   if (v == 'logout') signOut();
                   if (v == 'backup') context.push('/backup');
                 },
@@ -532,6 +557,14 @@ class _MapState extends ConsumerState<MapScreen>
                       cameraCenter ??
                       selected ??
                       widget.focus ??
+                      snapshot.value
+                          .where(
+                            (p) =>
+                                p.id == widget.focusPlantId &&
+                                p.status == ItemStatus.active,
+                          )
+                          .firstOrNull
+                          ?.location ??
                       items.firstOrNull?.location ??
                       sections.firstOrNull?.vertices.first;
                   final initialCamera =
@@ -551,7 +584,7 @@ class _MapState extends ConsumerState<MapScreen>
                         SyncStatus(snapshot),
                         const PlantFilterBar(),
                         Text(
-                          '${items.length} of ${snapshot.value.length} plants · ${ref.watch(plantFilterProvider).status?.name ?? "all statuses"}',
+                          '${tabs.index == 1 ? 'Plant list' : '${items.length} of ${snapshot.value.length} plants'} · ${ref.watch(plantFilterProvider).status?.name ?? "all statuses"}',
                         ),
                       ],
                       if (locationMessage != null)
@@ -642,7 +675,20 @@ class _MapState extends ConsumerState<MapScreen>
                                           contained.contains(p.sectionId),
                                     );
                                   }).toList(),
-                            plants: items,
+                            plants: [
+                              ...items,
+                              if (!items.any(
+                                (p) => p.id == widget.focusPlantId,
+                              ))
+                                ...snapshot.value.where(
+                                  (p) =>
+                                      p.id == widget.focusPlantId &&
+                                      p.status == ItemStatus.active,
+                                ),
+                            ],
+                            focusPlantId: drawing == null
+                                ? widget.focusPlantId
+                                : null,
                             selected: selected,
                             draft: List.of(draft),
                             draftKind: drawing ?? SectionKind.row,
@@ -693,36 +739,7 @@ class _MapState extends ConsumerState<MapScreen>
                           ),
                         ),
                       ] else
-                        Expanded(
-                          child: items.isEmpty
-                              ? const Center(
-                                  child: Text(
-                                    'No plants match. Add a plant or reset filters.',
-                                  ),
-                                )
-                              : ListView.builder(
-                                  padding: const EdgeInsets.only(bottom: 90),
-                                  itemCount: items.length,
-                                  itemBuilder: (context, i) => ListTile(
-                                    leading: Text(
-                                      symbolLabels[taxonomy.taxa
-                                              .where(
-                                                (t) => t.id == items[i].taxonId,
-                                              )
-                                              .firstOrNull
-                                              ?.symbol ??
-                                          PlantSymbol.tree]!,
-                                      style: const TextStyle(fontSize: 28),
-                                    ),
-                                    title: Text(items[i].name),
-                                    subtitle: Text(
-                                      '${items[i].location.latitude.toStringAsFixed(6)}, ${items[i].location.longitude.toStringAsFixed(6)}',
-                                    ),
-                                    onTap: () =>
-                                        context.push('/plants/${items[i].id}'),
-                                  ),
-                                ),
-                        ),
+                        Expanded(child: const PlantsList()),
                     ],
                   );
                 },

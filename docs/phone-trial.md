@@ -206,3 +206,18 @@ Rows show green start and red finish dots with a white outline, centered on the 
 The launcher name is **OrchardAtlas**. A shared banner shows the installed version on app screens. GitHub's **Android app** workflow publishes **OrchardAtlas-0.<build>.0.zip**, containing **OrchardAtlas-0.<build>.0.apk**, checksums and verified signing metadata. The legacy internal `.trial` package suffix, local storage keys and signing secret names remain unchanged deliberately so existing installations can update without losing data.
 
 Device checks: create a new Group → Type → Variety while editing a plant, cancel another option and verify unsaved details remain; save and reopen the plant; rename an assigned icon, restart and restore its backup; zoom the map out and in and tap both row dots; confirm the version banner matches the ZIP/APK version.
+
+
+## Seasonal selectors, management conversion and Show on Map
+
+Seasonal planting uses the same Group → Type → Variety dropdowns and custom-option dialog as Add/Edit Plant. A Group or Type alone cannot be saved as a new planting; select a Variety. Automatically suggested labels follow choices until customized. Season, date, section and notes remain intact while selecting classifications.
+
+Plant Detail and Planting Detail offer **Convert to annual/perennial**. Conversion is per planting, preserving its record, location/section, status, dates, history, harvests and task links. Converting an individual plant to annual management asks for a season/year. Annual plants can edit that season, and Add Another Like This retains its management and season. Existing seasonal records retain their recorded season when converted to perennial management; historical completed/ended state is preserved. Conversion does not reopen an ended season. Use Orchard options → **Annual & perennial plantings** to browse both management categories, including completed records. The Plants tab includes both kinds and resolves their icons using the same inheritance/custom image/question-mark rules as the map.
+
+Task Target defaults to **Whole orchard**. Pick a Group, then optionally Type and Variety. Group-only and Type-only choices match all descendants and materialize one checklist entry per matching active plant or growing seasonal planting. Later matches join automatically, including when no plants currently match. Clearing Type retains the Group; clearing Variety retains the Type. Existing direct plant, section, seasonal and recurring task workflows remain available.
+
+**Edit Plant → Show on Map** opens a map centered on the saved location with its name selected, without saving the editor. Back returns to the same draft, including invalid unsaved coordinate text. A focused plant assigned to an Area/Row is temporarily revealed on the map; tapping the background clears it without revealing other contained plants. Archived plants must be restored first.
+
+**Version History**, available in Settings and Orchard options, shows the installed build's feature notes plus the four previous delivered feature updates. Update `lib/domain/release_history.dart` on every future feature release, retaining four prior entries and replacing the current notes. The current version label comes from the installed app; rebuilds with identical features use the same current notes.
+
+Device checks: add a seasonal custom Variety and verify dates/notes; convert both kinds of planting in both directions and restore their backup; confirm completed seasons remain historical; create Group-only, Type-only and Variety task scopes and add later matches; compare list/map inherited custom icons and delete one; Show on Map from an edited grouped plant and Back to its draft; open the five-update Version History.

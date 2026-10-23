@@ -137,6 +137,15 @@ List<OrchardTask> expandPlans({
       )) {
         targets.add((plant: p.id, section: null, crop: null));
       }
+      for (final c in crops.where(
+        (c) =>
+            c.propertyId == plan.propertyId &&
+            c.status == CropStatus.growing &&
+            (taxa == null || taxa.contains(c.taxonId)) &&
+            (scope == null || scope.contains(c.sectionId)),
+      )) {
+        targets.add((plant: null, section: null, crop: c.id));
+      }
     } else if (plan.target == 'sections') {
       for (final s in sections.where(
         (s) =>
@@ -182,9 +191,17 @@ List<OrchardTask> expandPlans({
             )) {
           continue;
         }
+        final targetKey =
+            target.plant ??
+            target.section ??
+            (target.crop == null
+                ? 'property'
+                : plan.target == 'plants'
+                ? 'crop:${target.crop}'
+                : target.crop!);
         final id = const Uuid().v5(
           Namespace.url.value,
-          '${plan.id}/$date/${target.plant ?? target.section ?? target.crop ?? 'property'}',
+          '${plan.id}/$date/$targetKey',
         );
         if (!known.add(id)) continue;
         result.add(

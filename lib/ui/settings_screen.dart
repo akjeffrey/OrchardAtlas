@@ -6,6 +6,7 @@ import '../domain/models.dart';
 import '../domain/taxonomy.dart';
 import 'icon_library_screen.dart';
 import 'icon_picker.dart';
+import 'version_history_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -14,6 +15,13 @@ class SettingsScreen extends StatelessWidget {
     appBar: AppBar(title: const Text('Settings')),
     body: ListView(
       children: [
+        ListTile(
+          leading: const Icon(Icons.history),
+          title: const Text('Version History'),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const VersionHistoryScreen()),
+          ),
+        ),
         ListTile(
           leading: const Icon(Icons.category_outlined),
           title: const Text('Group, Type & Variety options'),

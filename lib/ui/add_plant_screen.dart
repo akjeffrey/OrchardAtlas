@@ -30,6 +30,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
   final name = TextEditingController();
   final rootstock = TextEditingController();
   final nursery = TextEditingController();
+  final season = TextEditingController();
   final notes = TextEditingController();
   double? accuracyMeters;
   String? sectionId;
@@ -77,6 +78,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
         : parseCalendarDate(template.plantedOn!);
     sectionId = template.sectionId;
     rootstock.text = template.rootstock;
+    season.text = template.season ?? '${DateTime.now().year}';
     nursery.text = template.nursery;
     customName = template.name != path.last.name;
     for (var i = 0; i < path.length; i++) {
@@ -135,6 +137,7 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
     name.dispose();
     rootstock.dispose();
     nursery.dispose();
+    season.dispose();
     notes.dispose();
     latitude.dispose();
     longitude.dispose();
@@ -244,6 +247,10 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
             plantingDate: plantingDate,
             sectionId: sectionId,
             rootstock: rootstock.text,
+            lifeCycle: widget.template?.lifeCycle ?? PlantLifeCycle.perennial,
+            season: widget.template?.lifeCycle == PlantLifeCycle.annual
+                ? season.text.trim()
+                : widget.template?.season,
             nursery: nursery.text,
             notes: notes.text,
             accuracyMeters: accuracyMeters,
@@ -413,6 +420,12 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
                   ),
           ),
           SectionPicker(value: sectionId, onChanged: (id) => useSection(id)),
+          if (widget.template?.lifeCycle == PlantLifeCycle.annual)
+            TextField(
+              controller: season,
+              maxLength: 500,
+              decoration: const InputDecoration(labelText: 'Season / year'),
+            ),
           TextField(
             controller: rootstock,
             maxLength: 500,

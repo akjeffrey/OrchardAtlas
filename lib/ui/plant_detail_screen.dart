@@ -7,6 +7,7 @@ import '../domain/models.dart';
 import 'common.dart';
 import 'events_table.dart';
 import 'delete_actions.dart';
+import 'life_cycle_button.dart';
 
 class PlantDetailScreen extends ConsumerStatefulWidget {
   const PlantDetailScreen(this.id, {super.key});
@@ -56,6 +57,10 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
               ),
               Text(path),
               Text('Status: ${plant.status.name}'),
+              Text(
+                'Management: ${plant.lifeCycle.name}${plant.season == null ? '' : ' · ${plant.season}'}',
+              ),
+              LifeCycleButton(plant: plant),
               if (plant.sectionId != null)
                 TextButton(
                   onPressed: () => context.push('/sections/${plant.sectionId}'),

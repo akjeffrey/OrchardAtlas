@@ -9,6 +9,8 @@ import '../domain/landscape.dart';
 import 'common.dart';
 import 'sections_screen.dart';
 import 'tasks_screen.dart';
+import 'classification_picker.dart';
+import 'life_cycle_button.dart';
 
 class CropFormScreen extends ConsumerStatefulWidget {
   const CropFormScreen({super.key, this.section, this.source});
@@ -24,13 +26,14 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
       notes = TextEditingController();
   String? sectionId, taxonId, error;
   DateTime? date = DateTime.now();
-  bool busy = false;
+  bool busy = false, customLabel = false;
   @override
   void initState() {
     super.initState();
     sectionId = widget.section?.id ?? widget.source?.sectionId;
     taxonId = widget.source?.taxonId;
     label.text = widget.source?.label ?? '';
+    customLabel = widget.source != null;
   }
 
   @override
@@ -41,73 +44,13 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
     super.dispose();
   }
 
-  Future<void> variety() async {
-    if (taxonId == null) return;
-    final taxonomy = ref.read(taxonomyProvider);
-    final type = taxonomy
-        .ancestry(taxonId!)
-        .firstWhere((t) => t.rank == TaxonRank.genus);
-    var name = '';
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Add ${type.name} variety'),
-        content: TextField(
-          autofocus: true,
-          maxLength: 500,
-          decoration: const InputDecoration(labelText: 'Variety name'),
-          onChanged: (v) => name = v,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, name),
-            child: const Text('Add variety'),
-          ),
-        ],
-      ),
-    );
-    if (result == null || !mounted) return;
-    try {
-      final value = requiredText(result, 'Variety');
-      if (taxonomy.taxa
-          .where((t) => taxonomy.descendants(type.id).contains(t.id))
-          .any((t) => t.name.toLowerCase() == value.toLowerCase())) {
-        throw ArgumentError('Variety already exists');
-      }
-      final place = await ref.read(placeProvider.future);
-      if (!mounted) return;
-      final taxon = Taxon(
-        id: const Uuid().v4(),
-        name: value,
-        rank: TaxonRank.species,
-        parentId: type.id,
-        symbol: taxonomy.iconFor(type.id).symbol,
-        customIconId: taxonomy.iconFor(type.id).customIconId,
-        iconOverride: false,
-      );
-      ref.read(orchardRepositoryProvider).saveTaxon(place.id, taxon);
-      ref.read(submittedTaxaProvider.notifier).state = {
-        ...ref.read(submittedTaxaProvider),
-        taxon.id: taxon,
-      };
-      setState(() {
-        taxonId = taxon.id;
-        label.text = value;
-      });
-    } catch (e) {
-      if (mounted) setState(() => error = '$e');
-    }
-  }
-
   Future<void> save() async {
     if (busy) return;
     setState(() => busy = true);
     try {
-      if (sectionId == null || taxonId == null) {
+      if (sectionId == null ||
+          taxonId == null ||
+          !ref.read(taxonomyProvider).isPlantIdentity(taxonId!)) {
         throw ArgumentError('Select a section and crop classification');
       }
       final place = await ref.read(placeProvider.future);
@@ -136,10 +79,6 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final taxonomy = ref.watch(taxonomyProvider);
-    final identities = taxonomy.taxa
-        .where((t) => t.rank.index >= TaxonRank.species.index)
-        .toList();
     return Scaffold(
       appBar: AppBar(
         title: Text(
@@ -159,34 +98,18 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
             value: sectionId,
             onChanged: (id) => setState(() => sectionId = id),
           ),
-          DropdownButtonFormField<String>(
-            key: ValueKey('crop-taxon-$taxonId-${identities.length}'),
-            initialValue: identities.any((t) => t.id == taxonId)
-                ? taxonId
-                : null,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Crop Variety'),
-            items: [
-              for (final t in identities)
-                DropdownMenuItem(
-                  value: t.id,
-                  child: Text(
-                    taxonomy.ancestry(t.id).map((p) => p.name).join(' › '),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-            ],
+          ClassificationPicker(
+            value: taxonId,
             onChanged: (id) => setState(() {
               taxonId = id;
-              if (label.text.isEmpty) label.text = taxonomy.byId(id!).name;
+              if ((!customLabel || label.text.trim().isEmpty) && id != null) {
+                label.text = ref.read(taxonomyProvider).byId(id).name;
+              }
             }),
-          ),
-          TextButton(
-            onPressed: taxonId == null || busy ? null : variety,
-            child: const Text('Add a new variety'),
           ),
           TextField(
             controller: label,
+            onChanged: (value) => customLabel = value.trim().isNotEmpty,
             maxLength: 500,
             decoration: const InputDecoration(
               labelText: 'Planting / row segment label',
@@ -304,7 +227,7 @@ class CropDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Seasonal planting')),
+    appBar: AppBar(title: const Text('Planting Detail')),
     body: ref
         .watch(cropsProvider)
         .when(
@@ -341,6 +264,8 @@ class CropDetailScreen extends ConsumerWidget {
                 if (c.harvestedOn != null)
                   Text('Harvest complete: ${c.harvestedOn}'),
                 Text(c.notes),
+                Text('Management: ${c.lifeCycle.name}'),
+                LifeCycleButton(crop: c),
                 SyncStatus(snapshot),
                 Wrap(
                   spacing: 8,

@@ -132,3 +132,14 @@ backend with these fields; local trial APKs do not require a Firebase deployment
 ### Deleted custom icons
 
 Icon deletion is an owner-only, irreversible update to `{schemaVersion: 1, name: 'Deleted icon', png: '', deleted: true}`. It removes image bytes while retaining the UUID for existing and delayed offline references; physical document deletion and tombstone resurrection are denied. Readers accept legacy image records without `deleted`. Library/picker choices exclude tombstones, but assignments continue to resolve to an explicit **question mark**, including inherited taxon icons and optional Area/Row icons. Tombstones persist in local snapshots and backups and do not count toward the 128 active-image limit. Plant data and history are untouched. `unknown` is the built-in question-mark symbol; normal icon size tiers also apply to it.
+
+
+### Annual and perennial management
+
+Tracked items accept `lifeCycle: perennial|annual` (legacy default `perennial`) and nullable `season` (1–500 characters when set; required for annual management). These are editable metadata and are included in local snapshots and backups. Crop plantings accept `lifeCycle` with legacy default `annual`; their existing season remains immutable historical metadata.
+
+Conversions update these attributes in place. A tracked item stays in `items/{id}` and a seasonal planting stays in `crops/{id}`, even when its management changes. No plant, event, photo, harvest, task, date or geometry is moved/copied/deleted. A crop's lifecycle may change even after its season ended, while status, season and harvest completion dates remain unchanged. Ending/harvesting a growing crop still uses the original status transition restrictions; conversions cannot reopen it. Rules and local validation enforce these distinctions.
+
+The combined plant list projects both record types through the same taxonomy icon resolver and management filters. A crop's displayed location comes from its existing Area/Row. Missing cached section geometry produces an explicit incomplete-data state rather than an invented coordinate. Annual/perennial conversion does not reclassify other plants sharing its taxonomy.
+
+Matching plant task plans now include matching growing seasonal records as well as active tracked plants, preserving `itemId` versus `cropId` links. Newly included crop members of a `plants` plan have a crop namespace in their deterministic membership key, avoiding collisions with tracked plants. Existing tracked-plant and crop-plan task IDs remain unchanged. Seasonal history retains its crop harvest model; tracked-plant activities retain their event model.

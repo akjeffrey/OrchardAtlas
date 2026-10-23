@@ -9,6 +9,7 @@ import '../domain/landscape.dart';
 import '../domain/filters.dart';
 import '../domain/work.dart';
 import 'common.dart';
+import 'classification_picker.dart';
 import 'sections_screen.dart';
 
 class TaskTarget {
@@ -677,16 +678,27 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => ErrorPanel(e),
         data: (snapshot) {
-          final count = snapshot.value
-              .where(
-                (p) =>
-                    p.status == ItemStatus.active &&
-                    (taxonIds == null || taxonIds.contains(p.taxonId)) &&
-                    (sectionIds == null || sectionIds.contains(p.sectionId)),
-              )
-              .length;
+          final count =
+              crops
+                  .where(
+                    (c) =>
+                        c.status == CropStatus.growing &&
+                        (taxonIds == null || taxonIds.contains(c.taxonId)) &&
+                        (sectionIds == null ||
+                            sectionIds.contains(c.sectionId)),
+                  )
+                  .length +
+              snapshot.value
+                  .where(
+                    (p) =>
+                        p.status == ItemStatus.active &&
+                        (taxonIds == null || taxonIds.contains(p.taxonId)) &&
+                        (sectionIds == null ||
+                            sectionIds.contains(p.sectionId)),
+                  )
+                  .length;
           final choices = <String, String>{
-            '': 'Whole property',
+            '': 'Whole orchard',
             '__group__': 'Group: all matching plants',
             '__sections__': 'Group: areas / rows',
             '__crops__': 'Group: seasonal crops',
@@ -720,8 +732,27 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                 ],
                 onChanged: busy
                     ? null
-                    : (value) => setState(() => target = value!),
+                    : (value) => setState(() {
+                        target = value!;
+                        scopeTaxon = '';
+                        scopeSection = '';
+                      }),
               ),
+              if (target == '' ||
+                  target == '__group__' ||
+                  target == '__crops__')
+                ClassificationPicker(
+                  value: scopeTaxon.isEmpty ? null : scopeTaxon,
+                  allowAny: true,
+                  allowCreate: false,
+                  onChanged: (id) => setState(() {
+                    scopeTaxon = id ?? '';
+                    if (target != '__crops__') {
+                      target = id == null ? '' : '__group__';
+                      if (id == null) scopeSection = '';
+                    }
+                  }),
+                ),
               if (target.startsWith('__')) ...[
                 if (target == '__sections__')
                   DropdownButtonFormField<SectionKind>(
@@ -734,32 +765,6 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                         DropdownMenuItem(value: k, child: Text(k.name)),
                     ],
                     onChanged: (k) => setState(() => scopeKind = k!),
-                  ),
-                if (target != '__sections__')
-                  DropdownButtonFormField<String>(
-                    initialValue: scopeTaxon,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'All plants classified as',
-                    ),
-                    items: [
-                      const DropdownMenuItem(
-                        value: '',
-                        child: Text('All classifications'),
-                      ),
-                      for (final t in taxonomy.taxa)
-                        DropdownMenuItem(
-                          value: t.id,
-                          child: Text(
-                            taxonomy
-                                .ancestry(t.id)
-                                .map((a) => a.name)
-                                .join(' › '),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                    ],
-                    onChanged: (id) => setState(() => scopeTaxon = id!),
                   ),
                 SectionPicker(
                   value: scopeSection.isEmpty ? null : scopeSection,

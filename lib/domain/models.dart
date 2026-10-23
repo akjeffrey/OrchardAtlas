@@ -14,6 +14,8 @@ enum PlantSymbol {
 
 enum ItemStatus { active, archived }
 
+enum PlantLifeCycle { perennial, annual }
+
 enum TaskStatus { open, completed, cancelled, skipped }
 
 enum ItemKind { managedPlant, foragingResource }
@@ -134,6 +136,8 @@ class ManagedPlant extends TrackedItem {
     this.plantedOn,
     this.sectionId,
     this.rowOrder,
+    this.lifeCycle = PlantLifeCycle.perennial,
+    this.season,
     String rootstock = '',
     String nursery = '',
     String notes = '',
@@ -142,6 +146,10 @@ class ManagedPlant extends TrackedItem {
   }) : rootstock = optionalText(rootstock, 500),
        nursery = optionalText(nursery, 500),
        notes = optionalText(notes, 10000) {
+    if (season != null) requiredText(season!, 'Season');
+    if (lifeCycle == PlantLifeCycle.annual && season == null) {
+      throw ArgumentError('Annual plants require a season');
+    }
     if (rowOrder != null && (!rowOrder!.isFinite || rowOrder! < 0)) {
       throw ArgumentError('Invalid row order');
     }
@@ -153,6 +161,8 @@ class ManagedPlant extends TrackedItem {
       throw ArgumentError('Invalid GPS accuracy');
     }
   }
+  final PlantLifeCycle lifeCycle;
+  final String? season;
   final double? rowOrder;
   final String? plantedOn;
   final String? sectionId;
@@ -165,6 +175,8 @@ class ManagedPlant extends TrackedItem {
     name: name,
     taxonId: taxonId,
     location: location,
+    lifeCycle: lifeCycle,
+    season: season,
     plantedOn: plantedOn,
     sectionId: sectionId,
     rootstock: rootstock,
@@ -185,6 +197,8 @@ class ManagedPlant extends TrackedItem {
       name: name,
       taxonId: taxonId,
       location: location,
+      lifeCycle: lifeCycle,
+      season: season,
       rootstock: rootstock,
       nursery: nursery,
       sectionId: sectionId,
@@ -209,10 +223,14 @@ class ManagedPlant extends TrackedItem {
     bool clearRowOrder = false,
     double? accuracyMeters,
     bool clearAccuracy = false,
+    PlantLifeCycle? lifeCycle,
+    String? season,
   }) => ManagedPlant(
     id: id,
     propertyId: propertyId,
     name: name ?? this.name,
+    lifeCycle: lifeCycle ?? this.lifeCycle,
+    season: season ?? this.season,
     taxonId: taxonId ?? this.taxonId,
     location: location ?? this.location,
     createdAt: createdAt,
@@ -250,12 +268,14 @@ class ForagingResource extends TrackedItem {
   ItemKind get kind => ItemKind.foragingResource;
 }
 
-// A bulk-entry template deliberately contains no identity, location or history.
+// A bulk-entry template carries defaults and a starting point, never identity or history.
 class PlantTemplate {
   const PlantTemplate({
     required this.name,
     required this.taxonId,
     this.location,
+    this.lifeCycle = PlantLifeCycle.perennial,
+    this.season,
     this.plantedOn,
     this.sectionId,
     this.rootstock = '',
@@ -263,6 +283,8 @@ class PlantTemplate {
   });
   final String name;
   final String taxonId;
+  final PlantLifeCycle lifeCycle;
+  final String? season;
   final String? plantedOn, sectionId;
   final Coordinates? location;
   final String rootstock, nursery;

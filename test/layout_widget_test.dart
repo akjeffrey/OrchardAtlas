@@ -116,14 +116,18 @@ void main() {
       find.widgetWithText(TextField, 'Task title'),
       'Prune apples',
     );
-    await tester.tap(find.text('Whole property').first);
+    await tester.tap(find.text('Whole orchard').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Group: all matching plants').last);
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('All classifications'));
-    await tester.tap(find.text('All classifications'));
+    await tester.ensureVisible(find.text('All groups'));
+    await tester.tap(find.text('All groups'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Fruit trees › Apple (Malus)').last);
+    await tester.tap(find.text('Fruit trees').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('All types'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Apple (Malus)').last);
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.text('Create group checklist'),
@@ -304,7 +308,7 @@ void main() {
         find.widgetWithText(TextField, 'Task title'),
         'Harvest garlic',
       );
-      await tester.tap(find.text('Whole property').first);
+      await tester.tap(find.text('Whole orchard').first);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Group: areas / rows').last);
       await tester.pumpAndSettle();

@@ -154,6 +154,7 @@ class CropPlanting {
     this.plantedOn,
     this.harvestedOn,
     this.status = CropStatus.growing,
+    this.lifeCycle = PlantLifeCycle.annual,
     String notes = '',
   }) : label = requiredText(label, 'Crop label'),
        season = requiredText(season, 'Season'),
@@ -173,6 +174,21 @@ class CropPlanting {
   final String? plantedOn, harvestedOn;
   final DateTime createdAt;
   final CropStatus status;
+  final PlantLifeCycle lifeCycle;
+  CropPlanting withLifeCycle(PlantLifeCycle value) => CropPlanting(
+    id: id,
+    propertyId: propertyId,
+    sectionId: sectionId,
+    taxonId: taxonId,
+    label: label,
+    season: season,
+    createdAt: createdAt,
+    plantedOn: plantedOn,
+    harvestedOn: harvestedOn,
+    status: status,
+    notes: notes,
+    lifeCycle: value,
+  );
   CropPlanting finish(CropStatus status, {String? date}) {
     if (this.status == CropStatus.ended || status == CropStatus.growing) {
       throw ArgumentError('Start a new planting for a new season');
@@ -187,6 +203,7 @@ class CropPlanting {
       createdAt: createdAt,
       plantedOn: plantedOn,
       harvestedOn: date ?? harvestedOn,
+      lifeCycle: lifeCycle,
       status: status,
       notes: notes,
     );
