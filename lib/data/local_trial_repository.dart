@@ -100,6 +100,10 @@ class LocalTrialRepository
           sectionId: p['sectionId'] as String?,
           rowOrder: (p['rowOrder'] as num?)?.toDouble(),
           plantedOn: _readPlantedOn(p as Map, data),
+          lifeCycle: PlantLifeCycle.values.byName(
+            p['lifeCycle'] as String? ?? 'perennial',
+          ),
+          season: p['season'] as String?,
           rootstock: p['rootstock'] as String? ?? '',
           nursery: p['nursery'] as String? ?? '',
           notes: p['notes'] as String? ?? '',
@@ -810,9 +814,17 @@ class LocalTrialRepository
       final b = LandscapeMapping.crop(crop)
         ..remove('status')
         ..remove('harvestedOn');
+      final managementOnly =
+          old.lifeCycle != crop.lifeCycle &&
+          old.status == crop.status &&
+          old.harvestedOn == crop.harvestedOn;
+      a.remove('lifeCycle');
+      b.remove('lifeCycle');
       if (jsonEncode(a) != jsonEncode(b) ||
-          old.status == CropStatus.ended ||
-          crop.status == CropStatus.growing) {
+          (!managementOnly &&
+              (old.status == CropStatus.ended ||
+                  crop.status == CropStatus.growing ||
+                  old.lifeCycle != crop.lifeCycle))) {
         throw ArgumentError('Create a new planting to change a season');
       }
       crops[index] = crop;

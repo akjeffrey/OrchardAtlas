@@ -101,6 +101,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/',
         builder: (_, state) => OrchardHome(
           focus: state.extra is Coordinates ? state.extra as Coordinates : null,
+          focusPlantId: state.uri.queryParameters['plant'],
         ),
       ),
       GoRoute(

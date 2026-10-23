@@ -71,6 +71,7 @@ class LandscapeMapping {
     'taxonId': c.taxonId,
     'label': c.label,
     'season': c.season,
+    'lifeCycle': c.lifeCycle.name,
     'notes': c.notes,
     'plantedOn': c.plantedOn,
     'harvestedOn': c.harvestedOn,
@@ -90,6 +91,9 @@ class LandscapeMapping {
       taxonId: d['taxonId'] as String,
       label: d['label'] as String,
       season: d['season'] as String,
+      lifeCycle: PlantLifeCycle.values.byName(
+        d['lifeCycle'] as String? ?? 'annual',
+      ),
       notes: d['notes'] as String,
       plantedOn: d['plantedOn'] as String?,
       harvestedOn: d['harvestedOn'] as String?,

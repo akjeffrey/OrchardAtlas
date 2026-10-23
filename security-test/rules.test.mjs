@@ -351,3 +351,38 @@ test('custom icon names can change without modifying images or permissions', asy
   const stored = (await getDoc(doc(db('alice'), path))).data();
   if (stored.png !== icon.png) throw new Error('Renaming changed the image');
 });
+
+test('plant management conversion is owner-only and annual management requires a season', async () => {
+  await setDoc(doc(db('alice'), eventPath), harvest);
+  await assertFails(updateDoc(doc(db('bob'), itemPath), {lifeCycle: 'annual', season: '2027'}));
+  await assertFails(updateDoc(doc(db(), itemPath), {lifeCycle: 'annual', season: '2027'}));
+  await assertFails(updateDoc(doc(db('alice'), itemPath), {lifeCycle: 'annual'}));
+  await assertFails(updateDoc(doc(db('alice'), itemPath), {lifeCycle: 'annual', season: ''}));
+  await assertFails(updateDoc(doc(db('alice'), itemPath), {lifeCycle: 'invalid', season: '2027'}));
+  await assertSucceeds(updateDoc(doc(db('alice'), itemPath), {lifeCycle: 'annual', season: '2027'}));
+  await assertSucceeds(updateDoc(doc(db('alice'), itemPath), {lifeCycle: 'perennial'}));
+  const saved = (await getDoc(doc(db('alice'), itemPath))).data();
+  if (saved.name !== plant.name || saved.taxonId !== plant.taxonId) throw new Error('Conversion changed identity');
+  await assertSucceeds(getDoc(doc(db('alice'), eventPath)));
+});
+
+test('crop conversion preserves seasonal identity even after ending and cannot rewrite immutable metadata', async () => {
+  await setDoc(doc(db('alice'), sectionPath), sectionData);
+  const path = `${propertyPath}/crops/${cropId}`;
+  const planting = {schemaVersion: 1, sectionId, taxonId: taxon, label: 'Garlic', season: '2026', notes: 'Keep',
+    plantedOn: '2026-01-01', harvestedOn: null, status: 'growing', createdAt: now};
+  await assertSucceeds(setDoc(doc(db('alice'), path), planting));
+  await assertFails(updateDoc(doc(db('bob'), path), {lifeCycle: 'perennial'}));
+  await assertFails(updateDoc(doc(db(), path), {lifeCycle: 'perennial'}));
+  await assertFails(updateDoc(doc(db('alice'), path), {lifeCycle: 'invalid'}));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), {lifeCycle: 'perennial'}));
+  await assertFails(updateDoc(doc(db('alice'), path), {lifeCycle: 'annual', label: 'Rewritten'}));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), {lifeCycle: 'annual'}));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), {status: 'ended'}));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), {lifeCycle: 'perennial'}));
+  await assertSucceeds(updateDoc(doc(db('alice'), path), {lifeCycle: 'annual'}));
+  await assertFails(updateDoc(doc(db('alice'), path), {status: 'growing'}));
+  await assertFails(updateDoc(doc(db('alice'), path), {season: '2027'}));
+  const saved = (await getDoc(doc(db('alice'), path))).data();
+  if (saved.status !== 'ended' || saved.notes !== 'Keep' || saved.season !== '2026') throw new Error('Conversion rewrote the season');
+});

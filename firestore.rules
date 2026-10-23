@@ -11,7 +11,7 @@ service cloud.firestore {
     function text(value) { return value is string && value.size() > 0 && value.size() <= 500; }
     function validItem(d, propertyId) {
       return d.keys().hasAll(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
-        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt', 'plantedOn', 'rootstock', 'nursery', 'notes', 'status', 'accuracyMeters', 'sectionId', 'rowOrder'])
+        && d.keys().hasOnly(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt', 'plantedOn', 'rootstock', 'nursery', 'notes', 'status', 'accuracyMeters', 'sectionId', 'rowOrder', 'lifeCycle', 'season'])
         && d.schemaVersion == 1 && d.kind == 'managedPlant'
         && text(d.name) && d.taxonId is string && uuid(d.taxonId)
         && d.location is latlng && d.createdAt is timestamp
@@ -20,6 +20,9 @@ service cloud.firestore {
         && d.get('nursery', '') is string && d.get('nursery', '').size() <= 500
         && d.get('notes', '') is string && d.get('notes', '').size() <= 10000
         && d.get('status', 'active') in ['active', 'archived']
+        && d.get('lifeCycle','perennial') in ['perennial','annual']
+        && (d.get('season',null)==null || text(d.season))
+        && (d.get('lifeCycle','perennial')!='annual' || text(d.get('season','')))
         && (d.get('sectionId', null) == null || (d.sectionId is string && uuid(d.sectionId) && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.sectionId))))
         && (d.get('rowOrder',null)==null || (d.rowOrder is number && d.rowOrder >= 0 && d.rowOrder <= 1000000000))
         && (d.get('accuracyMeters', null) == null || (d.accuracyMeters is number && d.accuracyMeters >= 0 && d.accuracyMeters <= 100000));
@@ -121,9 +124,10 @@ service cloud.firestore {
     }
     function validCrop(d, propertyId) {
       return d.keys().hasAll(['schemaVersion','sectionId','taxonId','label','season','notes','plantedOn','harvestedOn','status','createdAt'])
-        && d.keys().hasOnly(['schemaVersion','sectionId','taxonId','label','season','notes','plantedOn','harvestedOn','status','createdAt'])
+        && d.keys().hasOnly(['schemaVersion','sectionId','taxonId','label','season','notes','plantedOn','harvestedOn','status','createdAt','lifeCycle'])
         && d.schemaVersion == 1 && d.sectionId is string && uuid(d.sectionId) && d.taxonId is string && uuid(d.taxonId)
         && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.sectionId))
+        && d.get('lifeCycle','annual') in ['annual','perennial']
         && text(d.label) && text(d.season) && d.notes is string && d.notes.size() <= 10000 && d.createdAt is timestamp
         && (d.plantedOn == null || date(d.plantedOn)) && (d.harvestedOn == null || date(d.harvestedOn))
         && d.status in ['growing','harvested','ended'] && (d.status != 'harvested' || d.harvestedOn != null);
@@ -186,8 +190,12 @@ service cloud.firestore {
       match /crops/{cropId} {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(cropId) && validCrop(request.resource.data, propertyId) && request.resource.data.status == 'growing';
-        allow update: if owner(propertyId) && validCrop(request.resource.data, propertyId) && resource.data.status != 'ended'
-          && request.resource.data.status != 'growing' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','harvestedOn']);
+        allow update: if owner(propertyId) && validCrop(request.resource.data, propertyId)
+          && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lifeCycle'])
+            && request.resource.data.get('lifeCycle','annual') != resource.data.get('lifeCycle','annual'))
+          || (resource.data.status != 'ended' && request.resource.data.status != 'growing'
+            && request.resource.data.get('lifeCycle','annual') == resource.data.get('lifeCycle','annual')
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','harvestedOn','lifeCycle'])));
         allow delete: if owner(propertyId);
       }
       match /cropHarvests/{harvestId} {
@@ -241,7 +249,7 @@ service cloud.firestore {
         allow read: if owner(propertyId);
         allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data, propertyId);
         allow update: if owner(propertyId) && validItem(request.resource.data, propertyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','taxonId','location','plantedOn','accuracyMeters','rowOrder','rootstock','nursery','notes','status','sectionId']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','taxonId','location','plantedOn','accuracyMeters','rowOrder','rootstock','nursery','notes','status','sectionId','lifeCycle','season']);
         allow delete: if owner(propertyId);
         match /photos/{photoId} { allow read, delete: if owner(propertyId); allow create, update: if false; }
         match /events/{eventId} {

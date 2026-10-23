@@ -10,7 +10,10 @@ class ClassificationPicker extends ConsumerStatefulWidget {
     super.key,
     required this.value,
     required this.onChanged,
+    this.allowAny = false,
+    this.allowCreate = true,
   });
+  final bool allowAny, allowCreate;
   final String? value;
   final ValueChanged<String?> onChanged;
   @override
@@ -67,15 +70,24 @@ class _ClassificationPickerState extends ConsumerState<ClassificationPicker> {
             DropdownButtonFormField<String>(
               key: ValueKey('classification-$revision-$level-$value'),
               isExpanded: true,
-              initialValue: level == 0
-                  ? group
-                  : level == 1
-                  ? type
-                  : (path.length >= 3 ? value : null),
+              initialValue:
+                  (level == 0
+                      ? group
+                      : level == 1
+                      ? type
+                      : (path.length >= 3 ? value : null)) ??
+                  (widget.allowAny ? '' : null),
               decoration: InputDecoration(
                 labelText: ['Group', 'Type', 'Variety'][level],
               ),
               items: [
+                if (widget.allowAny)
+                  DropdownMenuItem(
+                    value: '',
+                    child: Text(
+                      ['All groups', 'All types', 'All varieties'][level],
+                    ),
+                  ),
                 for (final t
                     in level == 2
                         ? taxonomy.taxa.where(
@@ -90,10 +102,11 @@ class _ClassificationPickerState extends ConsumerState<ClassificationPicker> {
                     value: t.id,
                     child: Text(t.name, overflow: TextOverflow.ellipsis),
                   ),
-                const DropdownMenuItem(
-                  value: '__add__',
-                  child: Text('+ Add new option…'),
-                ),
+                if (widget.allowCreate)
+                  const DropdownMenuItem(
+                    value: '__add__',
+                    child: Text('+ Add new option…'),
+                  ),
               ],
               onChanged: busy
                   ? null
@@ -108,7 +121,15 @@ class _ClassificationPickerState extends ConsumerState<ClassificationPicker> {
                               : type,
                         );
                       } else {
-                        widget.onChanged(id);
+                        widget.onChanged(
+                          id == ''
+                              ? (level == 0
+                                    ? null
+                                    : level == 1
+                                    ? group
+                                    : type)
+                              : id,
+                        );
                       }
                     },
             ),

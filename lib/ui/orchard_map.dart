@@ -34,7 +34,9 @@ class OrchardMap extends ConsumerStatefulWidget {
     this.initialCamera,
     this.onCameraChanged,
     this.onSelectedMoved,
+    this.focusPlantId,
   });
+  final String? focusPlantId;
   final List<OrchardSection> sections;
   final List<ManagedPlant> plants;
   final List<Coordinates> draft;
@@ -57,13 +59,26 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
   String? selectedPlantId, selectedSectionId;
   GoogleMapController? controller;
   double? cameraZoom;
+  String? revealedPlantId;
+  @override
+  void initState() {
+    super.initState();
+    selectedPlantId = revealedPlantId = widget.focusPlantId;
+  }
 
   bool visible(ManagedPlant plant) =>
-      plant.status == ItemStatus.active && plant.sectionId == null;
+      plant.status == ItemStatus.active &&
+      (plant.sectionId == null || plant.id == revealedPlantId);
 
   @override
   void didUpdateWidget(covariant OrchardMap oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.focusPlantId != oldWidget.focusPlantId) {
+      selectedPlantId = revealedPlantId = widget.focusPlantId;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showName();
+      });
+    }
     if (widget.onPlant == null ||
         !widget.plants.any((p) => p.id == selectedPlantId && visible(p))) {
       selectedPlantId = null;
@@ -112,6 +127,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
     } else {
       setState(() {
         selectedPlantId = id;
+        if (id != revealedPlantId) revealedPlantId = null;
         selectedSectionId = null;
       });
       showName();
@@ -127,6 +143,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
     } else {
       setState(() {
         selectedSectionId = id;
+        revealedPlantId = null;
         selectedPlantId = null;
       });
       showName();
@@ -137,6 +154,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
     hideName();
     if (selectedMarker != null) {
       setState(() {
+        revealedPlantId = null;
         selectedPlantId = null;
         selectedSectionId = null;
       });
@@ -165,9 +183,7 @@ class _OrchardMapState extends ConsumerState<OrchardMap> {
       :onCameraChanged,
       :onSelectedMoved,
     ) = widget;
-    final visiblePlants = plants
-        .where((p) => p.status == ItemStatus.active && p.sectionId == null)
-        .toList();
+    final visiblePlants = plants.where(visible).toList();
     final targetPoint =
         center ??
         selected ??

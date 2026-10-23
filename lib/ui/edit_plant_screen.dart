@@ -20,6 +20,7 @@ class _EditState extends ConsumerState<EditPlantScreen> {
   final name = TextEditingController(),
       rootstock = TextEditingController(),
       nursery = TextEditingController(),
+      season = TextEditingController(),
       notes = TextEditingController();
   bool initialized = false;
   String? sectionId, taxonId;
@@ -31,6 +32,7 @@ class _EditState extends ConsumerState<EditPlantScreen> {
     name.dispose();
     rootstock.dispose();
     nursery.dispose();
+    season.dispose();
     notes.dispose();
     latitude.dispose();
     longitude.dispose();
@@ -59,6 +61,7 @@ class _EditState extends ConsumerState<EditPlantScreen> {
               name.text = plant.name;
               rootstock.text = plant.rootstock;
               nursery.text = plant.nursery;
+              season.text = plant.season ?? '';
               notes.text = plant.notes;
               initialized = true;
             }
@@ -66,6 +69,26 @@ class _EditState extends ConsumerState<EditPlantScreen> {
               padding: const EdgeInsets.all(16),
               children: [
                 const Text('Edit plant details, classification and location.'),
+                OutlinedButton.icon(
+                  icon: const Icon(Icons.map_outlined),
+                  label: const Text('Show on Map'),
+                  onPressed: () {
+                    if (plant.status == ItemStatus.archived) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Restore this archived plant before showing it on the map.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
+                    context.push('/?plant=${plant.id}', extra: plant.location);
+                  },
+                ),
+                const Text(
+                  'Show on Map uses the saved location. Use Back to return to your unsaved edits.',
+                ),
                 TextField(
                   controller: name,
                   maxLength: 500,
@@ -136,6 +159,14 @@ class _EditState extends ConsumerState<EditPlantScreen> {
                     onPressed: () => setState(() => plantedOn = null),
                   ),
                 ),
+                if (plant.lifeCycle == PlantLifeCycle.annual)
+                  TextField(
+                    controller: season,
+                    maxLength: 500,
+                    decoration: const InputDecoration(
+                      labelText: 'Season / year',
+                    ),
+                  ),
                 SectionPicker(
                   value: sectionId,
                   onChanged: (id) => setState(() => sectionId = id),
@@ -187,6 +218,9 @@ class _EditState extends ConsumerState<EditPlantScreen> {
                                       plant.location.longitude.toString(),
                               clearRowOrder: sectionId != plant.sectionId,
                               rootstock: rootstock.text,
+                              season: plant.lifeCycle == PlantLifeCycle.annual
+                                  ? season.text.trim()
+                                  : plant.season,
                               nursery: nursery.text,
                               notes: notes.text,
                               sectionId: sectionId,

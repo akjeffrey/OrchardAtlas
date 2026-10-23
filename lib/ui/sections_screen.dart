@@ -749,7 +749,7 @@ class SectionDetailScreen extends ConsumerWidget {
                           ListTile(
                             title: Text('${c.label} · ${c.season}'),
                             subtitle: Text(
-                              '${c.status.name} · ${c.plantedOn ?? 'Planting date unknown'}',
+                              '${c.lifeCycle.name} · ${c.status.name} · ${c.plantedOn ?? 'Planting date unknown'}',
                             ),
                             onTap: () => context.push('/crops/${c.id}'),
                           ),
