@@ -180,7 +180,10 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.text('Task saved'), findsOneWidget);
         expect(repo.tasks.length, depth == 1 ? 2 : 1);
-        final plan = (await repo.watchTaskPlans(repo.place.id).first).single;
+        final plans = await tester.runAsync(
+          () => repo.watchTaskPlans(repo.place.id).first,
+        );
+        final plan = plans!.single;
         expect(
           plan.taxonId,
           starterTaxonomy.taxa

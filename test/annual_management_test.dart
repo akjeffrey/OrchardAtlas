@@ -171,16 +171,40 @@ void main() {
     final firestore = FakeFirebaseFirestore();
     final remote = FirestoreOrchardRepository(firestore, prefs);
     remote.savePlant(plant);
+    await remote
+        .watchPlants(repo.place.id)
+        .firstWhere((s) => s.value.any((p) => p.id == plant.id));
     remote.updatePlant(
       plant.copyWith(lifeCycle: PlantLifeCycle.annual, season: '2026'),
     );
     expect(
-      (await remote.watchPlants(repo.place.id).first).value.single.lifeCycle,
+      (await remote
+              .watchPlants(repo.place.id)
+              .firstWhere(
+                (s) => s.value.any(
+                  (p) =>
+                      p.id == plant.id && p.lifeCycle == PlantLifeCycle.annual,
+                ),
+              ))
+          .value
+          .single
+          .lifeCycle,
       PlantLifeCycle.annual,
     );
     remote.saveCrop(crop.withLifeCycle(PlantLifeCycle.perennial));
     expect(
-      (await remote.watchCrops(repo.place.id).first).value.single.lifeCycle,
+      (await remote
+              .watchCrops(repo.place.id)
+              .firstWhere(
+                (s) => s.value.any(
+                  (c) =>
+                      c.id == crop.id &&
+                      c.lifeCycle == PlantLifeCycle.perennial,
+                ),
+              ))
+          .value
+          .single
+          .lifeCycle,
       PlantLifeCycle.perennial,
     );
   });
