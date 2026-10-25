@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../domain/extensions.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
@@ -19,9 +21,15 @@ import '../domain/repositories.dart';
 import 'firestore_mapping.dart';
 
 class FirestoreOrchardRepository
-    implements OrchardRepository, OrchardDirectoryRepository {
-  FirestoreOrchardRepository(this.firestore, this.preferences, {this.storage});
+    implements OrchardRepository, OrchardDirectoryRepository, OrchardRecords {
+  FirestoreOrchardRepository(
+    this.firestore,
+    this.preferences, {
+    this.storage,
+    this.currentUserId,
+  });
   final FirebaseStorage? storage;
+  final String Function()? currentUserId;
   final FirebaseFirestore firestore;
   final SharedPreferences preferences;
   final _pendingPlaces = <String, Place>{};
@@ -73,9 +81,7 @@ class FirestoreOrchardRepository
         throw StateError('Property unavailable. Reconnect to restore access.');
       }
       final place = FirestoreMapping.placeFromMap(doc.id, doc.data()!);
-      if (place.ownerId != userId) {
-        throw StateError('Property belongs to another account');
-      }
+
       return place;
     }
     // Server lookup prevents a cache miss from creating duplicate default places.
@@ -107,21 +113,59 @@ class FirestoreOrchardRepository
   }
 
   @override
-  Stream<List<Place>> watchPlaces(String userId) => firestore
-      .collection('properties')
-      .where('ownerId', isEqualTo: userId)
-      .snapshots(includeMetadataChanges: true)
-      .map((snapshot) {
-        final places = <String, Place>{
-          for (final p in _pendingPlaces.values.where(
-            (p) => p.ownerId == userId,
-          ))
-            p.id: p,
-          for (final d in snapshot.docs)
-            d.id: FirestoreMapping.placeFromMap(d.id, d.data()),
-        }.values.toList()..sort((a, b) => a.name.compareTo(b.name));
-        return places;
-      });
+  Stream<List<Place>> watchPlaces(String userId) => Stream.multi((controller) {
+    final owned = <String, Place>{}, shared = <String, Place>{};
+    void emit() => controller.add(
+      {...owned, ...shared}.values.toList()
+        ..sort((a, b) => a.name.compareTo(b.name)),
+    );
+    final a = firestore
+        .collection('properties')
+        .where('ownerId', isEqualTo: userId)
+        .snapshots()
+        .listen((s) {
+          owned
+            ..clear()
+            ..addAll({
+              for (final d in s.docs)
+                d.id: FirestoreMapping.placeFromMap(d.id, d.data()),
+            });
+          emit();
+        }, onError: controller.addError);
+    final b = firestore
+        .collection('users')
+        .doc(userId)
+        .collection('orchards')
+        .snapshots()
+        .listen((s) async {
+          try {
+            final places = <String, Place>{};
+            for (final link in s.docs) {
+              try {
+                final d = await firestore
+                    .collection('properties')
+                    .doc(link.id)
+                    .get();
+                if (d.exists) {
+                  places[d.id] = FirestoreMapping.placeFromMap(d.id, d.data()!);
+                }
+              } on FirebaseException catch (e) {
+                if (e.code != 'permission-denied') rethrow;
+              }
+            }
+            shared
+              ..clear()
+              ..addAll(places);
+            emit();
+          } catch (e, st) {
+            controller.addError(e, st);
+          }
+        }, onError: controller.addError);
+    controller.onCancel = () async {
+      await a.cancel();
+      await b.cancel();
+    };
+  });
   @override
   Future<Place> createPlace(String userId, String name) async {
     final place = Place(
@@ -173,9 +217,7 @@ class FirestoreOrchardRepository
           if (!doc.exists) throw StateError('Orchard unavailable');
           return FirestoreMapping.placeFromMap(doc.id, doc.data()!);
         }();
-    if (place.ownerId != userId) {
-      throw StateError('Orchard belongs to another account');
-    }
+
     if (!await preferences.setString('default-place:$userId', place.id)) {
       throw StateError('Could not save orchard selection');
     }
@@ -333,6 +375,7 @@ class FirestoreOrchardRepository
           .where((e) => e.data()['taskId'] == null)
           .toList();
       for (final e in events) {
+        _audit(batch, plant.propertyId, plant.id, e.id, e.data(), 'edited');
         batch.delete(e.reference);
       }
       if (plant.plantedOn != null) {
@@ -344,7 +387,9 @@ class FirestoreOrchardRepository
           id: id,
           propertyId: plant.propertyId,
           itemId: plant.id,
-          authorId: owner.data()!['ownerId'] as String,
+          authorId: events.isEmpty
+              ? currentUserId?.call() ?? owner.data()!['ownerId'] as String
+              : events.first.data()['authorId'] as String,
           type: ActivityType.planting,
           occurredAt: parseCalendarDate(plant.plantedOn!).toUtc(),
           activityDate: plant.plantedOn!,
@@ -539,16 +584,55 @@ class FirestoreOrchardRepository
   }
 
   @override
-  void updateEvent(PlantEvent event) => _observe(
-    event.id,
-    _items(event.propertyId)
+  void updateEvent(PlantEvent event) => _observe(event.id, _editEvent(event));
+  Future<void> _editEvent(PlantEvent event) async {
+    final reference = _items(event.propertyId)
+        .doc(event.itemId)
+        .collection('events')
+        .doc(event.id);
+    final old = await reference.get();
+    if (!old.exists) throw StateError('Activity unavailable');
+    final batch = firestore.batch();
+    _audit(
+      batch,
+      event.propertyId,
+      event.itemId,
+      event.id,
+      old.data()!,
+      'edited',
+    );
+    batch.update(reference, FirestoreMapping.eventToMap(event));
+    await batch.commit();
+  }
+
+  void _audit(
+    WriteBatch batch,
+    String orchard,
+    String item,
+    String event,
+    Map<String, dynamic> value,
+    String action,
+  ) {
+    final id = const Uuid().v4();
+    batch.set(_collection(orchard, RecordKind.activityRevision.name).doc(id), {
+      'id': id,
+      'itemId': item,
+      'eventId': event,
+      'action': action,
+      'changedAt': DateTime.now().toUtc().toIso8601String(),
+      'event': value,
+    });
+  }
+
+  @override
+  void deleteEvent(PlantEvent event) => _observe(event.id, _deleteEvent(event));
+  Future<void> _deleteEvent(PlantEvent event) async {
+    final old = await _items(event.propertyId)
         .doc(event.itemId)
         .collection('events')
         .doc(event.id)
-        .update(FirestoreMapping.eventToMap(event)),
-  );
-  @override
-  void deleteEvent(PlantEvent event) {
+        .get();
+    if (!old.exists) return;
     final batch = firestore.batch();
     batch.delete(
       _items(event.propertyId)
@@ -556,13 +640,21 @@ class FirestoreOrchardRepository
           .collection('events')
           .doc(event.id),
     );
+    _audit(
+      batch,
+      event.propertyId,
+      event.itemId,
+      event.id,
+      old.data()!,
+      'deleted',
+    );
     if (event.taskId != null) {
       batch.update(_collection(event.propertyId, 'tasks').doc(event.taskId), {
         'status': 'open',
         'completedOn': null,
       });
     }
-    _observe(event.id, batch.commit());
+    await batch.commit();
   }
 
   @override
@@ -656,6 +748,28 @@ class FirestoreOrchardRepository
     for (final id in sectionIds.toList().reversed) {
       await _collection(propertyId, 'sections').doc(id).delete();
     }
+    for (final kind in [RecordKind.photo, RecordKind.activityRevision]) {
+      final records = await _collection(
+        propertyId,
+        kind.name,
+      ).get(const GetOptions(source: Source.server));
+      for (final d in records.docs.where(
+        (d) => plantIds.contains(d.data()['itemId']),
+      )) {
+        final path = d.data()['storagePath'];
+        if (kind == RecordKind.photo &&
+            path is String &&
+            path.startsWith('properties/$propertyId/items/')) {
+          if (storage == null) throw StateError('Photo storage unavailable');
+          try {
+            await storage!.ref(path).delete();
+          } on FirebaseException catch (e) {
+            if (e.code != 'object-not-found') rethrow;
+          }
+        }
+        await d.reference.delete();
+      }
+    }
     final remaining = await _collection(
       propertyId,
       'tasks',
@@ -704,6 +818,68 @@ class FirestoreOrchardRepository
           .map((c) => c.id)
           .toSet(),
     );
+  }
+
+  @override
+  Stream<List<Map<String, dynamic>>> watchRecords(
+    String orchard,
+    RecordKind kind,
+  ) => _collection(orchard, kind.name)
+      .snapshots(includeMetadataChanges: true)
+      .map(
+        (s) => [
+          for (final d in s.docs) {...d.data(), 'id': d.id},
+        ],
+      );
+  @override
+  Future<void> putRecord(
+    String orchard,
+    RecordKind kind,
+    String id,
+    Map<String, dynamic> record,
+  ) async {
+    // Await acknowledgement only for the upload worker, not field-entry writes.
+    final batch = firestore.batch();
+    batch.set(_collection(orchard, kind.name).doc(id), {...record, 'id': id});
+    if (kind == RecordKind.foraging && record['parentId'] == null) {
+      final public = firestore
+          .collection('publicResources')
+          .doc('${orchard}_$id');
+      if (record['public'] == true) {
+        batch.set(public, {
+          'id': id,
+          'orchard': orchard,
+          for (final key in [
+            'name',
+            'taxonId',
+            'latitude',
+            'longitude',
+            'startMonth',
+            'endMonth',
+          ])
+            key: record[key],
+        });
+      } else {
+        batch.delete(public);
+      }
+    }
+    _observe(id, batch.commit());
+  }
+
+  @override
+  Future<void> removeRecord(String orchard, RecordKind kind, String id) async {
+    if (kind == RecordKind.photo && storage != null) {
+      final d = await _collection(orchard, kind.name).doc(id).get();
+      final path = d.data()?['storagePath'];
+      if (path is String && path.startsWith('properties/$orchard/items/')) {
+        try {
+          await storage!.ref(path).delete();
+        } on FirebaseException catch (e) {
+          if (e.code != 'object-not-found') rethrow;
+        }
+      }
+    }
+    _observe(id, _collection(orchard, kind.name).doc(id).delete());
   }
 
   @override

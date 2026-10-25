@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import 'activity_screen.dart';
+import '../application/extensions.dart';
 import 'backup_screen.dart';
 import 'add_plant_screen.dart';
 import 'map_screen.dart';
@@ -188,6 +189,8 @@ class OrchardAtlasApp extends ConsumerWidget {
     }
     if (trial) ref.watch(backupServiceProvider);
     ref.watch(taskMaterializerProvider);
+    ref.watch(photoWorkerProvider);
+    ref.watch(reminderWorkerProvider);
     final failure = ref.watch(failuresProvider).valueOrNull;
     final dismissedFailure = ref.watch(dismissedFailureProvider);
     return MaterialApp.router(

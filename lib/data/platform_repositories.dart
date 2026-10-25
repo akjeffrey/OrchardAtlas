@@ -12,7 +12,9 @@ class FirebaseAuthRepository implements AuthRepository {
   final FirebaseAuth auth;
   @override
   Stream<OrchardUser?> get userChanges => auth.authStateChanges().map(
-    (u) => u == null ? null : OrchardUser(u.uid, displayName: u.displayName),
+    (u) => u == null
+        ? null
+        : OrchardUser(u.uid, displayName: u.displayName, email: u.email),
   );
   @override
   Future<void> signIn(String email, String password) async {
@@ -24,10 +26,11 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<void> register(String email, String password) async {
-    await auth.createUserWithEmailAndPassword(
+    final credential = await auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
+    await credential.user?.sendEmailVerification();
   }
 
   @override
@@ -78,8 +81,24 @@ class FirebasePhotoRepository implements PhotoRepository {
   FirebasePhotoRepository(this.storage);
   final FirebaseStorage storage;
   @override
+  Future<Uint8List> read(String storagePath) async {
+    final bytes = await storage.ref(storagePath).getData(512 * 1024);
+    if (bytes == null) throw StateError('Photo unavailable');
+    return bytes;
+  }
+
+  @override
+  Future<void> delete(String storagePath) async {
+    try {
+      await storage.ref(storagePath).delete();
+    } on FirebaseException catch (e) {
+      if (e.code != 'object-not-found') rethrow;
+    }
+  }
+
+  @override
   Future<void> upload(Photo photo, Uint8List bytes, String contentType) async {
-    // The production V1 rules deny uploads. This port is for the next photo slice.
+    // The durable queue retains source bytes until this upload succeeds.
     await storage
         .ref(photo.storagePath)
         .putData(bytes, SettableMetadata(contentType: contentType));

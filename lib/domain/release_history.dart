@@ -11,33 +11,30 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Seasonal planting uses Group, Type and Variety dropdowns.',
-      'Convert existing plants between annual and perennial management without losing their history.',
-      'Plant lists use the same icons as the map and include seasonal plantings.',
-      'Choose task targets by Group, optional Type and optional Variety.',
-      'Show on Map from Edit Plant centers the saved plant with its name selected, while keeping the edit draft.',
-      'Version History shows the five most recent feature updates.',
+      'Show on Map is also available on Plant Detail.',
+      'Edit open task definitions and enable local reminders without losing completed work.',
+      'Capture foraging resources, seasons, observations and optional public listings.',
+      'Attach camera/gallery photos with thumbnails and durable queued uploads.',
+      'Explore harvest reports, copy CSV and recover edited/deleted activities.',
+      'Connected orchard invitations support owner, editor and viewer access.',
     ],
   ),
+  const ReleaseNote('0.53.0', [
+    'Seasonal planting uses Group, Type and Variety dropdowns.',
+    'Convert annual/perennial management while preserving history.',
+    'Shared list/map icons, hierarchical task targets and Edit Plant Show on Map.',
+  ]),
   const ReleaseNote('0.49.0', [
     'Create custom Groups, Types and Varieties directly from Edit Plant.',
-    'Rename custom icons in Settings.',
-    'Small green/red dots replace row endpoint flags.',
-    'Versioned ZIP/APK names and screen labels replace trial branding.',
+    'Rename custom icons in Settings; row endpoint dots and versioned filenames.',
   ]),
   const ReleaseNote('0.47.0', [
-    'Choose Add Plant locations on the map; Add Another keeps the previous location.',
-    'Names stay anchored beside plants, Areas and Rows.',
-    'Delete custom icons with a question-mark fallback.',
-    'Restore offers to use the restored file for automatic backups, defaulting to Yes.',
+    'Pick Add Plant locations on the map; Add Another retains location.',
+    'Anchored names, icon deletion fallback and automatic backup target after restore.',
   ]),
   const ReleaseNote('0.42.0', [
     'Edit classification names and icons in Settings.',
     'Import custom icons and include them in backups.',
     'Map icons stay bounded and shrink at wider zoom levels.',
-  ]),
-  const ReleaseNote('0.39.0', [
-    'Permanent APK signing and verification enable compatible in-place updates.',
-    'Published APK identity is checked against its version, package and signing certificate.',
   ]),
 ].take(5).toList(growable: false);

@@ -102,7 +102,7 @@ class _MapState extends ConsumerState<MapScreen>
     if (widget.focus != null) {
       locationMessage = widget.focusPlantId == null
           ? 'Plant saved locally. Tap its marker to open Plant Detail.'
-          : 'Showing saved plant location. Use Back to return to the editor.';
+          : 'Showing saved plant location. Use Back to return to the previous page.';
     }
   }
 
@@ -119,7 +119,7 @@ class _MapState extends ConsumerState<MapScreen>
       selected = null;
       locationMessage = widget.focusPlantId == null
           ? 'Plant saved locally. Tap its marker to open Plant Detail.'
-          : 'Showing saved plant location. Use Back to return to the editor.';
+          : 'Showing saved plant location. Use Back to return to the previous page.';
       moveTo(widget.focus!);
     }
   }

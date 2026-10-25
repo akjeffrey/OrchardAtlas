@@ -8,6 +8,7 @@ import 'common.dart';
 import 'events_table.dart';
 import 'delete_actions.dart';
 import 'life_cycle_button.dart';
+import 'photos_panel.dart';
 
 class PlantDetailScreen extends ConsumerStatefulWidget {
   const PlantDetailScreen(this.id, {super.key});
@@ -56,6 +57,24 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               Text(path),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Show on Map'),
+                onPressed: () {
+                  if (plant.status == ItemStatus.archived) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Restore this archived plant before showing it on the map.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  context.push('/?plant=${plant.id}', extra: plant.location);
+                },
+              ),
+              PhotosPanel(plant.id),
               Text('Status: ${plant.status.name}'),
               Text(
                 'Management: ${plant.lifeCycle.name}${plant.season == null ? '' : ' · ${plant.season}'}',

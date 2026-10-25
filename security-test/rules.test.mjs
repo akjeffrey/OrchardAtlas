@@ -386,3 +386,85 @@ test('crop conversion preserves seasonal identity even after ending and cannot r
   const saved = (await getDoc(doc(db('alice'), path))).data();
   if (saved.status !== 'ended' || saved.notes !== 'Keep' || saved.season !== '2026') throw new Error('Conversion rewrote the season');
 });
+
+const invitationId = '00000000-0000-4000-8000-000000000081';
+const resourceId = '00000000-0000-4000-8000-000000000082';
+async function seedMember(uid, role) {
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `${propertyPath}/members/${uid}`), { role, invitationId });
+  });
+}
+test('editor reads/writes content and existing author activities but cannot administer access; viewer is read only', async () => {
+  await seedMember('editor', 'editor'); await seedMember('viewer', 'viewer');
+  await assertSucceeds(getDoc(doc(db('viewer'), propertyPath)));
+  await assertSucceeds(getDoc(doc(db('viewer'), itemPath)));
+  await assertFails(updateDoc(doc(db('viewer'), itemPath), { name: 'No' }));
+  await assertFails(deleteDoc(doc(db('viewer'), itemPath)));
+  await assertSucceeds(updateDoc(doc(db('editor'), itemPath), { name: 'Edited pear' }));
+  await assertFails(updateDoc(doc(db('editor'), propertyPath), { name: 'Renamed' }));
+  await assertFails(setDoc(doc(db('editor'), `${propertyPath}/members/stranger`), { role: 'editor', invitationId }));
+  await setDoc(doc(db('alice'), eventPath), harvest);
+  await assertSucceeds(updateDoc(doc(db('editor'), eventPath), { notes: 'Editor observation' }));
+  await assertFails(updateDoc(doc(db('editor'), eventPath), { authorId: 'editor' }));
+  await assertSucceeds(deleteDoc(doc(db('alice'), `${propertyPath}/members/editor`)));
+  await assertFails(getDoc(doc(db('editor'), itemPath)));
+});
+test('verified invitation acceptance is atomic and cannot escalate role or accept another email', async () => {
+  const invitation = { orchard: property, orchardName: 'Orchard', ownerId: 'alice', email: 'bob@example.com', role: 'viewer', createdAt: now };
+  await setDoc(doc(db('alice'), `invitations/${invitationId}`), invitation);
+  const verified = env.authenticatedContext('bob', { email: 'bob@example.com', email_verified: true }).firestore();
+  const unverified = env.authenticatedContext('bob', { email: 'bob@example.com', email_verified: false }).firestore();
+  const other = env.authenticatedContext('other', { email: 'other@example.com', email_verified: true }).firestore();
+  await assertFails(getDoc(doc(unverified, `invitations/${invitationId}`)));
+  await assertFails(setDoc(doc(other, `${propertyPath}/members/other`), { role:'viewer', invitationId }));
+  await assertFails(setDoc(doc(verified, `${propertyPath}/members/bob`), { role:'editor', invitationId }));
+  const batch = writeBatch(verified);
+  batch.set(doc(verified, `${propertyPath}/members/bob`), { role:'viewer', invitationId });
+  batch.set(doc(verified, `users/bob/orchards/${property}`), { invitationId });
+  batch.delete(doc(verified, `invitations/${invitationId}`));
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(getDoc(doc(verified, itemPath)));
+  await assertFails(updateDoc(doc(verified, itemPath), { name:'No' }));
+  await assertFails(getDoc(doc(other, `users/bob/orchards/${property}`)));
+});
+test('foraging publication exposes only approved listing fields, observations remain private', async () => {
+  const resource = { id:resourceId,name:'Wild pears',taxonId:taxon,latitude:51,longitude:0,
+    createdAt:'2026-10-25T00:00:00Z',startMonth:9,endMonth:11,public:true,notes:'Private gate details' };
+  const batch=writeBatch(db('alice'));
+  batch.set(doc(db('alice'),`${propertyPath}/foraging/${resourceId}`),resource);
+  const listing={id:resourceId,orchard:property,name:resource.name,taxonId:taxon,latitude:51,longitude:0,startMonth:9,endMonth:11};
+  batch.set(doc(db('alice'),`publicResources/${property}_${resourceId}`),listing);
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(getDoc(doc(db('bob'),`publicResources/${property}_${resourceId}`)));
+  await assertFails(getDoc(doc(db('bob'),`${propertyPath}/foraging/${resourceId}`)));
+  await assertFails(updateDoc(doc(db('alice'),`publicResources/${property}_${resourceId}`),{notes:'Leak'}));
+  await assertFails(updateDoc(doc(db('alice'),`${propertyPath}/foraging/${resourceId}`),{startMonth:13}));
+  await assertFails(getDoc(doc(db(),`publicResources/${property}_${resourceId}`)));
+});
+test('activity revision payload must match the original event and stays immutable', async () => {
+  await setDoc(doc(db('alice'),eventPath),harvest);
+  const path=`${propertyPath}/activityRevision/${resourceId}`;
+  const revision={id:resourceId,itemId:item,eventId:event,action:'edited',changedAt:'2026-10-25T00:00:00Z',event:harvest};
+  await assertFails(setDoc(doc(db('alice'),path),{...revision,event:{...harvest,notes:'Forged'}}));
+  const batch=writeBatch(db('alice'));
+  batch.set(doc(db('alice'),path),revision);
+  batch.update(doc(db('alice'),eventPath),{notes:'Updated'});
+  await assertSucceeds(batch.commit());
+  await assertFails(updateDoc(doc(db('alice'),path),{action:'deleted'}));
+  await assertFails(deleteDoc(doc(db('alice'),path)));
+});
+test('photo metadata and task reminders enforce orchard role and bounded paths/size', async () => {
+  await seedMember('viewer','viewer');
+  const path=`${propertyPath}/photo/${resourceId}`;
+  const photo={id:resourceId,itemId:item,authorId:'alice',createdAt:'2026-10-25T00:00:00Z',
+    storagePath:`properties/${property}/items/${item}/photos/${resourceId}.jpg`,image:'bytes',thumbnail:'thumb',state:'pending',error:null};
+  await assertSucceeds(setDoc(doc(db('alice'),path),photo));
+  await assertSucceeds(getDoc(doc(db('viewer'),path)));
+  await assertFails(updateDoc(doc(db('viewer'),path),{state:'uploaded',image:null}));
+  await assertFails(updateDoc(doc(db('alice'),path),{storagePath:'properties/elsewhere/private.jpg'}));
+  await assertSucceeds(updateDoc(doc(db('alice'),path),{state:'uploaded',image:null}));
+  const reminder=`${propertyPath}/reminder/${event}`;
+  await assertSucceeds(setDoc(doc(db('alice'),reminder),{id:event,days:1}));
+  await assertFails(updateDoc(doc(db('alice'),reminder),{days:-1}));
+  await assertFails(deleteDoc(doc(db('viewer'),reminder)));
+});

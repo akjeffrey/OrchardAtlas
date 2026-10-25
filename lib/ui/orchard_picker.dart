@@ -30,11 +30,11 @@ class _PickerState extends ConsumerState<_OrchardPicker> {
       error = null;
     });
     try {
-      final active = await ref.read(placeProvider.future);
+      await ref.read(placeProvider.future);
+      final userId = ref.read(userProvider).value!.id;
       final directory = ref.read(orchardDirectoryProvider);
-      final next =
-          place ?? await directory.createPlace(active.ownerId, name.text);
-      await directory.selectPlace(active.ownerId, next.id);
+      final next = place ?? await directory.createPlace(userId, name.text);
+      await directory.selectPlace(userId, next.id);
       if (mounted) Navigator.pop(context, next);
     } catch (e) {
       if (mounted) setState(() => error = '$e');
@@ -66,7 +66,10 @@ class _PickerState extends ConsumerState<_OrchardPicker> {
                           trailing: IconButton(
                             tooltip: 'Rename orchard',
                             icon: const Icon(Icons.edit),
-                            onPressed: busy
+                            onPressed:
+                                busy ||
+                                    place.ownerId !=
+                                        ref.read(userProvider).valueOrNull?.id
                                 ? null
                                 : () async {
                                     var value = place.name;

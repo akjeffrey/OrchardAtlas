@@ -1,5 +1,6 @@
 import Flutter
 import UIKit
+import UserNotifications
 import GoogleMaps
 import CoreLocation
 import ImageIO
@@ -8,6 +9,7 @@ import UniformTypeIdentifiers
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let geocoder = CLGeocoder()
+  private let photoPicker = OrchardPhotoPicker()
   private let iconPicker = OrchardIconPicker()
   private var mapsConfigured = false
   override func application(
@@ -25,6 +27,37 @@ import UniformTypeIdentifiers
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "OrchardMapServices")!
+    let photoChannel = FlutterMethodChannel(name: "orchard_atlas/photos", binaryMessenger: registrar.messenger())
+    photoChannel.setMethodCallHandler { [weak self] call, result in
+      guard call.method == "capture", let self = self else { result(FlutterMethodNotImplemented); return }
+      let args = call.arguments as? [String: Any]
+      self.photoPicker.open(camera: args?["camera"] as? Bool ?? false, result: result)
+    }
+    let reminders = FlutterMethodChannel(name: "orchard_atlas/reminders", binaryMessenger: registrar.messenger())
+    reminders.setMethodCallHandler { call, result in
+      let center = UNUserNotificationCenter.current()
+      if call.method == "permission" {
+        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in DispatchQueue.main.async { result(granted) } }
+      } else if call.method == "replace", let args = call.arguments as? [String: Any],
+          let orchard = args["orchard"] as? String, let rows = args["notifications"] as? [[String: Any]] {
+        let prefix = "orchard/\(orchard)/"
+        center.getPendingNotificationRequests { existing in
+          center.removePendingNotificationRequests(withIdentifiers: existing.filter { $0.identifier.hasPrefix(prefix) }.map { $0.identifier })
+          for row in rows.prefix(60) {
+            guard let id = row["id"] as? String, let millis = row["time"] as? NSNumber else { continue }
+            let date = Date(timeIntervalSince1970: millis.doubleValue / 1000)
+            if date <= Date() { continue }
+            let content = UNMutableNotificationContent()
+            content.title = row["title"] as? String ?? "Orchard task"
+            content.body = row["body"] as? String ?? "Task due"
+            content.sound = .default
+            let trigger = UNCalendarNotificationTrigger(dateMatching: Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: date), repeats: false)
+            center.add(UNNotificationRequest(identifier: prefix + id, content: content, trigger: trigger))
+          }
+          DispatchQueue.main.async { result(nil) }
+        }
+      } else { result(FlutterMethodNotImplemented) }
+    }
     let channel = FlutterMethodChannel(name: "orchard_atlas/map_services", binaryMessenger: registrar.messenger())
     let iconChannel = FlutterMethodChannel(name: "orchard_atlas/backup", binaryMessenger: registrar.messenger())
     iconChannel.setMethodCallHandler { [weak self] call, result in
@@ -126,5 +159,41 @@ private final class OrchardIconPicker: NSObject, UIDocumentPickerDelegate {
         DispatchQueue.main.async { result(FlutterError(code: "icon_failed", message: "Choose a valid image under 8 MB (up to 64 megapixels).", details: nil)) }
       }
     }
+  }
+}
+
+private final class OrchardPhotoPicker: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+  private var pending: FlutterResult?
+  func open(camera: Bool, result: @escaping FlutterResult) {
+    guard pending == nil else { result(FlutterError(code: "busy", message: "Photo picker already open", details: nil)); return }
+    let source: UIImagePickerController.SourceType = camera ? .camera : .photoLibrary
+    guard UIImagePickerController.isSourceTypeAvailable(source) else { result(FlutterError(code: "unavailable", message: "Camera or gallery unavailable", details: nil)); return }
+    let roots = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }.filter { $0.isKeyWindow }
+    guard var presenter = roots.first?.rootViewController else { result(FlutterError(code: "unavailable", message: "Cannot open photo picker", details: nil)); return }
+    while let next = presenter.presentedViewController { presenter = next }
+    pending = result
+    let picker = UIImagePickerController(); picker.sourceType = source; picker.delegate = self
+    presenter.present(picker, animated: true)
+  }
+  func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+    let reply = pending; pending = nil; picker.dismiss(animated: true) { reply?(nil) }
+  }
+  func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+    let reply = pending; pending = nil
+    guard let original = info[.originalImage] as? UIImage else { picker.dismiss(animated: true); reply?(FlutterError(code: "photo_failed", message: "Invalid photo", details: nil)); return }
+    func encode(_ side: CGFloat, budget: Int) -> Data? {
+      let ratio = min(1, side / max(original.size.width, original.size.height))
+      let size = CGSize(width: max(1,original.size.width*ratio), height: max(1,original.size.height*ratio))
+      let format = UIGraphicsImageRendererFormat(); format.scale = 1
+      let image = UIGraphicsImageRenderer(size: size, format: format).image { _ in original.draw(in: CGRect(origin: .zero, size: size)) }
+      for quality in stride(from: 0.85, through: 0.25, by: -0.1) {
+        if let data = image.jpegData(compressionQuality: quality), data.count <= budget { return data }
+      }
+      return nil
+    }
+    guard let image = encode(1280,budget:512*1024), let thumbnail = encode(160,budget:32*1024) else {
+      picker.dismiss(animated:true); reply?(FlutterError(code:"photo_failed",message:"Photo too large",details:nil)); return
+    }
+    picker.dismiss(animated: true) { reply?(["image":FlutterStandardTypedData(bytes:image),"thumbnail":FlutterStandardTypedData(bytes:thumbnail)]) }
   }
 }

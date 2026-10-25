@@ -1,10 +1,15 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Photo capture remains deferred; owners may remove existing associated files.
-    match /properties/{propertyId}/{path=**} {
-      allow delete: if request.auth != null && firestore.get(/databases/(default)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+    function owner(orchard) { return request.auth!=null && firestore.get(/databases/(default)/documents/properties/$(orchard)).data.ownerId==request.auth.uid; }
+    function member(orchard) { return request.auth!=null && firestore.exists(/databases/(default)/documents/properties/$(orchard)/members/$(request.auth.uid)); }
+    function writer(orchard) { return owner(orchard) || (member(orchard) && firestore.get(/databases/(default)/documents/properties/$(orchard)/members/$(request.auth.uid)).data.role=='editor'); }
+    match /properties/{orchard}/items/{item}/photos/{file} {
+      allow read: if owner(orchard) || member(orchard);
+      allow create, update: if writer(orchard) && request.resource.size<=524288 && request.resource.contentType=='image/jpeg';
+      allow delete: if writer(orchard);
     }
+    match /properties/{orchard}/{path=**} { allow delete: if owner(orchard); }
     match /{path=**} { allow read, write: if false; }
   }
 }

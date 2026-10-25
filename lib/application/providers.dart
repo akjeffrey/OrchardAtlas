@@ -29,8 +29,8 @@ final orchardDirectoryProvider = Provider<OrchardDirectoryRepository>(
 final selectedOrchardProvider = StateProvider<Place?>((ref) => null);
 final orchardsProvider = StreamProvider<List<Place>>((ref) async* {
   final directory = ref.watch(orchardDirectoryProvider);
-  final place = await ref.watch(placeProvider.future);
-  yield* directory.watchPlaces(place.ownerId);
+  await ref.watch(placeProvider.future);
+  yield* directory.watchPlaces(ref.read(userProvider).value!.id);
 });
 final mapViewRepositoryProvider = Provider<MapViewRepository>(
   (ref) => throw UnimplementedError(),
@@ -97,7 +97,7 @@ final placeProvider = FutureProvider.autoDispose<Place>((ref) async {
   final user = ref.watch(userProvider).valueOrNull;
   if (user == null) throw StateError('Please sign in');
   final selected = ref.watch(selectedOrchardProvider);
-  if (selected != null && selected.ownerId == user.id) return selected;
+  if (selected != null) return selected;
   return ref.watch(orchardRepositoryProvider).openDefaultPlace(user.id);
 });
 final plantsProvider =

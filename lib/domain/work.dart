@@ -23,12 +23,14 @@ class TaskPlan {
     this.taxonId,
     this.sectionKind = SectionKind.row,
     this.dueDate,
+    this.anchorOn,
     this.repeat = RepeatSchedule.none,
     this.eventType,
     this.eventHarvest,
     this.notes = '',
   }) : title = requiredText(title, 'Task title') {
     if (dueDate != null) parseCalendarDate(dueDate!);
+    if (anchorOn != null) parseCalendarDate(anchorOn!);
     if (![
       'plant',
       'section',
@@ -51,7 +53,7 @@ class TaskPlan {
     if (notes.length > 10000) throw ArgumentError('Notes too long');
   }
   final String id, propertyId, title, target, notes;
-  final String? itemId, sectionId, cropId, taxonId, dueDate;
+  final String? itemId, sectionId, cropId, taxonId, dueDate, anchorOn;
   final DateTime createdAt;
   final SectionKind sectionKind;
   final RepeatSchedule repeat;
@@ -67,7 +69,9 @@ List<String> occurrenceDates(TaskPlan plan, DateTime now) {
     plan.dueDate ?? calendarDate(plan.createdAt.toLocal()),
   );
   final today = parseCalendarDate(calendarDate(now));
-  if (plan.repeat == RepeatSchedule.none) return [calendarDate(start)];
+  if (plan.repeat == RepeatSchedule.none) {
+    return [plan.anchorOn ?? calendarDate(start)];
+  }
   final result = <String>[];
   for (var i = 0; ; i++) {
     final date = switch (plan.repeat) {
@@ -222,9 +226,7 @@ List<OrchardTask> expandPlans({
             groupScope: plan.target,
             planId: plan.id,
             occurrenceOn: date,
-            dueDate: plan.dueDate == null && plan.repeat == RepeatSchedule.none
-                ? null
-                : date,
+            dueDate: plan.repeat == RepeatSchedule.none ? plan.dueDate : date,
             eventType: target.plant == null ? null : plan.eventType,
             eventHarvest: plan.eventHarvest,
             notes: plan.notes,

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import '../domain/extensions.dart';
+
 import 'package:uuid/uuid.dart';
 
 import '../domain/orchards.dart';
@@ -20,7 +22,7 @@ import 'firestore_mapping.dart';
 
 /// Explicit phone-trial storage; never connects to a Firebase project.
 class LocalTrialRepository
-    implements OrchardRepository, OrchardDirectoryRepository {
+    implements OrchardRepository, OrchardDirectoryRepository, OrchardRecords {
   LocalTrialRepository._(
     this.preferences,
     this.recordKey,
@@ -40,6 +42,7 @@ class LocalTrialRepository
   static const catalogKey = "orchard-atlas-trial-orchards";
   Place place;
   final _plans = <TaskPlan>[];
+  final _records = <String, Map<String, Map<String, dynamic>>>{};
   final List<ManagedPlant> plants;
   final List<PlantEvent> events;
   final List<Taxon> taxa;
@@ -210,6 +213,19 @@ class LocalTrialRepository
           ),
       ],
     );
+    for (final entry in (data?['records'] as Map? ?? {}).entries) {
+      RecordKind.values.byName(entry.key as String);
+      repo._records[entry.key as String] = {
+        for (final record in (entry.value as Map).entries)
+          record.key as String: Map<String, dynamic>.from(record.value as Map),
+      };
+    }
+    for (final r
+        in (repo._records[RecordKind.foraging.name] ?? {}).values.where(
+          (r) => r['parentId'] == null,
+        )) {
+      ResourceRecord.read(place.id, r);
+    }
     repo._plans.addAll([
       for (final p in data?['taskPlans'] as List? ?? [])
         WorkMapping.readPlan(
@@ -422,6 +438,7 @@ class LocalTrialRepository
 
   void _persist(String recordId) {
     final json = jsonEncode({
+      'records': _records,
       'createdAt': place.createdAt.toIso8601String(),
       'name': place.name,
       'taskPlans': [
@@ -913,6 +930,7 @@ class LocalTrialRepository
         events[index].recordedAt != event.recordedAt) {
       throw ArgumentError('Event identity is immutable');
     }
+    _audit(events[index], 'edited');
     events[index] = event;
     _persist(event.id);
   }
@@ -922,6 +940,10 @@ class LocalTrialRepository
     if (event.propertyId != place.id) {
       return _for(event.propertyId).deleteEvent(event);
     }
+    final old = events
+        .where((e) => e.id == event.id && e.itemId == event.itemId)
+        .firstOrNull;
+    if (old != null) _audit(old, 'deleted');
     events.removeWhere((e) => e.id == event.id && e.itemId == event.itemId);
     if (event.taskId != null) {
       final i = tasks.indexWhere((t) => t.id == event.taskId);
@@ -934,6 +956,9 @@ class LocalTrialRepository
   Future<void> deletePlant(String propertyId, String id) async {
     if (propertyId != place.id) {
       return _for(propertyId).deletePlant(propertyId, id);
+    }
+    for (final records in _records.values) {
+      records.removeWhere((_, r) => r['itemId'] == id);
     }
     plants.removeWhere((p) => p.id == id);
     events.removeWhere((e) => e.itemId == id);
@@ -958,6 +983,9 @@ class LocalTrialRepository
         .where((c) => ids.contains(c.sectionId))
         .map((c) => c.id)
         .toSet();
+    for (final records in _records.values) {
+      records.removeWhere((_, r) => plantIds.contains(r['itemId']));
+    }
     plants.removeWhere((p) => plantIds.contains(p.id));
     events.removeWhere((e) => plantIds.contains(e.itemId));
     final deletedPlans = _plans
@@ -1014,6 +1042,74 @@ class LocalTrialRepository
       plants[index] = plants[index].copyWith(rowOrder: i.toDouble());
     }
     _persist(sectionId);
+  }
+
+  @override
+  Stream<List<Map<String, dynamic>>> watchRecords(
+    String orchard,
+    RecordKind kind,
+  ) => orchard != place.id
+      ? _for(orchard).watchRecords(orchard, kind)
+      : _watch(
+          () => [
+            for (final r in (_records[kind.name] ?? {}).values)
+              Map<String, dynamic>.from(r),
+          ],
+        ).map((s) => s.value);
+  @override
+  Future<void> putRecord(
+    String orchard,
+    RecordKind kind,
+    String id,
+    Map<String, dynamic> record,
+  ) async {
+    if (orchard != place.id) {
+      return _for(orchard).putRecord(orchard, kind, id, record);
+    }
+    final value =
+        jsonDecode(jsonEncode({...record, 'id': id})) as Map<String, dynamic>;
+    if (kind == RecordKind.foraging && value['parentId'] == null) {
+      ResourceRecord.read(orchard, value);
+    }
+    final collection = _records.putIfAbsent(kind.name, () => {});
+    if (kind == RecordKind.activityRevision && collection.containsKey(id)) {
+      throw StateError('Revision is immutable');
+    }
+    collection[id] = value;
+    _persist(id);
+    await _writes;
+    if (_lastWriteError != null) {
+      throw StateError('Could not save on this device');
+    }
+  }
+
+  @override
+  Future<void> removeRecord(String orchard, RecordKind kind, String id) async {
+    if (orchard != place.id) {
+      return _for(orchard).removeRecord(orchard, kind, id);
+    }
+    if (kind == RecordKind.activityRevision) {
+      throw StateError('Revision is immutable');
+    }
+    _records[kind.name]?.remove(id);
+    _persist(id);
+    await _writes;
+  }
+
+  void _audit(PlantEvent e, String action) {
+    final id = const Uuid().v4();
+    _records.putIfAbsent(RecordKind.activityRevision.name, () => {})[id] = {
+      'id': id,
+      'action': action,
+      'changedAt': DateTime.now().toUtc().toIso8601String(),
+      'itemId': e.itemId,
+      'eventId': e.id,
+      'event': {
+        ...FirestoreMapping.eventToMap(e),
+        'occurredAt': e.occurredAt.toIso8601String(),
+        'recordedAt': e.recordedAt.toIso8601String(),
+      },
+    };
   }
 
   @override
