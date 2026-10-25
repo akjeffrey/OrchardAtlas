@@ -470,9 +470,9 @@ class Photo {
 }
 
 class OrchardUser {
-  const OrchardUser(this.id, {this.displayName});
+  const OrchardUser(this.id, {this.displayName, this.email});
   final String id;
-  final String? displayName;
+  final String? displayName, email;
 }
 
 class Permission {

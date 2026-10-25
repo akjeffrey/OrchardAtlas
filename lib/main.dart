@@ -9,6 +9,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'application/providers.dart';
+import 'application/extensions.dart';
+import 'data/firebase_sharing.dart';
 import 'data/firestore_orchard_repository.dart';
 import 'data/local_trial_repository.dart';
 import 'data/platform_repositories.dart';
@@ -95,6 +97,7 @@ Future<void> main() async {
               firestore,
               preferences,
               storage: FirebaseStorage.instance,
+              currentUserId: () => FirebaseAuth.instance.currentUser!.uid,
             ),
           ),
           authRepositoryProvider.overrideWithValue(
@@ -103,6 +106,7 @@ Future<void> main() async {
           locationRepositoryProvider.overrideWithValue(
             DeviceLocationRepository(),
           ),
+          sharingProvider.overrideWithValue(FirebaseSharing(firestore)),
           photoRepositoryProvider.overrideWithValue(
             FirebasePhotoRepository(FirebaseStorage.instance),
           ),

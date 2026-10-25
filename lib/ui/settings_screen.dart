@@ -7,6 +7,9 @@ import '../domain/taxonomy.dart';
 import 'icon_library_screen.dart';
 import 'icon_picker.dart';
 import 'version_history_screen.dart';
+import 'foraging_screen.dart';
+import 'sharing_screen.dart';
+import 'reports_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -15,6 +18,30 @@ class SettingsScreen extends StatelessWidget {
     appBar: AppBar(title: const Text('Settings')),
     body: ListView(
       children: [
+        ListTile(
+          leading: const Icon(Icons.people),
+          title: const Text('Orchard sharing'),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const SharingScreen()),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.eco),
+          title: const Text('Foraging resources'),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const ForagingScreen()),
+          ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.bar_chart),
+          title: const Text('Harvest reports & recovery'),
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute<void>(builder: (_) => const ReportsScreen()),
+          ),
+        ),
         ListTile(
           leading: const Icon(Icons.history),
           title: const Text('Version History'),

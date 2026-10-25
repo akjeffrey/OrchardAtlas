@@ -59,7 +59,7 @@ GitHub issues are the source of truth for outstanding work: [open tickets](https
 - [x] Repeating tasks: support yearly, monthly, weekly and other repeat schedules. Each occurrence starts with fresh per-plant completion state; retain all previous occurrences and their completion records instead of overwriting history.
 - [x] Optional task-to-activity link: when defining a plant task, optionally choose an activity/event type such as pruning. Completing that task also creates a linked event on the affected plant, visible in its activity history. Reopening the task removes its generated event. For group/repeating tasks, link completion and event per plant and occurrence; avoid duplicate events or removing unrelated/manual events. Reconcile these edit/removal requirements with the current append-oriented event model.
 - [x] Task and event/activity table filters: add filtering to both lists, with appropriate date, target and classification filters, task status and event type.
-- [ ] [#24](https://github.com/akjeffrey/OrchardAtlas/issues/24) Task editing, reminders and notifications beyond the sorting, matching, recurrence and activity-link features above.
+- [x] [#24](https://github.com/akjeffrey/OrchardAtlas/issues/24) Task editing, reminders and notifications beyond the sorting, matching, recurrence and activity-link features above.
 
 ### Activity editing and classification views
 
@@ -88,10 +88,10 @@ GitHub issues are the source of truth for outstanding work: [open tickets](https
 - [x] Manual row plant ordering: let users rearrange plants while viewing a row (for example, drag-and-drop or move up/down), and persist the revised order.
 - [x] Orchard naming: let users edit an orchard's name. On a fresh app install, name the automatically created first orchard "Home Orchard". Preserve existing orchard names and records during upgrades.
 - [ ] [#25](https://github.com/akjeffrey/OrchardAtlas/issues/25) Orchard archive and explicit ownership transfer/deletion policies.
-- [ ] [#26](https://github.com/akjeffrey/OrchardAtlas/issues/26) Sharing: invitations, owner/editor/viewer permissions and collaboration UI.
-- [ ] [#27](https://github.com/akjeffrey/OrchardAtlas/issues/27) Foraging-resource entry, seasonality, observations and private/public visibility controls.
-- [ ] [#28](https://github.com/akjeffrey/OrchardAtlas/issues/28) Photo capture/gallery/upload, thumbnails and a durable offline upload queue.
-- [ ] [#29](https://github.com/akjeffrey/OrchardAtlas/issues/29) Richer harvest/yield reports and activity audit/recovery design.
+- [x] [#26](https://github.com/akjeffrey/OrchardAtlas/issues/26) Sharing: invitations, owner/editor/viewer permissions and collaboration UI.
+- [x] [#27](https://github.com/akjeffrey/OrchardAtlas/issues/27) Foraging-resource entry, seasonality, observations and private/public visibility controls.
+- [x] [#28](https://github.com/akjeffrey/OrchardAtlas/issues/28) Photo capture/gallery/upload, thumbnails and a durable offline upload queue.
+- [x] [#29](https://github.com/akjeffrey/OrchardAtlas/issues/29) Richer harvest/yield reports and activity audit/recovery design.
 - [ ] [#30](https://github.com/akjeffrey/OrchardAtlas/issues/30) Consistent accessible symbol catalog; custom icon imports and sizing are tracked under **Newly requested features**.
 - [ ] [#31](https://github.com/akjeffrey/OrchardAtlas/issues/31) More map editing tools: split/join rows, vertex insertion and measurements. Plant movement via a map picker is already implemented.
 - [x] Android trial JSON backup/restore through the system file picker, including Google Drive, all orchards, pre-restore recovery and default external-file retention. Automatic writes wait for one minute without new edits (resetting after each edit), with local-first saves, failed-write retries and restart catch-up. See drive-backup-and-updates.md.
@@ -115,3 +115,8 @@ GitHub issues are the source of truth for outstanding work: [open tickets](https
 - [ ] [#42](https://github.com/akjeffrey/OrchardAtlas/issues/42) Explore advanced orchard analytics.
 
 Google satellite downloads/offline tile packs are not promised by this app.
+
+## Latest delivered additions
+
+- [x] [#69](https://github.com/akjeffrey/OrchardAtlas/issues/69) Plant Detail **Show on Map**, matching Edit Plant focus and Back navigation.
+- Implementation, availability and setup for #24/#26/#27/#28/#29: [sharing, media, reminders and reports](collaboration-photos-reminders-reports.md). Connected roles/public publishing/Storage require Firebase; the local APK retains local-first capture and Drive backup.

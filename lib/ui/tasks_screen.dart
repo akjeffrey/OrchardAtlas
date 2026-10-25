@@ -9,6 +9,8 @@ import '../domain/landscape.dart';
 import '../domain/filters.dart';
 import '../domain/work.dart';
 import 'common.dart';
+import 'task_editor.dart';
+import '../application/extensions.dart';
 import 'classification_picker.dart';
 import 'sections_screen.dart';
 
@@ -70,8 +72,28 @@ class TaskMemberTile extends ConsumerWidget {
           : crop != null
           ? () => context.push('/crops/${crop.id}')
           : null,
+      leading: ref.watch(canEditOrchardProvider)
+          ? IconButton(
+              tooltip: 'Edit task & reminders',
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () {
+                final plan = ref
+                    .read(taskPlansProvider)
+                    .valueOrNull
+                    ?.where((p) => p.id == task.planId)
+                    .firstOrNull;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => TaskEditor(task: task, plan: plan),
+                  ),
+                );
+              },
+            )
+          : null,
       trailing: PopupMenuButton<TaskStatus>(
         tooltip: 'Change task status',
+        enabled: !ref.watch(viewOnlyOrchardProvider),
         onSelected: (status) {
           try {
             ref
@@ -129,7 +151,20 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
         ?.where((p) => p.id == widget.id)
         .firstOrNull;
     return Scaffold(
-      appBar: AppBar(title: const Text('Group task checklist')),
+      appBar: AppBar(
+        title: const Text('Group task checklist'),
+        actions: [
+          if (plan != null && ref.watch(canEditOrchardProvider))
+            IconButton(
+              tooltip: 'Edit task & reminders',
+              icon: const Icon(Icons.edit),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute<void>(builder: (_) => TaskEditor(plan: plan)),
+              ),
+            ),
+        ],
+      ),
       body: ref
           .watch(tasksProvider)
           .when(
@@ -386,12 +421,14 @@ class _TasksState extends ConsumerState<TasksPane> {
         ),
       ),
       TextButton.icon(
-        onPressed: () => context.push('/tasks/new', extra: widget.itemId),
+        onPressed: ref.watch(viewOnlyOrchardProvider)
+            ? null
+            : () => context.push('/tasks/new', extra: widget.itemId),
         icon: const Icon(Icons.add_task),
         label: const Text('Add task'),
       ),
       const Text(
-        'Due dates are recorded; background reminders are not available yet.',
+        'Use Edit task & reminders to enable notifications for a task or group.',
       ),
       Expanded(
         child: ref

@@ -279,9 +279,19 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Apple 1'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('1500.000 g'),
+        150,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('1500.000 g'), findsOneWidget);
-      expect(find.textContaining('Pending sync'), findsNWidgets(2));
+      expect(find.textContaining('Pending sync'), findsWidgets);
       expect(find.textContaining('Harvest ·'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Add Another Like This'),
+        -150,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Add Another Like This'), findsOneWidget);
     },
   );

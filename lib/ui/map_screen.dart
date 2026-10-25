@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../application/providers.dart';
+import '../application/extensions.dart';
 import '../domain/landscape.dart';
 import '../domain/models.dart';
 import '../domain/orchards.dart';
@@ -102,7 +103,7 @@ class _MapState extends ConsumerState<MapScreen>
     if (widget.focus != null) {
       locationMessage = widget.focusPlantId == null
           ? 'Plant saved locally. Tap its marker to open Plant Detail.'
-          : 'Showing saved plant location. Use Back to return to the editor.';
+          : 'Showing saved plant location. Use Back to return to the previous page.';
     }
   }
 
@@ -119,7 +120,7 @@ class _MapState extends ConsumerState<MapScreen>
       selected = null;
       locationMessage = widget.focusPlantId == null
           ? 'Plant saved locally. Tap its marker to open Plant Detail.'
-          : 'Showing saved plant location. Use Back to return to the editor.';
+          : 'Showing saved plant location. Use Back to return to the previous page.';
       moveTo(widget.focus!);
     }
   }
@@ -398,6 +399,11 @@ class _MapState extends ConsumerState<MapScreen>
     final auth = ref.read(authRepositoryProvider);
     ref.read(sessionLockedProvider.notifier).state = true;
     try {
+      try {
+        await ref.read(reminderSchedulerProvider).clear();
+      } catch (_) {
+        /* Platforms without notification support have no pending reminders. */
+      }
       await orchard.clearDeviceCache();
       await auth.signOut();
     } catch (_) {
@@ -530,7 +536,7 @@ class _MapState extends ConsumerState<MapScreen>
         floatingActionButton: drawing != null
             ? null
             : FloatingActionButton.extended(
-                onPressed: place.hasValue
+                onPressed: place.hasValue && !ref.watch(viewOnlyOrchardProvider)
                     ? () => tabs.index == 2
                           ? context.push('/tasks/new')
                           : context.push('/plants/new', extra: selected)
@@ -613,14 +619,18 @@ class _MapState extends ConsumerState<MapScreen>
                             ),
                             if (drawing == null) ...[
                               TextButton.icon(
-                                onPressed: sectionData.hasValue
+                                onPressed:
+                                    sectionData.hasValue &&
+                                        !ref.watch(viewOnlyOrchardProvider)
                                     ? () => startDrawing(SectionKind.row)
                                     : null,
                                 icon: const Icon(Icons.timeline),
                                 label: const Text('Add row'),
                               ),
                               TextButton.icon(
-                                onPressed: sectionData.hasValue
+                                onPressed:
+                                    sectionData.hasValue &&
+                                        !ref.watch(viewOnlyOrchardProvider)
                                     ? () => startDrawing(SectionKind.area)
                                     : null,
                                 icon: const Icon(Icons.crop_square),

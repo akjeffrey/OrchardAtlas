@@ -8,6 +8,19 @@ service cloud.firestore {
     function owner(propertyId) {
       return signedIn() && get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
     }
+    function member(propertyId) {
+      return signedIn() && exists(/databases/$(database)/documents/properties/$(propertyId)/members/$(request.auth.uid));
+    }
+    function reader(propertyId) { return owner(propertyId) || member(propertyId); }
+    function writer(propertyId) {
+      return owner(propertyId) || (member(propertyId) && get(/databases/$(database)/documents/properties/$(propertyId)/members/$(request.auth.uid)).data.role == 'editor');
+    }
+    function invited(invitationId, propertyId) {
+      let i = get(/databases/$(database)/documents/invitations/$(invitationId)).data;
+      return signedIn() && request.auth.token.email_verified == true
+        && request.auth.token.email.lower() == i.email && i.orchard == propertyId
+        && get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == i.ownerId;
+    }
     function text(value) { return value is string && value.size() > 0 && value.size() <= 500; }
     function validItem(d, propertyId) {
       return d.keys().hasAll(['schemaVersion', 'kind', 'name', 'taxonId', 'location', 'createdAt'])
@@ -143,7 +156,7 @@ service cloud.firestore {
     function validEvent(d) {
       return d.keys().hasAll(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes'])
         && d.keys().hasOnly(['schemaVersion', 'authorId', 'type', 'occurredAt', 'activityDate', 'recordedAt', 'notes', 'harvest','taskId'])
-        && d.schemaVersion == 1 && d.authorId == request.auth.uid
+        && d.schemaVersion == 1 && d.authorId is string
         && d.type in ['planting', 'bloom', 'pruning', 'fertilizing', 'spraying', 'pestsDisease', 'watering', 'harvest', 'removal', 'note', 'photo', 'budBreak', 'firstBloom', 'fullBloom', 'petalFall', 'fruitSet', 'pest', 'disease', 'damage', 'harvestStart', 'harvestEnd', 'died', 'observation']
         && d.occurredAt is timestamp && d.recordedAt is timestamp
         && d.activityDate is string && d.activityDate.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')
@@ -156,12 +169,13 @@ service cloud.firestore {
     }
     function validPlan(d,propertyId) {
       return d.keys().hasAll(['schemaVersion','title','target','createdAt','notes','repeat'])
-        && d.keys().hasOnly(['schemaVersion','title','target','createdAt','notes','repeat','itemId','sectionId','cropId','taxonId','sectionKind','dueDate','eventType','eventHarvest'])
+        && d.keys().hasOnly(['schemaVersion','title','target','createdAt','notes','repeat','itemId','sectionId','cropId','taxonId','sectionKind','dueDate','eventType','eventHarvest','anchorOn'])
         && d.schemaVersion==1 && text(d.title) && d.notes is string && d.notes.size()<=10000 && d.createdAt is timestamp
         && d.target in ['plant','plants','section','sections','crop','crops','property']
         && d.repeat in ['none','daily','weekly','monthly','yearly']
         && (d.get('sectionKind','row') in ['area','row'])
         && (d.get('dueDate',null)==null || date(d.dueDate))
+        && (d.get('anchorOn',null)==null || date(d.anchorOn))
         && (d.get('taxonId',null)==null || (d.taxonId is string && uuid(d.taxonId)))
         && (d.get('itemId',null)==null || (d.itemId is string && uuid(d.itemId) && exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(d.itemId))))
         && (d.get('sectionId',null)==null || (d.sectionId is string && uuid(d.sectionId) && exists(/databases/$(database)/documents/properties/$(propertyId)/sections/$(d.sectionId))))
@@ -170,7 +184,7 @@ service cloud.firestore {
         && (d.get('eventType',null)!='harvest' || validHarvest({'harvest':d.get('eventHarvest',null)}));
     }
     match /properties/{propertyId} {
-      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+      allow read: if signedIn() && (resource.data.ownerId == request.auth.uid || member(propertyId));
       allow create: if signedIn() && uuid(propertyId)
         && request.resource.data.keys().hasAll(['schemaVersion', 'name', 'ownerId', 'createdAt'])
         && request.resource.data.keys().hasOnly(['schemaVersion', 'name', 'ownerId', 'createdAt'])
@@ -179,28 +193,90 @@ service cloud.firestore {
         && text(request.resource.data.name) && request.resource.data.createdAt is timestamp;
       allow update: if owner(propertyId) && text(request.resource.data.name) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
       allow delete: if false;
-      match /sections/{sectionId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(sectionId) && request.resource.data.parentId != sectionId && validSection(request.resource.data, propertyId);
-        allow update: if owner(propertyId) && validSection(request.resource.data, propertyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','notes','vertices','color','symbol','customIconId','kind'])
-          && (request.resource.data.kind == resource.data.kind || (resource.data.kind=='bed' && request.resource.data.kind=='area'));
+      match /members/{userId} {
+        allow read: if reader(propertyId);
+        allow create: if signedIn() && request.auth.uid == userId
+          && request.resource.data.keys().hasOnly(['role','invitationId'])
+          && request.resource.data.role in ['editor','viewer']
+          && invited(request.resource.data.invitationId,propertyId)
+          && get(/databases/$(database)/documents/invitations/$(request.resource.data.invitationId)).data.role == request.resource.data.role;
+        allow update: if owner(propertyId) && request.resource.data.role in ['editor','viewer']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role']);
         allow delete: if owner(propertyId);
       }
+      match /foraging/{resourceId} {
+        allow read: if reader(propertyId);
+        allow create, update: if writer(propertyId) && uuid(resourceId)
+          && ((request.resource.data.keys().hasOnly(['id','name','taxonId','latitude','longitude','createdAt','startMonth','endMonth','public','notes'])
+            && request.resource.data.id==resourceId && text(request.resource.data.name)
+            && uuid(request.resource.data.taxonId) && request.resource.data.latitude is number
+            && request.resource.data.latitude>=-90 && request.resource.data.latitude<=90
+            && request.resource.data.longitude is number && request.resource.data.longitude>=-180 && request.resource.data.longitude<=180
+            && request.resource.data.startMonth is int && request.resource.data.startMonth>=1 && request.resource.data.startMonth<=12
+            && request.resource.data.endMonth is int && request.resource.data.endMonth>=1 && request.resource.data.endMonth<=12
+            && request.resource.data.public is bool && request.resource.data.notes is string && request.resource.data.notes.size()<=10000
+            && request.resource.data.createdAt is string)
+          || (request.resource.data.keys().hasOnly(['id','parentId','observation','date'])
+            && request.resource.data.id==resourceId && uuid(request.resource.data.parentId)
+            && exists(/databases/$(database)/documents/properties/$(propertyId)/foraging/$(request.resource.data.parentId))
+            && request.resource.data.observation is string && request.resource.data.observation.size()>0 && request.resource.data.observation.size()<=10000
+            && date(request.resource.data.date)));
+        allow delete: if writer(propertyId);
+      }
+      match /reminder/{reminderId} {
+        allow read: if reader(propertyId);
+        allow create, update: if writer(propertyId) && uuid(reminderId)
+          && request.resource.data.keys().hasOnly(['id','days']) && request.resource.data.id==reminderId
+          && request.resource.data.days is int && request.resource.data.days>=0 && request.resource.data.days<=365;
+        allow delete: if writer(propertyId);
+      }
+      match /activityRevision/{revisionId} {
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(revisionId)
+          && request.resource.data.keys().hasOnly(['id','itemId','eventId','action','changedAt','event'])
+          && request.resource.data.id==revisionId && uuid(request.resource.data.itemId) && uuid(request.resource.data.eventId)
+          && request.resource.data.action in ['edited','deleted'] && request.resource.data.changedAt is string
+          && request.resource.data.event == get(/databases/$(database)/documents/properties/$(propertyId)/items/$(request.resource.data.itemId)/events/$(request.resource.data.eventId)).data;
+        allow update: if false;
+        allow delete: if writer(propertyId) && !exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(resource.data.itemId));
+      }
+      match /photo/{photoId} {
+        function photo(d) {
+          return d.keys().hasOnly(['id','itemId','authorId','createdAt','storagePath','image','thumbnail','state','error'])
+            && d.id==photoId && uuid(d.itemId) && d.authorId is string && d.createdAt is string
+            && d.storagePath == 'properties/'+propertyId+'/items/'+d.itemId+'/photos/'+photoId+'.jpg'
+            && d.thumbnail is string && d.thumbnail.size()<=43692
+            && (d.image==null || (d.image is string && d.image.size()<=699052))
+            && d.state in ['pending','uploaded'] && (d.get('error',null)==null || (d.error is string && d.error.size()<=500));
+        }
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(photoId) && photo(request.resource.data) && request.resource.data.authorId==request.auth.uid;
+        allow update: if writer(propertyId) && photo(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state','image','error']);
+        allow delete: if writer(propertyId);
+      }
+      match /sections/{sectionId} {
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(sectionId) && request.resource.data.parentId != sectionId && validSection(request.resource.data, propertyId);
+        allow update: if writer(propertyId) && validSection(request.resource.data, propertyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','notes','vertices','color','symbol','customIconId','kind'])
+          && (request.resource.data.kind == resource.data.kind || (resource.data.kind=='bed' && request.resource.data.kind=='area'));
+        allow delete: if writer(propertyId);
+      }
       match /crops/{cropId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(cropId) && validCrop(request.resource.data, propertyId) && request.resource.data.status == 'growing';
-        allow update: if owner(propertyId) && validCrop(request.resource.data, propertyId)
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(cropId) && validCrop(request.resource.data, propertyId) && request.resource.data.status == 'growing';
+        allow update: if writer(propertyId) && validCrop(request.resource.data, propertyId)
           && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lifeCycle'])
             && request.resource.data.get('lifeCycle','annual') != resource.data.get('lifeCycle','annual'))
           || (resource.data.status != 'ended' && request.resource.data.status != 'growing'
             && request.resource.data.get('lifeCycle','annual') == resource.data.get('lifeCycle','annual')
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','harvestedOn','lifeCycle'])));
-        allow delete: if owner(propertyId);
+        allow delete: if writer(propertyId);
       }
       match /cropHarvests/{harvestId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(harvestId)
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(harvestId)
           && request.resource.data.keys().hasAll(['schemaVersion','cropId','activityDate','notes','recordedAt','harvest'])
           && request.resource.data.keys().hasOnly(['schemaVersion','cropId','activityDate','notes','recordedAt','harvest'])
           && request.resource.data.schemaVersion == 1 && request.resource.data.cropId is string && uuid(request.resource.data.cropId)
@@ -208,29 +284,31 @@ service cloud.firestore {
           && date(request.resource.data.activityDate) && request.resource.data.recordedAt is timestamp
           && request.resource.data.notes is string && request.resource.data.notes.size() <= 10000 && validHarvest(request.resource.data);
         allow update: if false;
-        allow delete: if owner(propertyId);
+        allow delete: if writer(propertyId);
       }
       match /taskPlans/{planId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(planId) && validPlan(request.resource.data,propertyId);
-        allow update: if owner(propertyId) && validPlan(request.resource.data,propertyId) && request.resource.data.createdAt==resource.data.createdAt;
-        allow delete: if owner(propertyId);
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(planId) && validPlan(request.resource.data,propertyId);
+        allow update: if writer(propertyId) && validPlan(request.resource.data,propertyId) && request.resource.data.createdAt==resource.data.createdAt;
+        allow delete: if writer(propertyId);
       }
       match /tasks/{taskId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(taskId) && validTask(request.resource.data, propertyId);
-        allow update: if owner(propertyId) && validTask(request.resource.data, propertyId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedOn']);
-        allow delete: if owner(propertyId);
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(taskId) && validTask(request.resource.data, propertyId);
+        allow update: if writer(propertyId) && validTask(request.resource.data, propertyId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedOn'])
+          || (writer(propertyId) && validTask(request.resource.data,propertyId) && resource.data.status=='open'
+          && request.resource.data.status=='open' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','notes','dueDate','eventType','eventHarvest']));
+        allow delete: if writer(propertyId);
       }
       match /icons/{iconId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(iconId)
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(iconId)
           && request.resource.data.keys().hasOnly(['schemaVersion','name','png'])
           && request.resource.data.schemaVersion==1 && text(request.resource.data.name)
           && request.resource.data.png is string && request.resource.data.png.size()<=43692
           && request.resource.data.png.matches('iVBORw0KGgo.*');
-        allow update: if owner(propertyId) && resource.data.get('deleted',false)==false
+        allow update: if writer(propertyId) && resource.data.get('deleted',false)==false
           && ((text(request.resource.data.name)
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']))
           || (request.resource.data.keys().hasOnly(['schemaVersion','name','png','deleted'])
@@ -239,30 +317,64 @@ service cloud.firestore {
         allow delete: if false;
       }
       match /taxa/{taxonId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(taxonId) && validTaxon(request.resource.data,propertyId);
-        allow update: if owner(propertyId) && validTaxon(request.resource.data,propertyId)
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(taxonId) && validTaxon(request.resource.data,propertyId);
+        allow update: if writer(propertyId) && validTaxon(request.resource.data,propertyId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','symbol','customIconId','scientificName','iconOverride']);
         allow delete: if false;
       }
       match /items/{itemId} {
-        allow read: if owner(propertyId);
-        allow create: if owner(propertyId) && uuid(itemId) && validItem(request.resource.data, propertyId);
-        allow update: if owner(propertyId) && validItem(request.resource.data, propertyId)
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(itemId) && validItem(request.resource.data, propertyId);
+        allow update: if writer(propertyId) && validItem(request.resource.data, propertyId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','taxonId','location','plantedOn','accuracyMeters','rowOrder','rootstock','nursery','notes','status','sectionId','lifeCycle','season']);
-        allow delete: if owner(propertyId);
-        match /photos/{photoId} { allow read, delete: if owner(propertyId); allow create, update: if false; }
+        allow delete: if writer(propertyId);
+        match /photos/{photoId} { allow read, delete: if writer(propertyId); allow create, update: if false; }
         match /events/{eventId} {
-          allow read: if owner(propertyId);
-          allow create: if owner(propertyId) && uuid(eventId)
+          allow read: if reader(propertyId);
+          allow create: if writer(propertyId) && uuid(eventId)
             && getAfter(/databases/$(database)/documents/properties/$(propertyId)/items/$(itemId)).data.kind == 'managedPlant'
-            && validEvent(request.resource.data);
-          allow update: if owner(propertyId) && validEvent(request.resource.data)
+            && validEvent(request.resource.data) && request.resource.data.authorId == request.auth.uid;
+          allow update: if writer(propertyId) && validEvent(request.resource.data)
             && request.resource.data.authorId==resource.data.authorId && request.resource.data.recordedAt==resource.data.recordedAt
             && request.resource.data.get('taskId',null)==resource.data.get('taskId',null);
-          allow delete: if owner(propertyId);
+          allow delete: if writer(propertyId);
         }
       }
+    }
+    match /invitations/{invitationId} {
+      allow read: if signedIn() && ((request.auth.token.email_verified==true && resource.data.email==request.auth.token.email.lower()) || resource.data.ownerId==request.auth.uid);
+      allow create: if signedIn() && uuid(invitationId)
+        && request.resource.data.keys().hasOnly(['orchard','orchardName','ownerId','email','role','createdAt'])
+        && owner(request.resource.data.orchard) && request.resource.data.ownerId==request.auth.uid
+        && text(request.resource.data.orchardName) && request.resource.data.email is string
+        && request.resource.data.email.size()<=254 && request.resource.data.email==request.resource.data.email.lower()
+        && request.resource.data.role in ['editor','viewer'] && request.resource.data.createdAt is timestamp;
+      allow update: if false;
+      allow delete: if signedIn() && (resource.data.ownerId==request.auth.uid || (request.auth.token.email_verified==true && resource.data.email==request.auth.token.email.lower()));
+    }
+    match /users/{userId}/orchards/{propertyId} {
+      allow read, delete: if signedIn() && request.auth.uid==userId;
+      allow create: if signedIn() && request.auth.uid==userId
+        && request.resource.data.keys().hasOnly(['invitationId'])
+        && invited(request.resource.data.invitationId,propertyId)
+        && getAfter(/databases/$(database)/documents/properties/$(propertyId)/members/$(userId)).data.invitationId==request.resource.data.invitationId;
+      allow update: if false;
+    }
+    match /publicResources/{resourceId} {
+      allow read: if signedIn();
+      allow create, update: if writer(request.resource.data.orchard)
+        && request.resource.data.keys().hasOnly(['id','orchard','name','taxonId','latitude','longitude','startMonth','endMonth'])
+        && resourceId==request.resource.data.orchard+'_'+request.resource.data.id
+        && getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.public==true
+        && request.resource.data.keys().hasAll(['id','orchard','name','taxonId','latitude','longitude','startMonth','endMonth'])
+        && request.resource.data.taxonId==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.taxonId
+        && request.resource.data.startMonth==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.startMonth
+        && request.resource.data.endMonth==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.endMonth
+        && request.resource.data.name==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.name
+        && request.resource.data.latitude==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.latitude
+        && request.resource.data.longitude==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.longitude;
+      allow delete: if signedIn() && (!exists(/databases/$(database)/documents/publicResources/$(resourceId)) || writer(resource.data.orchard));
     }
     match /{document=**} { allow read, write: if false; }
   }

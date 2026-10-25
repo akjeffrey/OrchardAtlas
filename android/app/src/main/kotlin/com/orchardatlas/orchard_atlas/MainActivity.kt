@@ -12,13 +12,20 @@ import android.view.WindowInsetsController
 import java.util.Locale
 
 class MainActivity : FlutterActivity() {
+    private lateinit var photoChannel: PhotoChannel
+    private lateinit var reminderChannel: ReminderChannel
     private lateinit var backupChannel: BackupChannel
     @Deprecated("Used by Android document providers on supported trial phones")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (::photoChannel.isInitialized && photoChannel.onActivityResult(requestCode,resultCode,data)) return
         if (::backupChannel.isInitialized && backupChannel.onActivityResult(requestCode, resultCode, data)) return
         super.onActivityResult(requestCode, resultCode, data)
     }
 
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        if (::reminderChannel.isInitialized && reminderChannel.permissionResult(requestCode,grantResults)) return
+        super.onRequestPermissionsResult(requestCode,permissions,grantResults)
+    }
     override fun onResume() {
         super.onResume()
         window.decorView.post { hideNavigationBar() }
@@ -45,6 +52,10 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        photoChannel = PhotoChannel(this)
+        reminderChannel = ReminderChannel(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/photos").setMethodCallHandler(photoChannel)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/reminders").setMethodCallHandler(reminderChannel)
         backupChannel = BackupChannel(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/backup").setMethodCallHandler(backupChannel)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/map_services")

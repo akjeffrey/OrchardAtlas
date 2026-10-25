@@ -84,5 +84,7 @@ abstract interface class LocationRepository {
 }
 
 abstract interface class PhotoRepository {
+  Future<Uint8List> read(String storagePath);
+  Future<void> delete(String storagePath);
   Future<void> upload(Photo photo, Uint8List bytes, String contentType);
 }

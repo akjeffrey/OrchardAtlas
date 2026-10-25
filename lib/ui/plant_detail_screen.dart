@@ -3,11 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../application/providers.dart';
+import '../application/extensions.dart';
 import '../domain/models.dart';
 import 'common.dart';
 import 'events_table.dart';
 import 'delete_actions.dart';
 import 'life_cycle_button.dart';
+import 'photos_panel.dart';
 
 class PlantDetailScreen extends ConsumerStatefulWidget {
   const PlantDetailScreen(this.id, {super.key});
@@ -56,6 +58,24 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                 style: Theme.of(context).textTheme.headlineMedium,
               ),
               Text(path),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.map_outlined),
+                label: const Text('Show on Map'),
+                onPressed: () {
+                  if (plant.status == ItemStatus.archived) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Restore this archived plant before showing it on the map.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+                  context.push('/?plant=${plant.id}', extra: plant.location);
+                },
+              ),
+              PhotosPanel(plant.id),
               Text('Status: ${plant.status.name}'),
               Text(
                 'Management: ${plant.lifeCycle.name}${plant.season == null ? '' : ' · ${plant.season}'}',
@@ -82,12 +102,16 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                 spacing: 8,
                 children: [
                   TextButton(
-                    onPressed: () =>
-                        deletePlantWithConfirmation(context, ref, plant),
+                    onPressed: ref.watch(viewOnlyOrchardProvider)
+                        ? null
+                        : () =>
+                              deletePlantWithConfirmation(context, ref, plant),
                     child: const Text('Delete permanently'),
                   ),
                   TextButton.icon(
-                    onPressed: () => context.push('/plants/${plant.id}/edit'),
+                    onPressed: ref.watch(viewOnlyOrchardProvider)
+                        ? null
+                        : () => context.push('/plants/${plant.id}/edit'),
                     icon: const Icon(Icons.edit),
                     label: const Text('Edit plant'),
                   ),
@@ -97,48 +121,55 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
                     label: const Text('Plant tasks'),
                   ),
                   TextButton(
-                    onPressed: () async {
-                      final archive = plant.status == ItemStatus.active;
-                      final confirmed = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: Text(
-                            archive ? 'Archive plant?' : 'Restore plant?',
-                          ),
-                          content: const Text(
-                            'History and tasks are retained. Archived plants never show on the map; find them in Archived Plants.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            FilledButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              child: Text(archive ? 'Archive' : 'Restore'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirmed == true && context.mounted) {
-                        try {
-                          ref
-                              .read(orchardRepositoryProvider)
-                              .updatePlant(
-                                plant.copyWith(
-                                  status: archive
-                                      ? ItemStatus.archived
-                                      : ItemStatus.active,
+                    onPressed: ref.watch(viewOnlyOrchardProvider)
+                        ? null
+                        : () async {
+                            final archive = plant.status == ItemStatus.active;
+                            final confirmed = await showDialog<bool>(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: Text(
+                                  archive ? 'Archive plant?' : 'Restore plant?',
                                 ),
-                              );
-                        } catch (e) {
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context)
-                                .showSnackBar(SnackBar(content: Text('$e')));
-                          }
-                        }
-                      }
-                    },
+                                content: const Text(
+                                  'History and tasks are retained. Archived plants never show on the map; find them in Archived Plants.',
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, false),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  FilledButton(
+                                    onPressed: () =>
+                                        Navigator.pop(context, true),
+                                    child: Text(
+                                      archive ? 'Archive' : 'Restore',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                            if (confirmed == true && context.mounted) {
+                              try {
+                                ref
+                                    .read(orchardRepositoryProvider)
+                                    .updatePlant(
+                                      plant.copyWith(
+                                        status: archive
+                                            ? ItemStatus.archived
+                                            : ItemStatus.active,
+                                      ),
+                                    );
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(
+                                    context,
+                                  ).showSnackBar(SnackBar(content: Text('$e')));
+                                }
+                              }
+                            }
+                          },
                     child: Text(
                       plant.status == ItemStatus.active
                           ? 'Archive plant'
@@ -152,29 +183,33 @@ class _DetailState extends ConsumerState<PlantDetailScreen> {
               ),
               SyncStatus(snapshot),
               FilledButton.icon(
-                onPressed: () => context.push('/plants/${plant.id}/activity'),
+                onPressed: ref.watch(viewOnlyOrchardProvider)
+                    ? null
+                    : () => context.push('/plants/${plant.id}/activity'),
                 icon: const Icon(Icons.edit_note),
                 label: const Text('Record Activity / Harvest'),
               ),
               OutlinedButton(
-                onPressed: () async {
-                  try {
-                    final history = await ref.read(
-                      eventsProvider(plant.id).future,
-                    );
-                    if (context.mounted) {
-                      context.push(
-                        '/plants/new',
-                        extra: plant.templateWithHistory(history.value),
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context)
-                          .showSnackBar(SnackBar(content: Text('$e')));
-                    }
-                  }
-                },
+                onPressed: ref.watch(viewOnlyOrchardProvider)
+                    ? null
+                    : () async {
+                        try {
+                          final history = await ref.read(
+                            eventsProvider(plant.id).future,
+                          );
+                          if (context.mounted) {
+                            context.push(
+                              '/plants/new',
+                              extra: plant.templateWithHistory(history.value),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context)
+                                .showSnackBar(SnackBar(content: Text('$e')));
+                          }
+                        }
+                      },
                 child: const Text('Add Another Like This'),
               ),
               Row(
