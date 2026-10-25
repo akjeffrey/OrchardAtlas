@@ -68,6 +68,20 @@ class FirestoreOrchardRepository
     return reference.get(const GetOptions(source: Source.server));
   }
 
+  Future<void> _checkAccess(Place place, String userId) async {
+    if (place.ownerId == userId) return;
+    final membership = await firestore
+        .collection('properties')
+        .doc(place.id)
+        .collection('members')
+        .doc(userId)
+        .get();
+    if (!membership.exists ||
+        !['editor', 'viewer'].contains(membership.data()?['role'])) {
+      throw StateError('Orchard access unavailable');
+    }
+  }
+
   @override
   Future<Place> openDefaultPlace(String userId) async {
     final key = 'default-place:$userId';
@@ -81,7 +95,7 @@ class FirestoreOrchardRepository
         throw StateError('Property unavailable. Reconnect to restore access.');
       }
       final place = FirestoreMapping.placeFromMap(doc.id, doc.data()!);
-
+      await _checkAccess(place, userId);
       return place;
     }
     // Server lookup prevents a cache miss from creating duplicate default places.
@@ -218,6 +232,7 @@ class FirestoreOrchardRepository
           return FirestoreMapping.placeFromMap(doc.id, doc.data()!);
         }();
 
+    await _checkAccess(place, userId);
     if (!await preferences.setString('default-place:$userId', place.id)) {
       throw StateError('Could not save orchard selection');
     }

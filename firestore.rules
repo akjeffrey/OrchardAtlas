@@ -238,7 +238,7 @@ service cloud.firestore {
           && request.resource.data.action in ['edited','deleted'] && request.resource.data.changedAt is string
           && request.resource.data.event == get(/databases/$(database)/documents/properties/$(propertyId)/items/$(request.resource.data.itemId)/events/$(request.resource.data.eventId)).data;
         allow update: if false;
-        allow delete: if owner(propertyId) && !exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(resource.data.itemId));
+        allow delete: if writer(propertyId) && !exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(resource.data.itemId));
       }
       match /photo/{photoId} {
         function photo(d) {
@@ -367,6 +367,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['id','orchard','name','taxonId','latitude','longitude','startMonth','endMonth'])
         && resourceId==request.resource.data.orchard+'_'+request.resource.data.id
         && getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.public==true
+        && request.resource.data.keys().hasAll(['id','orchard','name','taxonId','latitude','longitude','startMonth','endMonth'])
+        && request.resource.data.taxonId==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.taxonId
+        && request.resource.data.startMonth==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.startMonth
+        && request.resource.data.endMonth==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.endMonth
         && request.resource.data.name==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.name
         && request.resource.data.latitude==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.latitude
         && request.resource.data.longitude==getAfter(/databases/$(database)/documents/properties/$(request.resource.data.orchard)/foraging/$(request.resource.data.id)).data.longitude;

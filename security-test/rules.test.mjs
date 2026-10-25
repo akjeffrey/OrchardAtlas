@@ -430,10 +430,11 @@ test('verified invitation acceptance is atomic and cannot escalate role or accep
 test('foraging publication exposes only approved listing fields, observations remain private', async () => {
   const resource = { id:resourceId,name:'Wild pears',taxonId:taxon,latitude:51,longitude:0,
     createdAt:'2026-10-25T00:00:00Z',startMonth:9,endMonth:11,public:true,notes:'Private gate details' };
-  const batch=writeBatch(db('alice'));
-  batch.set(doc(db('alice'),`${propertyPath}/foraging/${resourceId}`),resource);
+  const store=db('alice');
+  const batch=writeBatch(store);
+  batch.set(doc(store,`${propertyPath}/foraging/${resourceId}`),resource);
   const listing={id:resourceId,orchard:property,name:resource.name,taxonId:taxon,latitude:51,longitude:0,startMonth:9,endMonth:11};
-  batch.set(doc(db('alice'),`publicResources/${property}_${resourceId}`),listing);
+  batch.set(doc(store,`publicResources/${property}_${resourceId}`),listing);
   await assertSucceeds(batch.commit());
   await assertSucceeds(getDoc(doc(db('bob'),`publicResources/${property}_${resourceId}`)));
   await assertFails(getDoc(doc(db('bob'),`${propertyPath}/foraging/${resourceId}`)));
@@ -446,9 +447,10 @@ test('activity revision payload must match the original event and stays immutabl
   const path=`${propertyPath}/activityRevision/${resourceId}`;
   const revision={id:resourceId,itemId:item,eventId:event,action:'edited',changedAt:'2026-10-25T00:00:00Z',event:harvest};
   await assertFails(setDoc(doc(db('alice'),path),{...revision,event:{...harvest,notes:'Forged'}}));
-  const batch=writeBatch(db('alice'));
-  batch.set(doc(db('alice'),path),revision);
-  batch.update(doc(db('alice'),eventPath),{notes:'Updated'});
+  const store=db('alice');
+  const batch=writeBatch(store);
+  batch.set(doc(store,path),revision);
+  batch.update(doc(store,eventPath),{notes:'Updated'});
   await assertSucceeds(batch.commit());
   await assertFails(updateDoc(doc(db('alice'),path),{action:'deleted'}));
   await assertFails(deleteDoc(doc(db('alice'),path)));
