@@ -36,7 +36,9 @@ import UniformTypeIdentifiers
     let reminders = FlutterMethodChannel(name: "orchard_atlas/reminders", binaryMessenger: registrar.messenger())
     reminders.setMethodCallHandler { call, result in
       let center = UNUserNotificationCenter.current()
-      if call.method == "permission" {
+      if call.method == "clear" {
+        center.removeAllPendingNotificationRequests(); center.removeAllDeliveredNotifications(); result(nil)
+      } else if call.method == "permission" {
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in DispatchQueue.main.async { result(granted) } }
       } else if call.method == "replace", let args = call.arguments as? [String: Any],
           let orchard = args["orchard"] as? String, let rows = args["notifications"] as? [[String: Any]] {

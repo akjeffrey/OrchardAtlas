@@ -15,6 +15,8 @@ class DeviceCamera implements CameraRepository {
 }
 
 class DeviceReminders implements ReminderScheduler {
+  @override
+  Future<void> clear() => _channel.invokeMethod<void>('clear');
   static const _channel = MethodChannel('orchard_atlas/reminders');
   @override
   Future<bool> requestPermission() async =>

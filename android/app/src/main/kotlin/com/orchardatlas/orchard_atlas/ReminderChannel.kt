@@ -15,6 +15,11 @@ class ReminderChannel(private val activity: MainActivity) : MethodChannel.Method
     private var permission: MethodChannel.Result? = null
     override fun onMethodCall(call: MethodCall,result: MethodChannel.Result) {
         when(call.method) {
+            "clear" -> {
+                val prefs=activity.getSharedPreferences("orchard-reminders",Context.MODE_PRIVATE)
+                for(scope in prefs.all.keys)ReminderReceiver.replace(activity,scope,JSONArray())
+                prefs.edit().clear().commit();result.success(null)
+            }
             "permission" -> {
                 if(Build.VERSION.SDK_INT>=33 && activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) {
                     if(permission!=null){result.error("busy","Permission request already open",null);return}

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { after, before, beforeEach, test } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
+import { ref, uploadBytes, getMetadata, deleteObject } from 'firebase/storage';
 import { collection, doc, getDoc, getDocs, query, where, setDoc, updateDoc, deleteDoc, writeBatch, Timestamp, GeoPoint } from 'firebase/firestore';
 
 const property = '00000000-0000-4000-8000-000000000001';
@@ -17,11 +18,13 @@ let env;
 const db = (uid) => uid ? env.authenticatedContext(uid).firestore() : env.unauthenticatedContext().firestore();
 before(async () => {
   env = await initializeTestEnvironment({ projectId: 'demo-orchard-atlas',
-    firestore: { rules: readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8') } });
+    firestore: { rules: readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8') },
+    storage: { rules: readFileSync(new URL('../storage.rules', import.meta.url), 'utf8') } });
 });
 after(async () => { await env?.cleanup(); });
 beforeEach(async () => {
   await env.clearFirestore();
+  await env.clearStorage();
   await setDoc(doc(db('alice'), propertyPath), { schemaVersion: 1, ownerId: 'alice', name: 'Orchard', createdAt: now });
   await setDoc(doc(db('alice'), itemPath), plant);
 });
@@ -469,4 +472,19 @@ test('photo metadata and task reminders enforce orchard role and bounded paths/s
   await assertSucceeds(setDoc(doc(db('alice'),reminder),{id:event,days:1}));
   await assertFails(updateDoc(doc(db('alice'),reminder),{days:-1}));
   await assertFails(deleteDoc(doc(db('viewer'),reminder)));
+});
+
+test('Storage enforces photo orchard roles and JPEG size/type bounds', async () => {
+  await seedMember('editor','editor'); await seedMember('viewer','viewer');
+  const path=`properties/${property}/items/${item}/photos/${resourceId}.jpg`;
+  const storage=(uid)=>env.authenticatedContext(uid).storage();
+  await assertSucceeds(uploadBytes(ref(storage('alice'),path),new Uint8Array([255,216,255]),{contentType:'image/jpeg'}));
+  await assertSucceeds(getMetadata(ref(storage('viewer'),path)));
+  await assertFails(uploadBytes(ref(storage('viewer'),path),new Uint8Array([1]),{contentType:'image/jpeg'}));
+  await assertFails(getMetadata(ref(storage('stranger'),path)));
+  await assertFails(uploadBytes(ref(storage('editor'),path),new Uint8Array(524289),{contentType:'image/jpeg'}));
+  await assertFails(uploadBytes(ref(storage('editor'),path),new Uint8Array([1]),{contentType:'text/plain'}));
+  await assertSucceeds(uploadBytes(ref(storage('editor'),path),new Uint8Array([1]),{contentType:'image/jpeg'}));
+  await assertFails(deleteObject(ref(storage('viewer'),path)));
+  await assertSucceeds(deleteObject(ref(storage('editor'),path)));
 });

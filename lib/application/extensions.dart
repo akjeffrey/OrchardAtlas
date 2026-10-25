@@ -21,7 +21,7 @@ final recordsProvider = StreamProvider.autoDispose
       yield* repo.watchRecords(orchard.id, kind);
     });
 final resourcesProvider = Provider<AsyncValue<List<ResourceRecord>>>((ref) {
-  final orchard = ref.watch(placeProvider).valueOrNull;
+  final orchard = ref.watch(placeProvider).asData?.value;
   return ref
       .watch(recordsProvider(RecordKind.foraging))
       .whenData(
@@ -56,7 +56,7 @@ final orchardMembersProvider = StreamProvider<List<Permission>>((ref) async* {
   yield* repo?.members(place.id) ?? Stream.value([]);
 });
 final canEditOrchardProvider = Provider<bool>((ref) {
-  final p = ref.watch(placeProvider).valueOrNull,
+  final p = ref.watch(placeProvider).asData?.value,
       u = ref.watch(userProvider).valueOrNull;
   return p != null &&
       u != null &&
@@ -69,8 +69,8 @@ final canEditOrchardProvider = Provider<bool>((ref) {
 /// One serialized worker; source bytes stay durable until object upload succeeds.
 final photoWorkerProvider = Provider<void>((ref) {
   if (ref.watch(trialModeProvider)) return;
-  final photos = ref.watch(recordsProvider(RecordKind.photo)).valueOrNull;
-  final place = ref.watch(placeProvider).valueOrNull;
+  final photos = ref.watch(recordsProvider(RecordKind.photo)).asData?.value;
+  final place = ref.watch(placeProvider).asData?.value;
   final repo = ref.watch(orchardRecordsProvider);
 
   final permitted = ref.watch(canEditOrchardProvider);
@@ -222,15 +222,15 @@ List<Map<String, dynamic>> dueNotifications(
 }
 
 final reminderWorkerProvider = Provider<void>((ref) {
-  final tasks = ref.watch(tasksProvider).valueOrNull?.value;
-  final records = ref.watch(recordsProvider(RecordKind.reminder)).valueOrNull;
+  final tasks = ref.watch(tasksProvider).asData?.value.value;
+  final records = ref.watch(recordsProvider(RecordKind.reminder)).asData?.value;
   final scheduler = ref.watch(reminderSchedulerProvider);
   if (tasks == null || records == null) return;
   final now = ref.watch(minuteClockProvider);
-  final plans = ref.watch(taskPlansProvider).valueOrNull;
-  final plants = ref.watch(plantsProvider).valueOrNull?.value;
-  final crops = ref.watch(cropsProvider).valueOrNull?.value;
-  final sections = ref.watch(sectionsProvider).valueOrNull?.value;
+  final plans = ref.watch(taskPlansProvider).asData?.value;
+  final plants = ref.watch(plantsProvider).asData?.value.value;
+  final crops = ref.watch(cropsProvider).asData?.value.value;
+  final sections = ref.watch(sectionsProvider).asData?.value.value;
   final predictions =
       plans == null || plants == null || crops == null || sections == null
       ? <OrchardTask>[]
@@ -243,7 +243,7 @@ final reminderWorkerProvider = Provider<void>((ref) {
           taxonomy: ref.watch(taxonomyProvider),
           now: now.add(const Duration(days: 30)),
         );
-  final orchard = ref.watch(placeProvider).valueOrNull;
+  final orchard = ref.watch(placeProvider).asData?.value;
   if (orchard == null) return;
   scheduleMicrotask(() async {
     try {
@@ -264,3 +264,10 @@ final publicResourcesProvider =
       (ref) =>
           ref.watch(sharingProvider)?.publicResources() ?? Stream.value([]),
     );
+
+final viewOnlyOrchardProvider = Provider<bool>(
+  (ref) =>
+      ref.watch(placeProvider).hasValue &&
+      ref.watch(userProvider).valueOrNull != null &&
+      !ref.watch(canEditOrchardProvider),
+);

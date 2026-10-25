@@ -93,6 +93,7 @@ class TaskMemberTile extends ConsumerWidget {
           : null,
       trailing: PopupMenuButton<TaskStatus>(
         tooltip: 'Change task status',
+        enabled: !ref.watch(viewOnlyOrchardProvider),
         onSelected: (status) {
           try {
             ref
@@ -420,7 +421,9 @@ class _TasksState extends ConsumerState<TasksPane> {
         ),
       ),
       TextButton.icon(
-        onPressed: () => context.push('/tasks/new', extra: widget.itemId),
+        onPressed: ref.watch(viewOnlyOrchardProvider)
+            ? null
+            : () => context.push('/tasks/new', extra: widget.itemId),
         icon: const Icon(Icons.add_task),
         label: const Text('Add task'),
       ),

@@ -45,7 +45,8 @@ link and consumes the invitation. Invitations cannot grant ownership. The owner
 can revoke members; content editors cannot manage membership or rename orchards.
 A revoked directory link is harmless: every orchard read is checked independently.
 Viewers can read; editors can modify orchard content. Rules are authoritative,
-including for requests bypassing the UI. Offline cached data cannot be remotely
+including for requests bypassing the UI. Viewer mode labels the orchard and disables
+common editing controls. Signing out cancels scheduled notifications. Offline cached data cannot be remotely
 erased; sign out and clear cache on shared phones. Revocation takes effect on
 server access; queued writes are rejected if access has been removed.
 

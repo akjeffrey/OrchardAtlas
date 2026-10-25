@@ -85,6 +85,7 @@ abstract interface class CameraRepository {
 }
 
 abstract interface class ReminderScheduler {
+  Future<void> clear();
   Future<bool> requestPermission();
   Future<void> replace(
     String orchard,

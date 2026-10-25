@@ -35,6 +35,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/sign-in';
       }
       if (authenticated && state.matchedLocation == '/sign-in') return '/';
+      if (ref.read(viewOnlyOrchardProvider) &&
+          (state.matchedLocation.endsWith('/edit') ||
+              state.matchedLocation.endsWith('/new') ||
+              state.matchedLocation.endsWith('/activity') ||
+              state.matchedLocation.endsWith('/harvest'))) {
+        return '/';
+      }
       return null;
     },
     routes: [
@@ -200,6 +207,16 @@ class OrchardAtlasApp extends ConsumerWidget {
       builder: (context, child) => Column(
         children: [
           const AppVersionBanner(),
+          if (ref.watch(viewOnlyOrchardProvider))
+            const Material(
+              child: SafeArea(
+                bottom: false,
+                child: Padding(
+                  padding: EdgeInsets.all(8),
+                  child: Text('View-only orchard'),
+                ),
+              ),
+            ),
           if (failure != null && dismissedFailure != failure.recordId)
             SafeArea(
               bottom: false,
