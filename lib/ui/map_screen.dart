@@ -9,7 +9,6 @@ import '../application/extensions.dart';
 import '../domain/landscape.dart';
 import '../domain/models.dart';
 import '../domain/orchards.dart';
-import '../domain/filters.dart';
 import 'section_style.dart';
 import 'common.dart';
 import 'location_search.dart';
@@ -21,9 +20,58 @@ import 'version_history_screen.dart';
 import 'sections_screen.dart';
 import 'tasks_screen.dart';
 import 'orchard_picker.dart';
+import 'foraging_screen.dart';
+import '../application/workspaces.dart';
+import '../domain/workspaces.dart';
 
 class OrchardHome extends ConsumerWidget {
   const OrchardHome({super.key, this.focus, this.focusPlantId});
+  final Coordinates? focus;
+  final String? focusPlantId;
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Explicit plant navigation always reaches the orchard map, then Back returns.
+    if (focus != null || focusPlantId != null) {
+      return _OrchardHome(focus: focus, focusPlantId: focusPlantId);
+    }
+    return ref
+        .watch(workspaceModeProvider)
+        .when(
+          skipLoadingOnRefresh: false,
+          loading: () =>
+              const Scaffold(body: Center(child: CircularProgressIndicator())),
+          error: (e, _) => Scaffold(
+            body: ErrorPanel(
+              e,
+              retry: () => ref.invalidate(workspaceModeProvider),
+            ),
+          ),
+          data: (mode) => mode == WorkspaceMode.foraging
+              ? ref
+                    .watch(placeProvider)
+                    .when(
+                      skipLoadingOnRefresh: false,
+                      data: (place) => ForagingScreen(
+                        key: ValueKey('foraging-${place.id}'),
+                        homeMode: true,
+                      ),
+                      loading: () => const Scaffold(
+                        body: Center(child: CircularProgressIndicator()),
+                      ),
+                      error: (e, _) => Scaffold(
+                        body: ErrorPanel(
+                          e,
+                          retry: () => ref.invalidate(placeProvider),
+                        ),
+                      ),
+                    )
+              : const _OrchardHome(),
+        );
+  }
+}
+
+class _OrchardHome extends ConsumerWidget {
+  const _OrchardHome({this.focus, this.focusPlantId});
   final String? focusPlantId;
   final Coordinates? focus;
   @override
@@ -314,12 +362,7 @@ class _MapState extends ConsumerState<MapScreen>
   Future<void> switchOrchard() async {
     if (drawing != null && !await discardDrawing()) return;
     if (!mounted) return;
-    final next = await showOrchardPicker(context);
-    if (next == null || !mounted) return;
-    ref.read(submittedTaxaProvider.notifier).state = {};
-    ref.read(plantFilterProvider.notifier).state = const PlantFilter();
-    context.go('/');
-    ref.read(selectedOrchardProvider.notifier).state = next;
+    await switchWorkspace(context, ref);
   }
 
   Future<void> mapSettings() async {
@@ -444,7 +487,11 @@ class _MapState extends ConsumerState<MapScreen>
                           }
                         },
                 )
-              : null,
+              : IconButton(
+                  tooltip: 'Switch mode or orchard',
+                  icon: const Icon(Icons.swap_horiz),
+                  onPressed: switchOrchard,
+                ),
           title: Text(
             fullScreen
                 ? '${place.valueOrNull?.name ?? 'Orchard'} map'

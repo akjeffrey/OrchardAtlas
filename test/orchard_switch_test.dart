@@ -106,6 +106,7 @@ void main() {
         find.widgetWithText(TextField, 'New orchard name'),
         'West orchard',
       );
+      await tester.ensureVisible(find.text('Create orchard'));
       await tester.tap(find.text('Create orchard'));
       await tester.pumpAndSettle();
       expect(container.read(placeProvider).value!.name, 'West orchard');

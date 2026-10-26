@@ -1,3 +1,5 @@
+import 'orchard_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -87,8 +89,10 @@ class _CropFormState extends ConsumerState<CropFormScreen> {
               : 'Replant for a new season',
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: OrchardForm(
+        title: 'Seasonal planting',
+        subtitle:
+            'Choose a planting, its area and the season you want to track.',
         children: [
           if (widget.source != null)
             const Text(

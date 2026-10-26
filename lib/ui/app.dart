@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../application/providers.dart';
 import '../domain/models.dart';
 import 'activity_screen.dart';
+import 'orchard_theme.dart';
 import '../application/extensions.dart';
 import 'backup_screen.dart';
 import 'add_plant_screen.dart';
@@ -169,10 +170,7 @@ class OrchardAtlasApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final locked = ref.watch(sessionLockedProvider);
     final trial = ref.watch(trialModeProvider);
-    final theme = ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff315e35)),
-      useMaterial3: true,
-    );
+    final theme = orchardTheme();
     if (locked) {
       return MaterialApp(
         theme: theme,

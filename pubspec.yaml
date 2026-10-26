@@ -27,3 +27,5 @@ dev_dependencies:
   google_maps_flutter_platform_interface: ^2.17.0
 flutter:
   uses-material-design: true
+  assets:
+    - assets/branding/orchard_atlas.png

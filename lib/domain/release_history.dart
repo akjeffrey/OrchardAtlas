@@ -11,14 +11,16 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Show on Map is also available on Plant Detail.',
-      'Edit open task definitions and enable local reminders without losing completed work.',
-      'Capture foraging resources, seasons, observations and optional public listings.',
-      'Attach camera/gallery photos with thumbnails and durable queued uploads.',
-      'Explore harvest reports, copy CSV and recover edited/deleted activities.',
-      'Connected orchard invitations support owner, editor and viewer access.',
+      'Switch between orchard and foraging modes; remember the chosen mode after restart.',
+      'Foraging has its own resource map/list and Add Resource flow.',
+      'Forms use the icon’s forest green, leaf green, warm ivory and red accents with consistent spacing.',
     ],
   ),
+  const ReleaseNote('0.58.0', [
+    'Plant Detail Show on Map, task editing and local reminders.',
+    'Foraging resources, camera/gallery photos and durable upload queues.',
+    'Harvest reports/CSV, activity recovery and connected orchard sharing.',
+  ]),
   const ReleaseNote('0.53.0', [
     'Seasonal planting uses Group, Type and Variety dropdowns.',
     'Convert annual/perennial management while preserving history.',

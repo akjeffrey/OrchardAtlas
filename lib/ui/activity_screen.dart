@@ -1,3 +1,5 @@
+import 'orchard_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -108,8 +110,10 @@ class _ActivityState extends ConsumerState<ActivityScreen> {
         widget.event == null ? 'Record Activity / Harvest' : 'Edit activity',
       ),
     ),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
+    body: OrchardForm(
+      title: 'Activity & harvest',
+      subtitle: 'Build a seasonal history of care, observations and harvests.',
+      icon: Icons.edit_note,
       children: [
         DropdownButtonFormField<ActivityType>(
           initialValue: type,

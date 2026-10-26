@@ -1,3 +1,5 @@
+import 'orchard_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -58,8 +60,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
     }
     return Scaffold(
       appBar: AppBar(title: const Text('Edit task & reminders')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: OrchardForm(
+        title: 'Task & reminders',
+        subtitle: 'Update open work and choose when you would like a reminder.',
+        icon: Icons.checklist,
         children: [
           const Text(
             'Edits apply to open work and future occurrences. Completed, skipped and cancelled work, target membership, recurrence anchors and linked activities are retained. Create a new task to change targets or recurrence.',

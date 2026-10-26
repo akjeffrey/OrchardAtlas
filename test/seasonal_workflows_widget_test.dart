@@ -366,11 +366,20 @@ void main() {
         find.widgetWithText(TextField, 'Plant name'),
         'Unsaved name',
       );
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextField, 'Latitude'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.enterText(
         find.widgetWithText(TextField, 'Latitude'),
         'invalid draft',
       );
-      await tester.ensureVisible(find.text('Show on Map'));
+      await tester.scrollUntilVisible(
+        find.text('Show on Map'),
+        -180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Show on Map'));
       await tester.pumpAndSettle();
       platform.attachPendingViews();
@@ -400,6 +409,11 @@ void main() {
             .text,
         'Unsaved name',
       );
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextField, 'Latitude'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(
         tester
             .widget<TextField>(find.widgetWithText(TextField, 'Latitude'))
@@ -427,11 +441,11 @@ void main() {
       expect(find.text('Version 0.51.0'), findsOneWidget);
       expect(find.byType(Card), findsWidgets);
       await tester.scrollUntilVisible(
-        find.text('Version 0.42.0'),
+        find.text('Version 0.47.0'),
         250,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Version 0.42.0'), findsOneWidget);
+      expect(find.text('Version 0.47.0'), findsOneWidget);
     },
   );
 }
