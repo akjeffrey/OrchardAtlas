@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../application/providers.dart';
+import 'orchard_theme.dart';
 
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
@@ -54,6 +55,10 @@ class _SignInState extends ConsumerState<SignInScreen> {
           shrinkWrap: true,
           padding: const EdgeInsets.all(24),
           children: [
+            Center(
+              child: Image.asset(OrchardBrand.logo, width: 88, height: 88),
+            ),
+            const SizedBox(height: 20),
             Text(
               'Your orchard, season by season',
               style: Theme.of(context).textTheme.headlineSmall,
@@ -62,12 +67,14 @@ class _SignInState extends ConsumerState<SignInScreen> {
             const Text(
               'First sign-in needs Internet. Returning sessions can work with cached records offline.',
             ),
+            const SizedBox(height: 16),
             TextField(
               controller: email,
               decoration: const InputDecoration(labelText: 'Email'),
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
             ),
+            const SizedBox(height: 12),
             TextField(
               controller: password,
               decoration: const InputDecoration(labelText: 'Password'),

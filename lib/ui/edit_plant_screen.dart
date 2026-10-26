@@ -1,3 +1,5 @@
+import 'orchard_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -65,8 +67,9 @@ class _EditState extends ConsumerState<EditPlantScreen> {
               notes.text = plant.notes;
               initialized = true;
             }
-            return ListView(
-              padding: const EdgeInsets.all(16),
+            return OrchardForm(
+              title: 'Edit plant details',
+              subtitle: 'Keep classification, planting information and location up to date.',
               children: [
                 const Text('Edit plant details, classification and location.'),
                 OutlinedButton.icon(

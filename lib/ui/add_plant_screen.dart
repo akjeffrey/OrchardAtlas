@@ -1,3 +1,5 @@
+import 'orchard_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -319,8 +321,9 @@ class _AddPlantState extends ConsumerState<AddPlantScreen> {
           widget.template == null ? 'Add Plant' : 'Add Another Like This',
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: OrchardForm(
+        title: 'Plant details',
+        subtitle: 'Choose your plant, planting date and place on the map.',
         children: [
           if (widget.template != null)
             const Text(

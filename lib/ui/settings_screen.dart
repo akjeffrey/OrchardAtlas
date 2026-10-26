@@ -7,7 +7,6 @@ import '../domain/taxonomy.dart';
 import 'icon_library_screen.dart';
 import 'icon_picker.dart';
 import 'version_history_screen.dart';
-import 'foraging_screen.dart';
 import 'sharing_screen.dart';
 import 'reports_screen.dart';
 
@@ -24,14 +23,6 @@ class SettingsScreen extends StatelessWidget {
           onTap: () => Navigator.push(
             context,
             MaterialPageRoute<void>(builder: (_) => const SharingScreen()),
-          ),
-        ),
-        ListTile(
-          leading: const Icon(Icons.eco),
-          title: const Text('Foraging resources'),
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute<void>(builder: (_) => const ForagingScreen()),
           ),
         ),
         ListTile(

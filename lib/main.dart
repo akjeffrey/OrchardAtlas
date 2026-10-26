@@ -18,6 +18,8 @@ import 'data/map_services.dart';
 import 'data/map_view_repository.dart';
 import 'ui/app.dart';
 import 'data/trial_backup_store.dart';
+import 'data/workspace_preferences.dart';
+import 'application/workspaces.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +34,9 @@ Future<void> main() async {
       runApp(
         ProviderScope(
           overrides: [
+            workspacePreferencesProvider.overrideWithValue(
+              DeviceWorkspacePreferences(preferences),
+            ),
             mapViewRepositoryProvider.overrideWithValue(
               DeviceMapViewRepository(preferences),
             ),
@@ -85,6 +90,9 @@ Future<void> main() async {
     runApp(
       ProviderScope(
         overrides: [
+          workspacePreferencesProvider.overrideWithValue(
+            DeviceWorkspacePreferences(preferences),
+          ),
           mapViewRepositoryProvider.overrideWithValue(
             DeviceMapViewRepository(preferences),
           ),

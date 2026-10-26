@@ -8,7 +8,7 @@ void main() {
     expect(releases.first.version, '0.51.0');
     expect(releases.map((r) => r.version).toSet(), hasLength(5));
     expect(releases.every((r) => r.changes.isNotEmpty), isTrue);
-    expect(releases[1].version, '0.53.0');
-    expect(releases.last.version, '0.42.0');
+    expect(releases[1].version, '0.58.0');
+    expect(releases.last.version, '0.47.0');
   });
 }

@@ -1,3 +1,5 @@
+import 'orchard_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -392,8 +394,11 @@ class _SectionFormState extends ConsumerState<SectionFormScreen> {
             }
             initialized = true;
           }
-          return ListView(
-            padding: const EdgeInsets.all(16),
+          return OrchardForm(
+            title: 'Area & row details',
+            subtitle:
+                'Shape your orchard layout and choose its map appearance.',
+            icon: Icons.polyline_outlined,
             children: [
               TextField(
                 controller: name,

@@ -6,6 +6,7 @@ import '../data/local_trial_repository.dart';
 import '../data/trial_backup_store.dart';
 import '../data/backup_documents.dart';
 import 'backup_service.dart';
+import 'workspaces.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -347,6 +348,7 @@ final backupServiceProvider = ChangeNotifierProvider<BackupService>(
       ref.read(submittedTaxaProvider.notifier).state = {};
       ref.read(plantFilterProvider.notifier).state = const PlantFilter();
       ref.invalidate(orchardRepositoryProvider);
+      ref.invalidate(workspaceModeProvider);
     },
   ),
 );

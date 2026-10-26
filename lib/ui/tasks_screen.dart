@@ -1,3 +1,5 @@
+import 'orchard_theme.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -747,8 +749,10 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
             for (final c in crops)
               'crop:${c.id}': 'Crop: ${c.label} · ${c.season}',
           };
-          return ListView(
-            padding: const EdgeInsets.all(16),
+          return OrchardForm(
+            title: 'Task details',
+            subtitle: 'Choose what needs doing and the plants it applies to.',
+            icon: Icons.checklist,
             children: [
               TextField(
                 controller: title,

@@ -10,68 +10,283 @@ import 'classification_picker.dart';
 import 'plant_location_picker.dart';
 import 'photos_panel.dart';
 import 'orchard_map.dart';
+import 'orchard_picker.dart';
+import 'orchard_theme.dart';
+import 'settings_screen.dart';
+import 'location_search.dart';
 
-class ForagingScreen extends ConsumerWidget {
-  const ForagingScreen({super.key});
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+class ForagingScreen extends ConsumerStatefulWidget {
+  const ForagingScreen({super.key, this.homeMode = false});
+  final bool homeMode;
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Scaffold(
-    appBar: AppBar(title: const Text('Foraging resources')),
-    floatingActionButton: ref.watch(canEditOrchardProvider)
-        ? FloatingActionButton.extended(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute<void>(builder: (_) => const ResourceEditor()),
-            ),
-            icon: const Icon(Icons.add),
-            label: const Text('Add resource'),
-          )
-        : null,
-    body: ref
-        .watch(resourcesProvider)
-        .when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('$e')),
-          data: (resources) => ListView(
-            padding: const EdgeInsets.only(bottom: 90),
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  'Private resources stay within this orchard. Public resources publish only the location, classification, name and season to signed-in users; observations and photos stay private.',
+  ConsumerState<ForagingScreen> createState() => _ForagingHomeState();
+}
+
+class _ForagingHomeState extends ConsumerState<ForagingScreen> {
+  bool map = true, fullScreen = false, locating = false;
+  Coordinates? center;
+  GoogleMapController? controller;
+  String? message;
+  Future<void> search() async {
+    final result = await showLocationSearch(context);
+    if (!mounted || result == null) return;
+    move(result.coordinates);
+  }
+
+  void move(Coordinates point) {
+    setState(() => center = point);
+    controller?.animateCamera(
+      CameraUpdate.newLatLngZoom(LatLng(point.latitude, point.longitude), 18),
+    );
+  }
+
+  Future<void> locate() async {
+    setState(() => locating = true);
+    try {
+      final fix = await ref.read(locationRepositoryProvider).currentPosition();
+      if (mounted) {
+        move(fix.coordinates);
+        setState(
+          () => message = 'GPS accuracy ±${fix.accuracyMeters.round()} m',
+        );
+      }
+    } catch (e) {
+      if (mounted) setState(() => message = '$e');
+    } finally {
+      if (mounted) setState(() => locating = false);
+    }
+  }
+
+  void open(ResourceRecord r) => Navigator.push(
+    context,
+    MaterialPageRoute<void>(builder: (_) => ResourceDetail(r)),
+  );
+  @override
+  Widget build(BuildContext context) {
+    final orchard = ref.watch(placeProvider).valueOrNull;
+    final resources = ref.watch(resourcesProvider);
+    return PopScope(
+      canPop: !fullScreen,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => fullScreen = false);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: widget.homeMode ? const WorkspaceSwitchButton() : null,
+          title: const Text('Foraging'),
+          actions: [
+            if (map)
+              IconButton(
+                tooltip: 'Search map location',
+                onPressed: search,
+                icon: const Icon(Icons.search),
+              ),
+            if (map)
+              IconButton(
+                tooltip: fullScreen ? 'Data mode' : 'Full screen map',
+                onPressed: () => setState(() => fullScreen = !fullScreen),
+                icon: Icon(
+                  fullScreen ? Icons.fullscreen_exit : Icons.fullscreen,
                 ),
               ),
-              if (ref.watch(sharingProvider) != null)
-                TextButton(
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(
-                      builder: (_) => const PublicResourcesScreen(),
-                    ),
-                  ),
-                  child: const Text('Browse public resources'),
-                ),
-              for (final r in resources)
-                ListTile(
-                  leading: Icon(
-                    r.inSeason(DateTime.now().month)
-                        ? Icons.eco
-                        : Icons.eco_outlined,
-                  ),
-                  title: Text(r.name),
-                  subtitle: Text(
-                    '${r.startMonth}–${r.endMonth} · ${r.public ? 'Public' : 'Private'} · ${r.inSeason(DateTime.now().month) ? 'In season' : 'Out of season'}',
-                  ),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute<void>(builder: (_) => ResourceDetail(r)),
+            if (widget.homeMode)
+              IconButton(
+                tooltip: 'Settings',
+                icon: const Icon(Icons.settings_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SettingsScreen(),
                   ),
                 ),
-              if (resources.isEmpty)
-                const ListTile(title: Text('No foraging resources yet.')),
-            ],
-          ),
+              ),
+          ],
         ),
-  );
+        floatingActionButton: ref.watch(canEditOrchardProvider)
+            ? FloatingActionButton.extended(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute<void>(
+                    builder: (_) => ResourceEditor(initialLocation: center),
+                  ),
+                ),
+                icon: const Icon(Icons.add),
+                label: const Text('Add resource'),
+              )
+            : null,
+        body: Column(
+          children: [
+            if (!fullScreen)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Image.asset(OrchardBrand.logo, width: 40, height: 40),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Foraging · ${orchard?.name ?? '…'}',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    SegmentedButton<bool>(
+                      segments: const [
+                        ButtonSegment(
+                          value: true,
+                          icon: Icon(Icons.map_outlined),
+                          label: Text('Map'),
+                        ),
+                        ButtonSegment(
+                          value: false,
+                          icon: Icon(Icons.list),
+                          label: Text('List'),
+                        ),
+                      ],
+                      selected: {map},
+                      showSelectedIcon: false,
+                      onSelectionChanged: (v) => setState(() => map = v.single),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(
+              child: resources.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('$e')),
+                data: (all) {
+                  if (!map) {
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            'Wild resources, seasonal observations and photos.',
+                          ),
+                        ),
+                        if (ref.watch(sharingProvider) != null)
+                          TextButton(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute<void>(
+                                builder: (_) => const PublicResourcesScreen(),
+                              ),
+                            ),
+                            child: const Text('Browse public resources'),
+                          ),
+                        for (final r in all)
+                          Card(
+                            child: ListTile(
+                              leading: Icon(
+                                r.inSeason(DateTime.now().month)
+                                    ? Icons.eco
+                                    : Icons.eco_outlined,
+                                color: OrchardBrand.leaf,
+                              ),
+                              title: Text(r.name),
+                              subtitle: Text(
+                                '${r.startMonth}–${r.endMonth} · ${r.public ? 'Public' : 'Private'} · ${r.inSeason(DateTime.now().month) ? 'In season' : 'Out of season'}',
+                              ),
+                              onTap: () => open(r),
+                            ),
+                          ),
+                        if (all.isEmpty)
+                          const FormIntro(
+                            title: 'Your next wild find',
+                            subtitle: 'Add a resource to mark its location, season and observations.',
+                            icon: Icons.eco_outlined,
+                          ),
+                      ],
+                    );
+                  }
+                  final initial =
+                      center ??
+                      all.firstOrNull?.location ??
+                      ref.watch(defaultMapViewProvider).valueOrNull?.center ??
+                      Coordinates(0, 0);
+                  return Column(
+                    children: [
+                      if (!fullScreen)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  all.isEmpty
+                                      ? 'No resources yet · Add your first find'
+                                      : '${all.length} foraging resource${all.length == 1 ? '' : 's'}',
+                                ),
+                              ),
+                              IconButton(
+                                tooltip: 'Use current GPS location',
+                                onPressed: locating ? null : locate,
+                                icon: const Icon(Icons.my_location),
+                              ),
+                              if (ref.watch(sharingProvider) != null)
+                                IconButton(
+                                  tooltip: 'Browse public resources',
+                                  icon: const Icon(Icons.public),
+                                  onPressed: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          const PublicResourcesScreen(),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      if (message != null && !fullScreen) Text(message!),
+                      Expanded(
+                        child: OrchardMap(
+                          center: initial,
+                          initialCamera: CameraPosition(
+                            target: LatLng(initial.latitude, initial.longitude),
+                            zoom: all.isEmpty && center == null
+                                ? ref
+                                          .watch(defaultMapViewProvider)
+                                          .valueOrNull
+                                          ?.zoom ??
+                                      3
+                                : 17,
+                          ),
+                          plants: [
+                            for (final r in all)
+                              ManagedPlant(
+                                id: r.id,
+                                propertyId: r.orchard,
+                                name: r.name,
+                                taxonId: r.taxonId,
+                                location: r.location,
+                                createdAt: r.createdAt,
+                              ),
+                          ],
+                          onPlant: (id) =>
+                              open(all.firstWhere((r) => r.id == id)),
+                          onCameraMove: (p) => center = p,
+                          onMapCreated: (c) => controller = c,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class ResourceDetail extends ConsumerWidget {
@@ -213,7 +428,8 @@ class _ObservationState extends State<_Observation> {
 }
 
 class ResourceEditor extends ConsumerStatefulWidget {
-  const ResourceEditor({super.key, this.resource});
+  const ResourceEditor({super.key, this.resource, this.initialLocation});
+  final Coordinates? initialLocation;
   final ResourceRecord? resource;
   @override
   ConsumerState<ResourceEditor> createState() => _ResourceEditorState();
@@ -223,7 +439,8 @@ class _ResourceEditorState extends ConsumerState<ResourceEditor> {
   late final name = TextEditingController(text: widget.resource?.name),
       notes = TextEditingController(text: widget.resource?.notes);
   late String? taxon = widget.resource?.taxonId;
-  late Coordinates? location = widget.resource?.location;
+  late Coordinates? location =
+      widget.resource?.location ?? widget.initialLocation;
   late int start = widget.resource?.startMonth ?? 1,
       end = widget.resource?.endMonth ?? 12;
   late bool public = widget.resource?.public ?? false;
@@ -245,8 +462,10 @@ class _ResourceEditorState extends ConsumerState<ResourceEditor> {
             : 'Edit foraging resource',
       ),
     ),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
+    body: OrchardForm(
+      title: 'Foraging resource',
+      subtitle: 'Remember the location, harvest season and what you observe.',
+      icon: Icons.eco_outlined,
       children: [
         TextField(
           controller: name,

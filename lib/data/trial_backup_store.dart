@@ -18,7 +18,8 @@ class TrialBackupStore {
       key.startsWith('${LocalTrialRepository.storageKey}:orchard:') ||
       key == 'trial-selected:${LocalTrialRepository.userId}' ||
       key.startsWith('map-default:${LocalTrialRepository.userId}:') ||
-      key == 'task-sort:${LocalTrialRepository.userId}';
+      key == 'task-sort:${LocalTrialRepository.userId}' ||
+      key == 'workspace-mode:${LocalTrialRepository.userId}';
 
   Map<String, String> records() => {
     for (final key in preferences.getKeys().where(included))

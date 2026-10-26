@@ -61,6 +61,7 @@ class _ClassificationPickerState extends ConsumerState<ClassificationPicker> {
     final group = path.firstOrNull?.id,
         type = path.length > 1 ? path[1].id : null;
     return Column(
+      spacing: 12,
       children: [
         if (error != null) Text(error!),
         for (var level = 0; level < 3; level++)
