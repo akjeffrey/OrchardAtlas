@@ -6,6 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/extensions.dart';
+import '../domain/find_sharing.dart';
+import '../data/find_sharing.dart';
 import '../domain/work.dart';
 import '../domain/models.dart';
 import '../data/extension_devices.dart';
@@ -270,4 +272,8 @@ final viewOnlyOrchardProvider = Provider<bool>(
       ref.watch(placeProvider).hasValue &&
       ref.watch(userProvider).valueOrNull != null &&
       !ref.watch(canEditOrchardProvider),
+);
+
+final findSharingProvider = Provider<FindSharingRepository>(
+  (ref) => DeviceFindSharing(),
 );

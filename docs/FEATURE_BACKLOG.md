@@ -122,3 +122,5 @@ Google satellite downloads/offline tile packs are not promised by this app.
 - Implementation, availability and setup for #24/#26/#27/#28/#29: [sharing, media, reminders and reports](collaboration-photos-reminders-reports.md). Connected roles/public publishing/Storage require Firebase; the local APK retains local-first capture and Drive backup.
 
 - [x] Foraging as a remembered home mode in the Mode & orchard switcher, with its own resource map/list. Shared icon-inspired form theme. See [mode and theme design](foraging-mode-and-visual-theme.md).
+
+- [x] Tap-to-pin foraging capture, preserving the selected spot through map movement; native **Share find** summaries in the local and connected builds.

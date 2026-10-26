@@ -27,6 +27,24 @@ import UniformTypeIdentifiers
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "OrchardMapServices")!
+    let shareChannel = FlutterMethodChannel(name: "orchard_atlas/share", binaryMessenger: registrar.messenger())
+    shareChannel.setMethodCallHandler { call, result in
+      guard call.method == "shareText" else { result(FlutterMethodNotImplemented); return }
+      guard let args = call.arguments as? [String: Any], let text = args["text"] as? String,
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, text.count <= 10000 else {
+        result(FlutterError(code: "invalid_share", message: "Invalid find summary", details: nil)); return
+      }
+      let roots = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap { $0.windows }.filter { $0.isKeyWindow }
+      guard var presenter = roots.first?.rootViewController else { result(FlutterError(code: "share_unavailable", message: "Cannot open sharing", details: nil)); return }
+      while let next = presenter.presentedViewController { presenter = next }
+      let sheet = UIActivityViewController(activityItems: [text], applicationActivities: nil)
+      if let popover = sheet.popoverPresentationController {
+        popover.sourceView = presenter.view
+        popover.sourceRect = CGRect(x: presenter.view.bounds.midX, y: presenter.view.bounds.midY, width: 1, height: 1)
+        popover.permittedArrowDirections = []
+      }
+      presenter.present(sheet, animated: true) { result(nil) }
+    }
     let photoChannel = FlutterMethodChannel(name: "orchard_atlas/photos", binaryMessenger: registrar.messenger())
     photoChannel.setMethodCallHandler { [weak self] call, result in
       guard call.method == "capture", let self = self else { result(FlutterMethodNotImplemented); return }

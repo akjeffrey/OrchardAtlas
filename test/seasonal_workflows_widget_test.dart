@@ -441,11 +441,11 @@ void main() {
       expect(find.text('Version 0.51.0'), findsOneWidget);
       expect(find.byType(Card), findsWidgets);
       await tester.scrollUntilVisible(
-        find.text('Version 0.47.0'),
+        find.text('Version 0.49.0'),
         250,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('Version 0.47.0'), findsOneWidget);
+      expect(find.text('Version 0.49.0'), findsOneWidget);
     },
   );
 }
