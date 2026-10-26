@@ -52,6 +52,19 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/share").setMethodCallHandler { call, result ->
+            if(call.method != "shareText") { result.notImplemented() }
+            else {
+                val text=call.argument<String>("text").orEmpty()
+                if(text.isBlank() || text.length>10000) { result.error("invalid_share","Invalid find summary",null) }
+                else try {
+                    val share=android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                        type="text/plain";putExtra(android.content.Intent.EXTRA_TEXT,text)
+                    }
+                    startActivity(android.content.Intent.createChooser(share,"Share foraging find"));result.success(null)
+                }catch(_:Exception){result.error("share_unavailable","No sharing app is available",null)}
+            }
+        }
         photoChannel = PhotoChannel(this)
         reminderChannel = ReminderChannel(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/photos").setMethodCallHandler(photoChannel)

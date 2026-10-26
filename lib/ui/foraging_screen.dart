@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../application/providers.dart';
 import '../application/extensions.dart';
 import '../domain/extensions.dart';
+import '../domain/find_sharing.dart';
 import '../domain/models.dart';
 import 'classification_picker.dart';
 import 'plant_location_picker.dart';
@@ -26,7 +27,7 @@ class ForagingScreen extends ConsumerStatefulWidget {
 
 class _ForagingHomeState extends ConsumerState<ForagingScreen> {
   bool map = true, fullScreen = false, locating = false;
-  Coordinates? center;
+  Coordinates? center, selected;
   GoogleMapController? controller;
   String? message;
   Future<void> search() async {
@@ -59,6 +60,25 @@ class _ForagingHomeState extends ConsumerState<ForagingScreen> {
     }
   }
 
+  void select(Coordinates point) => setState(() {
+    selected = point;
+    message = 'Pinned location selected. Tap Add resource to record this find.';
+  });
+  Future<void> addResource() async {
+    final added = await Navigator.push<ResourceRecord>(
+      context,
+      MaterialPageRoute<ResourceRecord>(
+        builder: (_) => ResourceEditor(initialLocation: selected ?? center),
+      ),
+    );
+    if (added == null || !mounted) return;
+    setState(() {
+      selected = null;
+      message =
+          '${added.name} saved. Tap its marker or list entry to share this find.';
+    });
+  }
+
   void open(ResourceRecord r) => Navigator.push(
     context,
     MaterialPageRoute<void>(builder: (_) => ResourceDetail(r)),
@@ -77,6 +97,15 @@ class _ForagingHomeState extends ConsumerState<ForagingScreen> {
           leading: widget.homeMode ? const WorkspaceSwitchButton() : null,
           title: const Text('Foraging'),
           actions: [
+            if (selected != null)
+              IconButton(
+                tooltip: 'Clear selected location',
+                icon: const Icon(Icons.location_off_outlined),
+                onPressed: () => setState(() {
+                  selected = null;
+                  message = null;
+                }),
+              ),
             if (map)
               IconButton(
                 tooltip: 'Search map location',
@@ -106,12 +135,7 @@ class _ForagingHomeState extends ConsumerState<ForagingScreen> {
         ),
         floatingActionButton: ref.watch(canEditOrchardProvider)
             ? FloatingActionButton.extended(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => ResourceEditor(initialLocation: center),
-                  ),
-                ),
+                onPressed: addResource,
                 icon: const Icon(Icons.add),
                 label: const Text('Add resource'),
               )
@@ -169,7 +193,7 @@ class _ForagingHomeState extends ConsumerState<ForagingScreen> {
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 12),
                           child: Text(
-                            'Wild resources, seasonal observations and photos.',
+                            'Record wild finds and share their locations with others.',
                           ),
                         ),
                         if (ref.watch(sharingProvider) != null)
@@ -222,7 +246,7 @@ class _ForagingHomeState extends ConsumerState<ForagingScreen> {
                               Expanded(
                                 child: Text(
                                   all.isEmpty
-                                      ? 'No resources yet · Add your first find'
+                                      ? 'Tap the map to pin a find, then Add resource'
                                       : '${all.length} foraging resource${all.length == 1 ? '' : 's'}',
                                 ),
                               ),
@@ -250,6 +274,13 @@ class _ForagingHomeState extends ConsumerState<ForagingScreen> {
                       Expanded(
                         child: OrchardMap(
                           center: initial,
+                          selected: selected,
+                          onTap: ref.watch(canEditOrchardProvider)
+                              ? select
+                              : null,
+                          onSelectedMoved: ref.watch(canEditOrchardProvider)
+                              ? select
+                              : null,
                           initialCamera: CameraPosition(
                             target: LatLng(initial.latitude, initial.longitude),
                             zoom: all.isEmpty && center == null
@@ -344,6 +375,30 @@ class ResourceDetail extends ConsumerWidget {
           ),
           Text(
             'Season: ${r.startMonth}–${r.endMonth} · ${r.public ? 'Public listing' : 'Private'}',
+          ),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.share_outlined),
+            label: const Text('Share find'),
+            onPressed: () async {
+              final taxonomy = ref.read(taxonomyProvider);
+              final classification = taxonomy.taxa.any((t) => t.id == r.taxonId)
+                  ? taxonomy.ancestry(r.taxonId).map((t) => t.name).join(' › ')
+                  : null;
+              try {
+                await ref
+                    .read(findSharingProvider)
+                    .share(findShareText(r, classification: classification));
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Could not open sharing: $e')),
+                  );
+                }
+              }
+            },
+          ),
+          const Text(
+            'Share find sends the exact location through an app you choose. Private notes and photos are excluded.',
           ),
           Text(r.notes),
           PhotosPanel(r.id),
@@ -464,7 +519,7 @@ class _ResourceEditorState extends ConsumerState<ResourceEditor> {
     ),
     body: OrchardForm(
       title: 'Foraging resource',
-      subtitle: 'Remember the location, harvest season and what you observe.',
+      subtitle: 'Record a wild find, then share its location with others.',
       icon: Icons.eco_outlined,
       children: [
         TextField(
@@ -508,7 +563,9 @@ class _ResourceEditorState extends ConsumerState<ResourceEditor> {
           child: const Text('Pick location on map'),
         ),
         if (location != null)
-          Text('${location!.latitude}, ${location!.longitude}'),
+          Text(
+            'Selected location: ${location!.latitude}, ${location!.longitude}',
+          ),
         for (final isStart in [true, false])
           DropdownButtonFormField<int>(
             initialValue: isStart ? start : end,
@@ -530,9 +587,11 @@ class _ResourceEditorState extends ConsumerState<ResourceEditor> {
             }),
           ),
         SwitchListTile(
-          title: const Text('Publish resource listing'),
-          subtitle: const Text(
-            'Requires connected mode. Exact location is included. Observations and photos remain private.',
+          title: const Text('Publish find to the community'),
+          subtitle: Text(
+            ref.watch(trialModeProvider)
+                ? 'This phone build stores the preference locally. Use Share find after saving to send its exact location.'
+                : 'Publishing shares the name, classification, season and exact location with signed-in users. Notes and photos stay private.',
           ),
           value: public,
           onChanged: (v) => setState(() => public = v),
@@ -574,7 +633,12 @@ class _ResourceEditorState extends ConsumerState<ResourceEditor> {
                           r.id,
                           r.toMap(),
                         );
-                    if (context.mounted) Navigator.pop(context);
+                    if (context.mounted) {
+                      Navigator.pop(
+                        context,
+                        widget.resource == null ? r : null,
+                      );
+                    }
                   } catch (e) {
                     if (mounted) setState(() => error = '$e');
                   } finally {

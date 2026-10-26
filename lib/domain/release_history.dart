@@ -11,11 +11,15 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Switch between orchard and foraging modes; remember the chosen mode after restart.',
-      'Foraging has its own resource map/list and Add Resource flow.',
-      'Forms use the icon’s forest green, leaf green, warm ivory and red accents with consistent spacing.',
+      'Tap the foraging map to drop a draggable pin; Add Resource uses that exact spot even after panning.',
+      'Cancelled entry keeps the pin; successful save clears it.',
+      'Share find sends a name, season and map link through your chosen app, excluding private notes and photos.',
     ],
   ),
+  const ReleaseNote('0.62.0', [
+    'Remembered orchard/foraging modes with a separate foraging map/list.',
+    'Icon-inspired greens, ivory, red accents and consistently spaced forms.',
+  ]),
   const ReleaseNote('0.58.0', [
     'Plant Detail Show on Map, task editing and local reminders.',
     'Foraging resources, camera/gallery photos and durable upload queues.',
