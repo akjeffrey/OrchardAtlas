@@ -78,13 +78,22 @@ void main() {
       final draftName = tester
           .widget<TextField>(find.widgetWithText(TextField, 'Plant name'))
           .controller!;
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextField, 'Latitude'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       if (outcome == 'invalid input') {
         await tester.enterText(
           find.widgetWithText(TextField, 'Latitude'),
           'oops',
         );
       }
-      await tester.ensureVisible(find.text('Pick location on map'));
+      await tester.scrollUntilVisible(
+        find.text('Pick location on map'),
+        -180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Pick location on map'));
       await tester.pumpAndSettle();
       platform.attachPendingViews();
@@ -109,6 +118,11 @@ void main() {
       }
       await tester.pumpAndSettle();
       final confirmed = outcome == 'save' || outcome == 'invalid input';
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextField, 'Longitude'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       String field(String label) => tester
           .widget<TextField>(find.widgetWithText(TextField, label))
           .controller!
@@ -118,7 +132,11 @@ void main() {
       expect(draftName.text, 'Draft name');
       expect(repo.plants.single.location.latitude, 51);
       // Reopening starts at the editor's draft, not the old saved point.
-      await tester.ensureVisible(find.text('Pick location on map'));
+      await tester.scrollUntilVisible(
+        find.text('Pick location on map'),
+        -180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Pick location on map'));
       await tester.pumpAndSettle();
       platform.attachPendingViews();

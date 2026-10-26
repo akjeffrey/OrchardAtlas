@@ -335,6 +335,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.byType(GoogleMap),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       platform.attachPendingViews();
       await tester.pumpAndSettle();
       expect(

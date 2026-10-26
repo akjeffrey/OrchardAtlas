@@ -366,11 +366,20 @@ void main() {
         find.widgetWithText(TextField, 'Plant name'),
         'Unsaved name',
       );
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextField, 'Latitude'),
+        180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.enterText(
         find.widgetWithText(TextField, 'Latitude'),
         'invalid draft',
       );
-      await tester.ensureVisible(find.text('Show on Map'));
+      await tester.scrollUntilVisible(
+        find.text('Show on Map'),
+        -180,
+        scrollable: find.byType(Scrollable).first,
+      );
       await tester.tap(find.text('Show on Map'));
       await tester.pumpAndSettle();
       platform.attachPendingViews();
@@ -399,6 +408,11 @@ void main() {
             .controller!
             .text,
         'Unsaved name',
+      );
+      await tester.scrollUntilVisible(
+        find.widgetWithText(TextField, 'Latitude'),
+        180,
+        scrollable: find.byType(Scrollable).first,
       );
       expect(
         tester
