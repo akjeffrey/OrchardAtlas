@@ -488,3 +488,29 @@ test('Storage enforces photo orchard roles and JPEG size/type bounds', async () 
   await assertFails(deleteObject(ref(storage('viewer'),path)));
   await assertSucceeds(deleteObject(ref(storage('editor'),path)));
 });
+
+test('seed trays enforce dimensions, immutable layout, orchard roles and cell coordinates', async () => {
+  await seedMember('editor','editor'); await seedMember('viewer','viewer');
+  const trayId='00000000-0000-4000-8000-000000000091';
+  const path=`${propertyPath}/seedTray/${trayId}`;
+  const tray={schemaVersion:1,id:trayId,name:'Spring tray',rows:3,columns:4,createdAt:'2026-11-26T00:00:00Z'};
+  await assertFails(setDoc(doc(db('alice'),path),{...tray,rows:0}));
+  await assertFails(setDoc(doc(db('alice'),path),{...tray,rows:24,columns:24}));
+  await assertSucceeds(setDoc(doc(db('alice'),path),tray));
+  await assertSucceeds(getDoc(doc(db('viewer'),path)));
+  await assertSucceeds(updateDoc(doc(db('editor'),path),{name:'Renamed'}));
+  await assertFails(updateDoc(doc(db('viewer'),path),{name:'No'}));
+  await assertFails(updateDoc(doc(db('alice'),path),{columns:5}));
+  const cellId=`${trayId}_1_2`,cellPath=`${propertyPath}/seedCell/${cellId}`;
+  const cell={schemaVersion:1,id:cellId,trayId,row:1,column:2,label:'Tomato',taxonId:taxon,
+    kind:'seed',assignedAt:'2026-11-26T00:00:00Z',symbol:null,customIconId:null};
+  await assertSucceeds(setDoc(doc(db('editor'),cellPath),cell));
+  await assertSucceeds(getDoc(doc(db('viewer'),cellPath)));
+  await assertFails(updateDoc(doc(db('viewer'),cellPath),{label:'No'}));
+  await assertFails(setDoc(doc(db('alice'),`${propertyPath}/seedCell/${trayId}_4_1`),{...cell,id:`${trayId}_4_1`,row:4,column:1}));
+  await assertFails(setDoc(doc(db('alice'),`${propertyPath}/seedCell/${trayId}_2_1`),{...cell,id:`${trayId}_2_1`,row:1,column:1}));
+  await assertFails(setDoc(doc(db('bob'),cellPath),cell));
+  await assertSucceeds(updateDoc(doc(db('editor'),cellPath),{kind:'plant'}));
+  await assertFails(deleteDoc(doc(db('viewer'),cellPath)));
+  await assertSucceeds(deleteDoc(doc(db('editor'),cellPath)));
+});

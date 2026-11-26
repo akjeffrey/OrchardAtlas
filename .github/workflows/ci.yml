@@ -16,9 +16,15 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format --output=none --set-exit-if-changed lib test
+      - name: Normalize Dart style for verification
+        run: |
+          dart fix --apply --code=curly_braces_in_flow_control_structures lib
+          dart format lib test
       - run: flutter analyze
       - run: flutter test
+      - name: Verify formatting produced no changes
+        if: always()
+        run: git diff --exit-code -- lib test
   security:
     runs-on: ubuntu-latest
     steps:

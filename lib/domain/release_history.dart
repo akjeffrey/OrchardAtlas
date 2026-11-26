@@ -11,11 +11,15 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Tap the foraging map to drop a draggable pin; Add Resource uses that exact spot even after panning.',
-      'Cancelled entry keeps the pin; successful save clears it.',
-      'Share find sends a name, season and map link through your chosen app, excluding private notes and photos.',
+      'Seed Starter tab: create and rename multiple trays with custom row and column counts.',
+      'Select individual cells, complete rows or columns and assign seeds/plants with classification icons.',
+      'Seed trays persist offline and in Drive backups; main tabs scroll horizontally.',
     ],
   ),
+  const ReleaseNote('0.65.0',[
+    'Tap and drag a foraging pin; Add Resource keeps the selected location.',
+    'Share find through the device share sheet without private notes or photos.',
+  ]),
   const ReleaseNote('0.62.0', [
     'Remembered orchard/foraging modes with a separate foraging map/list.',
     'Icon-inspired greens, ivory, red accents and consistently spaced forms.',
