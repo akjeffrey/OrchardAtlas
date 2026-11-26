@@ -1119,18 +1119,29 @@ class LocalTrialRepository
   Future<void> assignTrayCells(
     SeedTray tray,
     Set<TrayPosition> positions,
-    TrayAssignment assignment,
-  ) async {
+    TrayAssignment assignment, {
+    List<SeedPacketPhoto> packetPhotos = const [],
+  }) async {
     if (tray.propertyId != place.id) {
-      return _for(tray.propertyId).assignTrayCells(tray, positions, assignment);
+      return _for(tray.propertyId).assignTrayCells(
+        tray,
+        positions,
+        assignment,
+        packetPhotos: packetPhotos,
+      );
     }
     _seedTray(tray.id).validateSelection(positions);
+    validatePacketPhotos(assignment, packetPhotos);
     if (!orchardTaxonomy(taxa).isPlantIdentity(assignment.taxonId)) {
       throw ArgumentError('Choose a Variety');
     }
     if (assignment.customIconId != null &&
         !icons.any((i) => i.id == assignment.customIconId)) {
       throw ArgumentError('Choose an available icon');
+    }
+    for (final photo in packetPhotos) {
+      _records.putIfAbsent(RecordKind.photo.name, () => {})[photo.id] =
+          SeedTrayMapping.packetPhoto(tray, photo, connected: false);
     }
     final cells = _records.putIfAbsent(RecordKind.seedCell.name, () => {});
     for (final p in positions) {
@@ -1159,6 +1170,55 @@ class LocalTrialRepository
     await _writes;
     if (_lastWriteError != null) {
       throw StateError('Could not clear seed cells on this phone');
+    }
+  }
+
+  @override
+  Future<void> setTrayTransplantDate(
+    SeedTray tray,
+    Set<TrayPosition> positions,
+    String? date,
+  ) async {
+    if (tray.propertyId != place.id) {
+      return _for(tray.propertyId).setTrayTransplantDate(tray, positions, date);
+    }
+    _seedTray(tray.id).validateSelection(positions);
+    final cells = _records[RecordKind.seedCell.name] ?? {};
+    final updates = <String, Map<String, dynamic>>{};
+    for (final p in positions) {
+      final old = cells[p.recordId(tray.id)];
+      if (old != null) {
+        updates[p.recordId(tray.id)] = SeedTrayMapping.cell(
+          tray,
+          p,
+          SeedTrayMapping.readCell(old).value.withTransplantDate(date),
+        );
+      }
+    }
+    cells.addAll(updates);
+    _persist(tray.id);
+    await _writes;
+    if (_lastWriteError != null) {
+      throw StateError('Could not save transplant dates');
+    }
+  }
+
+  @override
+  Future<void> deleteSeedTray(String propertyId, String trayId) async {
+    if (propertyId != place.id) {
+      return _for(propertyId).deleteSeedTray(propertyId, trayId);
+    }
+    _records[RecordKind.seedCell.name]?.removeWhere(
+      (_, d) => d['trayId'] == trayId,
+    );
+    _records[RecordKind.photo.name]?.removeWhere(
+      (_, d) => d['itemId'] == trayId,
+    );
+    _records[RecordKind.seedTray.name]?.remove(trayId);
+    _persist(trayId);
+    await _writes;
+    if (_lastWriteError != null) {
+      throw StateError('Could not save tray deletion');
     }
   }
 

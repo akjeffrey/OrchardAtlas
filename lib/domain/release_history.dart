@@ -11,11 +11,16 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Seed Starter tab: create and rename multiple trays with custom row and column counts.',
-      'Select individual cells, complete rows or columns and assign seeds/plants with classification icons.',
-      'Seed trays persist offline and in Drive backups; main tabs scroll horizontally.',
+      'Seed cell planting dates, days until transplant and calculated expected transplant dates.',
+      'Record or undo actual transplants; retained cells turn grey with a check mark.',
+      'Capture front/back seed-packet photos while planting and include them in offline backups.',
+      'Delete trays with confirmed cleanup of cell entries and packet photos.',
     ],
   ),
+  const ReleaseNote('0.70.0', [
+    'Seed Starter trays, custom row/column counts and bulk cell selection.',
+    'Seed/plant classifications and icons with offline persistence and Drive backups.',
+  ]),
   const ReleaseNote('0.65.0', [
     'Tap and drag a foraging pin; Add Resource keeps the selected location.',
     'Share find through the device share sheet without private notes or photos.',
