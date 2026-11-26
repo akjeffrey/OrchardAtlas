@@ -892,9 +892,10 @@ class FirestoreOrchardRepository
   Future<void> assignTrayCells(
     SeedTray tray,
     Set<TrayPosition> positions,
-    TrayAssignment assignment,
+    TrayAssignment assignment, {List<SeedPacketPhoto> packetPhotos = const []}
   ) async {
     tray.validateSelection(positions);
+    validatePacketPhotos(assignment,packetPhotos);
     final batch = firestore.batch();
     for (final p in positions) {
       batch.set(
@@ -904,6 +905,9 @@ class FirestoreOrchardRepository
         ).doc(p.recordId(tray.id)),
         SeedTrayMapping.cell(tray, p, assignment),
       );
+    }
+    for(final photo in packetPhotos) {
+      batch.set(_collection(tray.propertyId,RecordKind.photo.name).doc(photo.id),SeedTrayMapping.packetPhoto(tray,photo,connected:true));
     }
     _observe(tray.id, batch.commit());
   }
@@ -924,6 +928,47 @@ class FirestoreOrchardRepository
       );
     }
     _observe(tray.id, batch.commit());
+  }
+
+  @override
+  Future<void> setTrayTransplantDate(SeedTray tray,Set<TrayPosition> positions,String? date) async {
+    tray.validateSelection(positions);
+    if(date!=null)parseCalendarDate(date);
+    final current=await watchTrayCells(tray.propertyId,tray.id).first;
+    for(final p in positions) {current[p]?.withTransplantDate(date);}
+    final batch=firestore.batch();
+    for(final p in positions.where(current.containsKey)) {
+      batch.update(_collection(tray.propertyId,RecordKind.seedCell.name).doc(p.recordId(tray.id)),{'transplantedOn':date});
+    }
+    _observe(tray.id,batch.commit());
+  }
+  @override
+  Future<void> deleteSeedTray(String propertyId,String trayId) async {
+    final reference=_collection(propertyId,RecordKind.seedTray.name).doc(trayId);
+    final doc=await reference.get(const GetOptions(source:Source.server));
+    if(!doc.exists)return;
+    final tray=SeedTrayMapping.readTray(propertyId,{...doc.data()!,'id':trayId});
+    // Block concurrent cell/photo creation while resumable cleanup runs.
+    await reference.update({'deleting':true});
+    final photos=await _collection(propertyId,RecordKind.photo.name).where('itemId',isEqualTo:trayId).get(const GetOptions(source:Source.server));
+    for(final p in photos.docs) {
+      final path=p.data()['storagePath'];
+      if(path is! String || !path.startsWith('properties/$propertyId/items/$trayId/photos/'))throw StateError('Unexpected packet photo path');
+      if(storage==null && p.data()['state']=='uploaded')throw StateError('Photo storage unavailable');
+      if(storage!=null) {
+        try{await storage!.ref(path).delete();}on FirebaseException catch(e){if(e.code!='object-not-found')rethrow;}
+      }
+    }
+    final refs=<DocumentReference<Map<String,dynamic>>>[
+      for(final p in tray.positions)_collection(propertyId,RecordKind.seedCell.name).doc(p.recordId(trayId)),
+      for(final p in photos.docs)p.reference,
+    ];
+    for(var offset=0;offset<refs.length;offset+=400) {
+      final batch=firestore.batch();
+      for(final r in refs.skip(offset).take(400)){batch.delete(r);}
+      await batch.commit();
+    }
+    await reference.delete();
   }
 
   @override

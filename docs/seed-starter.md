@@ -17,8 +17,8 @@ choice, optional cell label, and icon selection. Classification icons are the
 default; built-in and custom overrides are optional. Applying fills every
 selected cell. Replacing occupied cells asks for confirmation. Clear cell
 contents also requires confirmation. Deleted custom icons use the existing
-question-mark fallback. None of these operations creates a mapped plant or a
-plant activity; germination, transplanting and tray-history features are deferred.
+question-mark fallback. These operations do not create a mapped plant or plant activity. Germination
+and detailed tray-history features remain deferred.
 
 ## Domain and persistence
 
@@ -50,3 +50,42 @@ Tests cover grid dimensions/selection unions, mapping, independent cell writes,
 rename/restart, orchard isolation, backup restoration, UI creation/assignment and
 server permission/bounds checks. CI performs formatting, static analysis, full
 Flutter/security suites, native builds and signed APK verification.
+
+## Planting and transplantation
+
+New cell plantings default their planting date to today; it can be edited or
+cleared. Enter an optional whole number of days until transplant (0–3650). An
+expected transplant date is derived from the planting date plus that interval;
+unknown dates in old records remain unknown. Select an occupied cell and open
+Add seed / plant to review/edit its dates and packet photos. Date details are
+also exposed in cell tooltips/accessibility labels.
+
+Record transplant applies an actual chosen date to the selected occupied cells.
+It cannot precede a known planting date. Cells remain occupied with their label,
+photos and classification, but have grey fill, dimmed icons and a check mark.
+Undo transplant clears the actual date and restores the growing appearance.
+These records do not automatically create a plant at a new map location.
+
+## Seed-packet photos
+
+The planting form provides separate front and back camera/gallery controls.
+Cancelled edits discard draft photos. Confirming a planting saves new photo
+metadata and cells in one local snapshot or Firestore batch (at most 402 writes).
+A bulk selection shares two photo references instead of duplicating the bytes in
+every cell. Existing capture limits/thumbnails, offline upload queue and Storage
+rules apply. Original planting dates and photo references survive transplantation.
+Local snapshots/Drive backups include photos subject to the existing 20 MiB
+archive limit; full uploaded photos use authenticated Storage and offline
+thumbnails. Replaced/unlinked photos remain with their tray until tray deletion,
+since other cells can still reference the same packet.
+
+## Tray deletion
+
+Delete tray asks for confirmation and removes all its cell assignments and packet
+photo records. Local deletion persists offline immediately. Connected deletion
+requires server access and also removes stored photo objects. A deleting marker
+blocks new cell/photo entries during cleanup. If connectivity or deletion fails,
+the tray remains visible with a retry message; repeat Delete tray to finish the
+idempotent cleanup. Other trays and orchard records are unaffected. In-flight
+uploads whose metadata was removed are discarded/cleaned up by the upload worker.
+Deploy updated Firestore rules before using connected lifecycle/photo features.

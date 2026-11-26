@@ -196,8 +196,8 @@ service cloud.firestore {
       match /seedTray/{trayId} {
         function tray(d) {
           return d.keys().hasAll(['schemaVersion','id','name','rows','columns','createdAt'])
-            && d.keys().hasOnly(['schemaVersion','id','name','rows','columns','createdAt'])
-            && d.schemaVersion==1 && d.id==trayId && text(d.name)
+            && d.keys().hasOnly(['schemaVersion','id','name','rows','columns','createdAt','deleting'])
+            && d.get('deleting',false) is bool && d.schemaVersion==1 && d.id==trayId && text(d.name)
             && d.rows is int && d.rows>=1 && d.rows<=24
             && d.columns is int && d.columns>=1 && d.columns<=24 && d.rows*d.columns<=400
             && d.createdAt is string && d.createdAt.size()<=40;
@@ -205,27 +205,37 @@ service cloud.firestore {
         allow read: if reader(propertyId);
         allow create: if writer(propertyId) && uuid(trayId) && tray(request.resource.data);
         allow update: if writer(propertyId) && tray(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
-        allow delete: if false;
+          && ((resource.data.get('deleting',false)==false && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']))
+          || (request.resource.data.get('deleting',false)==true && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['deleting'])));
+        allow delete: if writer(propertyId) && resource.data.get('deleting',false)==true;
       }
       match /seedCell/{cellId} {
+        function packetRef(photoId,trayId) {
+          return photoId==null || (photoId is string && uuid(photoId)
+            && getAfter(/databases/$(database)/documents/properties/$(propertyId)/photo/$(photoId)).data.itemId==trayId);
+        }
         function cell(d) {
           let t = get(/databases/$(database)/documents/properties/$(propertyId)/seedTray/$(d.trayId)).data;
           return d.keys().hasAll(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId'])
-            && d.keys().hasOnly(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId'])
-            && d.schemaVersion==1 && uuid(d.trayId) && d.id==cellId
+            && d.keys().hasOnly(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId','plantedOn','transplantAfterDays','transplantedOn','packetFrontId','packetBackId'])
+            && t.get('deleting',false)==false && d.schemaVersion==1 && uuid(d.trayId) && d.id==cellId
             && d.row is int && d.row>=1 && d.row<=t.rows
             && d.column is int && d.column>=1 && d.column<=t.columns
             && cellId==d.trayId+'_'+string(d.row)+'_'+string(d.column)
             && text(d.label) && uuid(d.taxonId) && d.kind in ['seed','plant']
             && d.assignedAt is string && d.assignedAt.size()<=40
             && (d.symbol==null || d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine','unknown'])
+            && (d.get('plantedOn',null)==null || date(d.plantedOn))
+            && (d.get('transplantedOn',null)==null || date(d.transplantedOn))
+            && (d.get('plantedOn',null)==null || d.get('transplantedOn',null)==null || d.transplantedOn>=d.plantedOn)
+            && (d.get('transplantAfterDays',null)==null || (d.transplantAfterDays is int && d.transplantAfterDays>=0 && d.transplantAfterDays<=3650))
+            && packetRef(d.get('packetFrontId',null),d.trayId) && packetRef(d.get('packetBackId',null),d.trayId)
             && validIconRef(d,propertyId);
         }
         allow read: if reader(propertyId);
         allow create: if writer(propertyId) && cell(request.resource.data);
         allow update: if writer(propertyId) && cell(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label','taxonId','kind','assignedAt','symbol','customIconId']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label','taxonId','kind','assignedAt','symbol','customIconId','plantedOn','transplantAfterDays','transplantedOn','packetFrontId','packetBackId']);
         allow delete: if writer(propertyId);
       }
       match /members/{userId} {
@@ -285,7 +295,11 @@ service cloud.firestore {
             && d.state in ['pending','uploaded'] && (d.get('error',null)==null || (d.error is string && d.error.size()<=500));
         }
         allow read: if reader(propertyId);
-        allow create: if writer(propertyId) && uuid(photoId) && photo(request.resource.data) && request.resource.data.authorId==request.auth.uid;
+        allow create: if writer(propertyId) && uuid(photoId) && photo(request.resource.data) && request.resource.data.authorId==request.auth.uid
+          && (exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(request.resource.data.itemId))
+            || exists(/databases/$(database)/documents/properties/$(propertyId)/foraging/$(request.resource.data.itemId))
+            || (exists(/databases/$(database)/documents/properties/$(propertyId)/seedTray/$(request.resource.data.itemId))
+              && get(/databases/$(database)/documents/properties/$(propertyId)/seedTray/$(request.resource.data.itemId)).data.get('deleting',false)==false));
         allow update: if writer(propertyId) && photo(request.resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['state','image','error']);
         allow delete: if writer(propertyId);

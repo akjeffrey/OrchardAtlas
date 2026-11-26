@@ -514,3 +514,25 @@ test('seed trays enforce dimensions, immutable layout, orchard roles and cell co
   await assertFails(deleteDoc(doc(db('viewer'),cellPath)));
   await assertSucceeds(deleteDoc(doc(db('editor'),cellPath)));
 });
+
+test('seed lifecycle dates, packet references and resumable tray deletion enforce permissions',async()=>{
+  const trayId='00000000-0000-4000-8000-000000000092',front='00000000-0000-4000-8000-000000000093';
+  const path=`${propertyPath}/seedTray/${trayId}`,store=db('alice');
+  await seedMember('viewer','viewer');
+  await setDoc(doc(store,path),{schemaVersion:1,id:trayId,name:'Tray',rows:2,columns:2,createdAt:'2026-11-26T00:00:00Z'});
+  const cellId=`${trayId}_1_1`,cellPath=`${propertyPath}/seedCell/${cellId}`;
+  const cell={schemaVersion:1,id:cellId,trayId,row:1,column:1,label:'Tomato',taxonId:taxon,kind:'seed',assignedAt:'2026-11-26T00:00:00Z',symbol:null,customIconId:null,
+    plantedOn:'2026-11-26',transplantAfterDays:14,transplantedOn:null,packetFrontId:front,packetBackId:null};
+  await assertFails(setDoc(doc(store,cellPath),cell));
+  const batch=writeBatch(store);
+  batch.set(doc(store,`${propertyPath}/photo/${front}`),{id:front,itemId:trayId,authorId:'alice',createdAt:'2026-11-26T00:00:00Z',storagePath:`properties/${property}/items/${trayId}/photos/${front}.jpg`,image:'bytes',thumbnail:'thumb',state:'pending',error:null});
+  batch.set(doc(store,cellPath),cell);await assertSucceeds(batch.commit());
+  await assertFails(updateDoc(doc(store,cellPath),{transplantAfterDays:-1}));
+  await assertFails(updateDoc(doc(store,cellPath),{transplantedOn:'2026-01-01'}));
+  await assertFails(updateDoc(doc(db('viewer'),cellPath),{transplantedOn:'2026-12-20'}));
+  await assertSucceeds(updateDoc(doc(store,cellPath),{transplantedOn:'2026-12-20'}));
+  await assertFails(updateDoc(doc(db('viewer'),path),{deleting:true}));
+  await assertSucceeds(updateDoc(doc(store,path),{deleting:true}));
+  await assertFails(updateDoc(doc(store,cellPath),{label:'Late edit'}));
+  await assertSucceeds(deleteDoc(doc(store,cellPath)));await assertSucceeds(deleteDoc(doc(store,`${propertyPath}/photo/${front}`)));await assertSucceeds(deleteDoc(doc(store,path)));
+});

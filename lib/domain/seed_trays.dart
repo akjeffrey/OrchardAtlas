@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'models.dart';
 
 enum TrayContentKind { seed, plant }
@@ -24,6 +25,7 @@ class SeedTray {
     required this.rows,
     required this.columns,
     required this.createdAt,
+    this.deleting = false,
   }) : name = requiredText(name, 'Tray name') {
     if (rows < 1 ||
         rows > maxDimension ||
@@ -37,6 +39,7 @@ class SeedTray {
   final String id, propertyId, name;
   final int rows, columns;
   final DateTime createdAt;
+  final bool deleting;
   int get capacity => rows * columns;
   bool contains(TrayPosition p) => p.row <= rows && p.column <= columns;
   Set<TrayPosition> get positions => {
@@ -60,6 +63,7 @@ class SeedTray {
     rows: rows,
     columns: columns,
     createdAt: createdAt,
+    deleting: deleting,
   );
   void validateSelection(Set<TrayPosition> selected) {
     if (selected.isEmpty || selected.any((p) => !contains(p))) {
@@ -83,10 +87,36 @@ class TrayAssignment {
     required this.assignedAt,
     this.symbol,
     this.customIconId,
-  }) : label = requiredText(label, 'Seed / plant name');
+    this.plantedOn,
+    this.transplantAfterDays,
+    this.transplantedOn,
+    this.packetFrontId,
+    this.packetBackId,
+  }) : label = requiredText(label, 'Seed / plant name') {
+    if(plantedOn!=null)parseCalendarDate(plantedOn!);
+    if(transplantedOn!=null)parseCalendarDate(transplantedOn!);
+    if(transplantAfterDays!=null && (transplantAfterDays!<0 || transplantAfterDays!>3650)) {
+      throw ArgumentError('Days until transplant must be 0–3650');
+    }
+    if(plantedOn!=null && transplantedOn!=null && transplantedOn!.compareTo(plantedOn!)<0) {
+      throw ArgumentError('Transplant date cannot precede planting');
+    }
+  }
   final String label, taxonId;
   final TrayContentKind kind;
   final DateTime assignedAt;
+  final String? plantedOn, transplantedOn, packetFrontId, packetBackId;
+  final int? transplantAfterDays;
+  bool get isTransplanted => transplantedOn != null;
+  String? get expectedTransplantOn {
+    if(plantedOn==null || transplantAfterDays==null)return null;
+    final d=parseCalendarDate(plantedOn!);
+    return calendarDate(DateTime.utc(d.year,d.month,d.day).add(Duration(days:transplantAfterDays!)));
+  }
+  TrayAssignment withTransplantDate(String? date)=>TrayAssignment(label:label,taxonId:taxonId,kind:kind,
+    assignedAt:assignedAt,symbol:symbol,customIconId:customIconId,plantedOn:plantedOn,
+    transplantAfterDays:transplantAfterDays,transplantedOn:date,packetFrontId:packetFrontId,packetBackId:packetBackId);
+
 
   /// Null means resolve the current inherited classification icon.
   final PlantSymbol? symbol;
@@ -104,7 +134,25 @@ abstract interface class SeedTrayRepository {
   Future<void> assignTrayCells(
     SeedTray tray,
     Set<TrayPosition> positions,
-    TrayAssignment assignment,
+    TrayAssignment assignment, {List<SeedPacketPhoto> packetPhotos = const []}
   );
   Future<void> clearTrayCells(SeedTray tray, Set<TrayPosition> positions);
+  Future<void> setTrayTransplantDate(SeedTray tray,Set<TrayPosition> positions,String? date);
+  Future<void> deleteSeedTray(String propertyId,String trayId);
+}
+
+class SeedPacketPhoto {
+  SeedPacketPhoto({required this.id,required this.authorId,required this.image,required this.thumbnail}) {
+    if(image.isEmpty || image.length>512*1024 || thumbnail.isEmpty || thumbnail.length>32*1024) {
+      throw ArgumentError('Seed packet photo exceeds supported size');
+    }
+  }
+  final String id,authorId;
+  final Uint8List image,thumbnail;
+}
+void validatePacketPhotos(TrayAssignment assignment,List<SeedPacketPhoto> photos) {
+  final references={assignment.packetFrontId,assignment.packetBackId}..remove(null);
+  if(photos.length>2 || photos.map((p)=>p.id).toSet().length!=photos.length || photos.any((p)=>!references.contains(p.id))) {
+    throw ArgumentError('Packet photos must match front/back references');
+  }
 }

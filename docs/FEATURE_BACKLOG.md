@@ -126,3 +126,5 @@ Google satellite downloads/offline tile packs are not promised by this app.
 - [x] Tap-to-pin foraging capture, preserving the selected spot through map movement; native **Share find** summaries in the local and connected builds.
 
 - [x] Seed Starter: scrollable main tabs, named trays with row/column counts, individual/row/column selection and seed/plant assignments with icons. See [seed starter design](seed-starter.md).
+
+- [x] Seed Starter planting/transplant dates and day estimates, greyed transplanted cells, front/back packet photos and confirmed tray deletion.
