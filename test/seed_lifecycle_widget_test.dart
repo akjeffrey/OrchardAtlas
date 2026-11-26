@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:orchard_atlas/application/providers.dart';
 import 'package:orchard_atlas/application/extensions.dart';
 import 'package:orchard_atlas/domain/extensions.dart';
-import 'package:orchard_atlas/domain/models.dart';
 import 'package:orchard_atlas/domain/seed_trays.dart';
 import 'package:orchard_atlas/domain/taxonomy.dart';
 import 'package:orchard_atlas/data/local_trial_repository.dart';
