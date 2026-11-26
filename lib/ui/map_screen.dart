@@ -574,8 +574,8 @@ class _MapState extends ConsumerState<MapScreen>
               ? null
               : TabBar(
                   controller: tabs,
-                  isScrollable:true,
-                  tabAlignment:TabAlignment.start,
+                  isScrollable: true,
+                  tabAlignment: TabAlignment.start,
                   tabs: const [
                     Tab(text: 'Map'),
                     Tab(text: 'Plants'),
@@ -588,14 +588,24 @@ class _MapState extends ConsumerState<MapScreen>
             ? null
             : FloatingActionButton.extended(
                 onPressed: place.hasValue && !ref.watch(viewOnlyOrchardProvider)
-                    ? () => tabs.index == 3 ? addSeedTray(context) : tabs.index == 2
+                    ? () => tabs.index == 3
+                          ? addSeedTray(context)
+                          : tabs.index == 2
                           ? context.push('/tasks/new')
                           : context.push('/plants/new', extra: selected)
                     : null,
                 icon: const Icon(Icons.add),
-                label: Text(tabs.index == 3 ? 'Add tray' : tabs.index == 2 ? 'Add task' : 'Add Plant'),
+                label: Text(
+                  tabs.index == 3
+                      ? 'Add tray'
+                      : tabs.index == 2
+                      ? 'Add task'
+                      : 'Add Plant',
+                ),
               ),
-        body: tabs.index == 3 ? const SeedStarterPane() : tabs.index == 2
+        body: tabs.index == 3
+            ? const SeedStarterPane()
+            : tabs.index == 2
             ? const TasksPane()
             : plants.when(
                 loading: () => const Center(child: CircularProgressIndicator()),

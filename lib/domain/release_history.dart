@@ -16,7 +16,7 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
       'Seed trays persist offline and in Drive backups; main tabs scroll horizontally.',
     ],
   ),
-  const ReleaseNote('0.65.0',[
+  const ReleaseNote('0.65.0', [
     'Tap and drag a foraging pin; Add Resource keeps the selected location.',
     'Share find through the device share sheet without private notes or photos.',
   ]),

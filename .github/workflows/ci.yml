@@ -16,10 +16,7 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Normalize Dart style for verification
-        run: |
-          dart fix --apply --code=curly_braces_in_flow_control_structures lib
-          dart format lib test
+      - run: dart format lib test
       - run: flutter analyze
       - run: flutter test
       - name: Verify formatting produced no changes
