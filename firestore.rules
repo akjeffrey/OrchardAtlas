@@ -193,6 +193,41 @@ service cloud.firestore {
         && text(request.resource.data.name) && request.resource.data.createdAt is timestamp;
       allow update: if owner(propertyId) && text(request.resource.data.name) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
       allow delete: if false;
+      match /seedTray/{trayId} {
+        function tray(d) {
+          return d.keys().hasAll(['schemaVersion','id','name','rows','columns','createdAt'])
+            && d.keys().hasOnly(['schemaVersion','id','name','rows','columns','createdAt'])
+            && d.schemaVersion==1 && d.id==trayId && text(d.name)
+            && d.rows is int && d.rows>=1 && d.rows<=24
+            && d.columns is int && d.columns>=1 && d.columns<=24 && d.rows*d.columns<=400
+            && d.createdAt is string && d.createdAt.size()<=40;
+        }
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && uuid(trayId) && tray(request.resource.data);
+        allow update: if writer(propertyId) && tray(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name']);
+        allow delete: if false;
+      }
+      match /seedCell/{cellId} {
+        function cell(d) {
+          let t = get(/databases/$(database)/documents/properties/$(propertyId)/seedTray/$(d.trayId)).data;
+          return d.keys().hasAll(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId'])
+            && d.keys().hasOnly(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId'])
+            && d.schemaVersion==1 && uuid(d.trayId) && d.id==cellId
+            && d.row is int && d.row>=1 && d.row<=t.rows
+            && d.column is int && d.column>=1 && d.column<=t.columns
+            && cellId==d.trayId+'_'+string(d.row)+'_'+string(d.column)
+            && text(d.label) && uuid(d.taxonId) && d.kind in ['seed','plant']
+            && d.assignedAt is string && d.assignedAt.size()<=40
+            && (d.symbol==null || d.symbol in ['tree','apple','pear','berry','flower','citrus','nut','vine','unknown'])
+            && validIconRef(d,propertyId);
+        }
+        allow read: if reader(propertyId);
+        allow create: if writer(propertyId) && cell(request.resource.data);
+        allow update: if writer(propertyId) && cell(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label','taxonId','kind','assignedAt','symbol','customIconId']);
+        allow delete: if writer(propertyId);
+      }
       match /members/{userId} {
         allow read: if reader(propertyId);
         allow create: if signedIn() && request.auth.uid == userId

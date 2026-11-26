@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import '../domain/extensions.dart';
+import '../domain/seed_trays.dart';
+import 'seed_tray_mapping.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -21,7 +23,11 @@ import '../domain/repositories.dart';
 import 'firestore_mapping.dart';
 
 class FirestoreOrchardRepository
-    implements OrchardRepository, OrchardDirectoryRepository, OrchardRecords {
+    implements
+        OrchardRepository,
+        OrchardDirectoryRepository,
+        OrchardRecords,
+        SeedTrayRepository {
   FirestoreOrchardRepository(
     this.firestore,
     this.preferences, {
@@ -833,6 +839,91 @@ class FirestoreOrchardRepository
           .map((c) => c.id)
           .toSet(),
     );
+  }
+
+  @override
+  Stream<List<SeedTray>> watchSeedTrays(String propertyId) =>
+      watchRecords(propertyId, RecordKind.seedTray).map(
+        (records) => [
+          for (final r in records) SeedTrayMapping.readTray(propertyId, r),
+        ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
+      );
+  @override
+  Stream<Map<TrayPosition, TrayAssignment>> watchTrayCells(
+    String propertyId,
+    String trayId,
+  ) => _collection(propertyId, RecordKind.seedCell.name)
+      .where('trayId', isEqualTo: trayId)
+      .snapshots(includeMetadataChanges: true)
+      .map(
+        (s) => Map.fromEntries(
+          s.docs.map(
+            (d) => SeedTrayMapping.readCell({...d.data(), 'id': d.id}),
+          ),
+        ),
+      );
+  @override
+  Future<void> createSeedTray(SeedTray tray) async {
+    _observe(
+      tray.id,
+      _collection(
+        tray.propertyId,
+        RecordKind.seedTray.name,
+      ).doc(tray.id).set(SeedTrayMapping.tray(tray)),
+    );
+  }
+
+  @override
+  Future<void> renameSeedTray(
+    String propertyId,
+    String trayId,
+    String name,
+  ) async {
+    _observe(
+      trayId,
+      _collection(
+        propertyId,
+        RecordKind.seedTray.name,
+      ).doc(trayId).update({'name': requiredText(name, 'Tray name')}),
+    );
+  }
+
+  @override
+  Future<void> assignTrayCells(
+    SeedTray tray,
+    Set<TrayPosition> positions,
+    TrayAssignment assignment,
+  ) async {
+    tray.validateSelection(positions);
+    final batch = firestore.batch();
+    for (final p in positions) {
+      batch.set(
+        _collection(
+          tray.propertyId,
+          RecordKind.seedCell.name,
+        ).doc(p.recordId(tray.id)),
+        SeedTrayMapping.cell(tray, p, assignment),
+      );
+    }
+    _observe(tray.id, batch.commit());
+  }
+
+  @override
+  Future<void> clearTrayCells(
+    SeedTray tray,
+    Set<TrayPosition> positions,
+  ) async {
+    tray.validateSelection(positions);
+    final batch = firestore.batch();
+    for (final p in positions) {
+      batch.delete(
+        _collection(
+          tray.propertyId,
+          RecordKind.seedCell.name,
+        ).doc(p.recordId(tray.id)),
+      );
+    }
+    _observe(tray.id, batch.commit());
   }
 
   @override

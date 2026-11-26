@@ -124,3 +124,5 @@ Google satellite downloads/offline tile packs are not promised by this app.
 - [x] Foraging as a remembered home mode in the Mode & orchard switcher, with its own resource map/list. Shared icon-inspired form theme. See [mode and theme design](foraging-mode-and-visual-theme.md).
 
 - [x] Tap-to-pin foraging capture, preserving the selected spot through map movement; native **Share find** summaries in the local and connected builds.
+
+- [x] Seed Starter: scrollable main tabs, named trays with row/column counts, individual/row/column selection and seed/plant assignments with icons. See [seed starter design](seed-starter.md).

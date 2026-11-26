@@ -3,7 +3,14 @@ import 'dart:typed_data';
 import 'models.dart';
 
 /// Independently versioned orchard records, shared by local and remote adapters.
-enum RecordKind { foraging, photo, activityRevision, reminder }
+enum RecordKind {
+  foraging,
+  photo,
+  activityRevision,
+  reminder,
+  seedTray,
+  seedCell,
+}
 
 abstract interface class OrchardRecords {
   Stream<List<Map<String, dynamic>>> watchRecords(

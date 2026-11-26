@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 
 import '../domain/extensions.dart';
+import '../domain/seed_trays.dart';
+import 'seed_tray_mapping.dart';
 
 import 'package:uuid/uuid.dart';
 
@@ -22,7 +24,11 @@ import 'firestore_mapping.dart';
 
 /// Explicit phone-trial storage; never connects to a Firebase project.
 class LocalTrialRepository
-    implements OrchardRepository, OrchardDirectoryRepository, OrchardRecords {
+    implements
+        OrchardRepository,
+        OrchardDirectoryRepository,
+        OrchardRecords,
+        SeedTrayRepository {
   LocalTrialRepository._(
     this.preferences,
     this.recordKey,
@@ -225,6 +231,16 @@ class LocalTrialRepository
           (r) => r['parentId'] == null,
         )) {
       ResourceRecord.read(place.id, r);
+    }
+    final trays = {
+      for (final d in (repo._records[RecordKind.seedTray.name] ?? {}).values)
+        d['id'] as String: SeedTrayMapping.readTray(place.id, d),
+    };
+    for (final d in (repo._records[RecordKind.seedCell.name] ?? {}).values) {
+      final entry = SeedTrayMapping.readCell(d);
+      if (trays[d['trayId']]?.contains(entry.key) != true) {
+        throw const FormatException('Seed cell has no matching tray position');
+      }
     }
     repo._plans.addAll([
       for (final p in data?['taskPlans'] as List? ?? [])
@@ -1042,6 +1058,108 @@ class LocalTrialRepository
       plants[index] = plants[index].copyWith(rowOrder: i.toDouble());
     }
     _persist(sectionId);
+  }
+
+  @override
+  Stream<List<SeedTray>> watchSeedTrays(String propertyId) =>
+      watchRecords(propertyId, RecordKind.seedTray).map(
+        (records) => [
+          for (final r in records) SeedTrayMapping.readTray(propertyId, r),
+        ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
+      );
+  @override
+  Stream<Map<TrayPosition, TrayAssignment>> watchTrayCells(
+    String propertyId,
+    String trayId,
+  ) => watchRecords(propertyId, RecordKind.seedCell).map(
+    (records) => Map.fromEntries(
+      records.where((r) => r['trayId'] == trayId).map(SeedTrayMapping.readCell),
+    ),
+  );
+  @override
+  Future<void> createSeedTray(SeedTray tray) async {
+    if (tray.propertyId != place.id) {
+      return _for(tray.propertyId).createSeedTray(tray);
+    }
+    if (_records[RecordKind.seedTray.name]?.containsKey(tray.id) == true) {
+      throw StateError('Tray already exists');
+    }
+    await putRecord(
+      place.id,
+      RecordKind.seedTray,
+      tray.id,
+      SeedTrayMapping.tray(tray),
+    );
+  }
+
+  SeedTray _seedTray(String id) {
+    final d = _records[RecordKind.seedTray.name]?[id];
+    if (d == null) throw StateError('Tray unavailable');
+    return SeedTrayMapping.readTray(place.id, d);
+  }
+
+  @override
+  Future<void> renameSeedTray(
+    String propertyId,
+    String trayId,
+    String name,
+  ) async {
+    if (propertyId != place.id) {
+      return _for(propertyId).renameSeedTray(propertyId, trayId, name);
+    }
+    await putRecord(
+      place.id,
+      RecordKind.seedTray,
+      trayId,
+      SeedTrayMapping.tray(_seedTray(trayId).renamed(name)),
+    );
+  }
+
+  @override
+  Future<void> assignTrayCells(
+    SeedTray tray,
+    Set<TrayPosition> positions,
+    TrayAssignment assignment,
+  ) async {
+    if (tray.propertyId != place.id) {
+      return _for(tray.propertyId).assignTrayCells(tray, positions, assignment);
+    }
+    _seedTray(tray.id).validateSelection(positions);
+    if (!orchardTaxonomy(taxa).isPlantIdentity(assignment.taxonId)) {
+      throw ArgumentError('Choose a Variety');
+    }
+    if (assignment.customIconId != null &&
+        !icons.any((i) => i.id == assignment.customIconId)) {
+      throw ArgumentError('Choose an available icon');
+    }
+    final cells = _records.putIfAbsent(RecordKind.seedCell.name, () => {});
+    for (final p in positions) {
+      cells[p.recordId(tray.id)] = SeedTrayMapping.cell(tray, p, assignment);
+    }
+    _persist(tray.id);
+    await _writes;
+    if (_lastWriteError != null) {
+      throw StateError('Could not save seed cells on this phone');
+    }
+  }
+
+  @override
+  Future<void> clearTrayCells(
+    SeedTray tray,
+    Set<TrayPosition> positions,
+  ) async {
+    if (tray.propertyId != place.id) {
+      return _for(tray.propertyId).clearTrayCells(tray, positions);
+    }
+    _seedTray(tray.id).validateSelection(positions);
+    for (final p in positions) {
+      _records[RecordKind.seedCell.name]?.remove(p.recordId(tray.id));
+    }
+    _persist(tray.id);
+    await _writes;
+    if (_lastWriteError != null) {
+      throw StateError('Could not clear seed cells on this phone');
+    }
   }
 
   @override
