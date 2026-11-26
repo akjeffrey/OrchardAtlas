@@ -981,7 +981,7 @@ class FirestoreOrchardRepository
       if (path is! String ||
           !path.startsWith('properties/$propertyId/items/$trayId/photos/')) {
         throw StateError('Unexpected packet photo path');
-          }
+      }
       if (storage == null && p.data()['state'] == 'uploaded') {
         throw StateError('Photo storage unavailable');
       }

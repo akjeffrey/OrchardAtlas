@@ -729,13 +729,13 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
         setState(() {
           if (isFront) {
             front = result;
-      }
             removeFront = false;
           } else {
             back = result;
             removeBack = false;
           }
         });
+      }
     } catch (e) {
       if (mounted) setState(() => error = '$e');
     } finally {
