@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+
 import '../domain/extensions.dart';
 import 'seed_packet_photos.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -173,7 +175,11 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
   String? error;
   void toggle(Set<TrayPosition> group) =>
       setState(() => selected = toggleTraySelection(selected, group));
-  Future<bool> confirm(String title, String message, {String actionLabel='Continue'}) async =>
+  Future<bool> confirm(
+    String title,
+    String message, {
+    String actionLabel = 'Continue',
+  }) async =>
       await showDialog<bool>(
         context: context,
         builder: (c) => AlertDialog(
@@ -255,7 +261,12 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
     try {
       await ref
           .read(seedTrayRepositoryProvider)
-          .assignTrayCells(tray, positions, result.assignment,packetPhotos:result.photos);
+          .assignTrayCells(
+            tray,
+            positions,
+            result.assignment,
+            packetPhotos: result.photos,
+          );
       if (mounted) setState(() => selected = {});
     } catch (e) {
       if (mounted) setState(() => error = '$e');
@@ -264,30 +275,69 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
     }
   }
 
-  Future<void> transplant(SeedTray tray,Map<TrayPosition,TrayAssignment> cells,{bool undo=false}) async {
-    final positions=selected.where(cells.containsKey).toSet();
+  Future<void> transplant(
+    SeedTray tray,
+    Map<TrayPosition, TrayAssignment> cells, {
+    bool undo = false,
+  }) async {
+    final positions = selected.where(cells.containsKey).toSet();
     String? date;
-    if(undo) {
-      if(!await confirm('Undo transplant?','The selected cells will return to their growing appearance. Planting details and packet photos are retained.'))return;
+    if (undo) {
+      if (!await confirm(
+        'Undo transplant?',
+        'The selected cells will return to their growing appearance. Planting details and packet photos are retained.',
+      )) {
+        return;
+      }
     } else {
-      final picked=await showDatePicker(context:context,initialDate:DateTime.now(),firstDate:DateTime(1900),lastDate:DateTime(2100,12,31));
-      if(picked==null)return;
-      date=calendarDate(picked);
+      final picked = await showDatePicker(
+        context: context,
+        initialDate: DateTime.now(),
+        firstDate: DateTime(1900),
+        lastDate: DateTime(2100, 12, 31),
+      );
+      if (picked == null) return;
+      date = calendarDate(picked);
     }
-    if(!mounted)return;
-    setState(()=>busy=true);
-    try{await ref.read(seedTrayRepositoryProvider).setTrayTransplantDate(tray,positions,date);if(mounted)setState(()=>selected={});}
-    catch(e){if(mounted)setState(()=>error='$e');}finally{if(mounted)setState(()=>busy=false);}
-  }
-  Future<void> deleteTray(SeedTray tray) async {
-    if(!await confirm('Delete tray?','Delete ${tray.name}, all its cell entries and seed packet photos? This cannot be undone.',actionLabel:'Delete tray'))return;
-    if(!mounted)return;
-    setState(()=>busy=true);
+    if (!mounted) return;
+    setState(() => busy = true);
     try {
-      await ref.read(seedTrayRepositoryProvider).deleteSeedTray(tray.propertyId,tray.id);
-      if(mounted)Navigator.maybePop(context);
-    }catch(e){if(mounted)setState(()=>error='Could not finish deletion: $e. Reconnect and retry Delete tray.');}
-    finally{if(mounted)setState(()=>busy=false);}
+      await ref
+          .read(seedTrayRepositoryProvider)
+          .setTrayTransplantDate(tray, positions, date);
+      if (mounted) setState(() => selected = {});
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> deleteTray(SeedTray tray) async {
+    if (!await confirm(
+      'Delete tray?',
+      'Delete ${tray.name}, all its cell entries and seed packet photos? This cannot be undone.',
+      actionLabel: 'Delete tray',
+    )) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => busy = true);
+    try {
+      await ref
+          .read(seedTrayRepositoryProvider)
+          .deleteSeedTray(tray.propertyId, tray.id);
+      if (mounted) Navigator.maybePop(context);
+    } catch (e) {
+      if (mounted) {
+        setState(
+          () => error =
+              'Could not finish deletion: $e. Reconnect and retry Delete tray.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   @override
@@ -310,7 +360,12 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
           appBar: AppBar(
             title: Text(tray.name),
             actions: [
-              if(ref.watch(canEditOrchardProvider))IconButton(tooltip:'Delete tray',icon:const Icon(Icons.delete_outline),onPressed:busy?null:()=>deleteTray(tray)),
+              if (ref.watch(canEditOrchardProvider))
+                IconButton(
+                  tooltip: 'Delete tray',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: busy ? null : () => deleteTray(tray),
+                ),
               if (canEdit)
                 IconButton(
                   tooltip: 'Rename tray',
@@ -331,7 +386,10 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          if(tray.deleting)const Text('Deletion started. Retry Delete tray to finish cleanup.'),
+                          if (tray.deleting)
+                            const Text(
+                              'Deletion started. Retry Delete tray to finish cleanup.',
+                            ),
                           Text(
                             '${tray.rows} rows × ${tray.columns} columns · ${cells.length}/${tray.capacity} occupied',
                           ),
@@ -372,8 +430,27 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
                                   icon: const Icon(Icons.eco_outlined),
                                   label: const Text('Add seed / plant'),
                                 ),
-                                TextButton.icon(onPressed:busy || !selected.any(cells.containsKey)?null:()=>transplant(tray,cells),icon:const Icon(Icons.done_all),label:const Text('Record transplant')),
-                                if(selected.any((p)=>cells[p]?.isTransplanted==true))TextButton(onPressed:busy?null:()=>transplant(tray,cells,undo:true),child:const Text('Undo transplant')),
+                                TextButton.icon(
+                                  onPressed:
+                                      busy || !selected.any(cells.containsKey)
+                                      ? null
+                                      : () => transplant(tray, cells),
+                                  icon: const Icon(Icons.done_all),
+                                  label: const Text('Record transplant'),
+                                ),
+                                if (selected.any(
+                                  (p) => cells[p]?.isTransplanted == true,
+                                ))
+                                  TextButton(
+                                    onPressed: busy
+                                        ? null
+                                        : () => transplant(
+                                            tray,
+                                            cells,
+                                            undo: true,
+                                          ),
+                                    child: const Text('Undo transplant'),
+                                  ),
                                 TextButton(
                                   onPressed:
                                       busy || !selected.any(cells.containsKey)
@@ -530,7 +607,9 @@ class SeedTrayGrid extends ConsumerWidget {
                           child: Padding(
                             padding: const EdgeInsets.all(3),
                             child: Material(
-                              color: assignment?.isTransplanted==true ? Colors.grey.shade300 : active
+                              color: assignment?.isTransplanted == true
+                                  ? Colors.grey.shade300
+                                  : active
                                   ? Theme.of(context)
                                         .colorScheme
                                         .primaryContainer
@@ -564,21 +643,28 @@ class SeedTrayGrid extends ConsumerWidget {
                                           size: 22,
                                         )
                                       else
-                                        Opacity(opacity:assignment.isTransplanted ? 0.45 : 1.0,child:IconPreview(
-                                          size: 22,
-                                          symbol:
-                                              assignment.symbol ??
-                                              appearance?.symbol ??
-                                              PlantSymbol.unknown,
-                                          customIconId:
-                                              assignment.customIconId ??
-                                              (assignment.symbol == null
-                                                  ? appearance?.customIconId
-                                                  : null),
-                                        )),
+                                        Opacity(
+                                          opacity: assignment.isTransplanted
+                                              ? 0.45
+                                              : 1.0,
+                                          child: IconPreview(
+                                            size: 22,
+                                            symbol:
+                                                assignment.symbol ??
+                                                appearance?.symbol ??
+                                                PlantSymbol.unknown,
+                                            customIconId:
+                                                assignment.customIconId ??
+                                                (assignment.symbol == null
+                                                    ? appearance?.customIconId
+                                                    : null),
+                                          ),
+                                        ),
                                       const SizedBox(height: 3),
                                       Text(
-                                        assignment?.isTransplanted==true ? '✓ ${assignment!.label}' : assignment?.label ?? '$r:$c',
+                                        assignment?.isTransplanted == true
+                                            ? '✓ ${assignment!.label}'
+                                            : assignment?.label ?? '$r:$c',
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                         style: Theme.of(context)
@@ -604,7 +690,7 @@ class SeedTrayGrid extends ConsumerWidget {
 }
 
 class _PlantingDraft {
-  const _PlantingDraft(this.assignment,this.photos);
+  const _PlantingDraft(this.assignment, this.photos);
   final TrayAssignment assignment;
   final List<SeedPacketPhoto> photos;
 }
@@ -625,25 +711,49 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
       widget.initial?.symbol == null && widget.initial?.customIconId == null;
   late PlantSymbol symbol = widget.initial?.symbol ?? PlantSymbol.flower;
   late String? custom = widget.initial?.customIconId;
-  late final days=TextEditingController(text:widget.initial?.transplantAfterDays?.toString() ?? '');
-  late String? plantedOn=widget.initial==null?calendarDate(DateTime.now()):widget.initial!.plantedOn;
-  late String? transplantedOn=widget.initial?.transplantedOn;
-  CapturedPhoto? front,back;
-  bool removeFront=false,removeBack=false,capturing=false;
+  late final days = TextEditingController(
+    text: widget.initial?.transplantAfterDays?.toString() ?? '',
+  );
+  late String? plantedOn = widget.initial == null
+      ? calendarDate(DateTime.now())
+      : widget.initial!.plantedOn;
+  late String? transplantedOn = widget.initial?.transplantedOn;
+  CapturedPhoto? front, back;
+  bool removeFront = false, removeBack = false, capturing = false;
   String? error;
-  Future<void> capture(bool isFront,bool camera) async {
-    setState(()=>capturing=true);
+  Future<void> capture(bool isFront, bool camera) async {
+    setState(() => capturing = true);
     try {
-      final result=await ref.read(cameraProvider).capture(camera:camera);
-      if(result!=null && mounted)setState((){if(isFront){front=result;removeFront=false;}else{back=result;removeBack=false;}});
-    }catch(e){if(mounted)setState(()=>error='$e');}finally{if(mounted)setState(()=>capturing=false);}
+      final result = await ref.read(cameraProvider).capture(camera: camera);
+      if (result != null && mounted) {
+        setState(() {
+          if (isFront) {
+            front = result;
+      }
+            removeFront = false;
+          } else {
+            back = result;
+            removeBack = false;
+          }
+        });
+    } catch (e) {
+      if (mounted) setState(() => error = '$e');
+    } finally {
+      if (mounted) setState(() => capturing = false);
+    }
   }
+
   String? get readyDate {
-    final count=int.tryParse(days.text);
-    if(plantedOn==null || count==null || count<0 || count>3650)return null;
-    final p=parseCalendarDate(plantedOn!);
-    return calendarDate(DateTime.utc(p.year,p.month,p.day).add(Duration(days:count)));
+    final count = int.tryParse(days.text);
+    if (plantedOn == null || count == null || count < 0 || count > 3650) {
+      return null;
+    }
+    final p = parseCalendarDate(plantedOn!);
+    return calendarDate(
+      DateTime.utc(p.year, p.month, p.day).add(Duration(days: count)),
+    );
   }
+
   @override
   void dispose() {
     days.dispose();
@@ -679,19 +789,90 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
             helperText: 'Defaults to the selected classification',
           ),
         ),
-        ListTile(title:const Text('Planting date'),subtitle:Text(plantedOn ?? 'Not recorded'),
-          onTap:capturing?null:() async {final d=await showDatePicker(context:context,initialDate:plantedOn==null?DateTime.now():parseCalendarDate(plantedOn!),firstDate:DateTime(1900),lastDate:DateTime(2100,12,31));if(d!=null && mounted)setState(()=>plantedOn=calendarDate(d));},
-          trailing:IconButton(tooltip:'Clear planting date',icon:const Icon(Icons.clear),onPressed:capturing?null:()=>setState(()=>plantedOn=null))),
-        TextField(controller:days,keyboardType:TextInputType.number,onChanged:(_)=>setState((){}),decoration:const InputDecoration(labelText:'Days until transplant (optional)',helperText:'Whole days, 0–3650')),
-        if(readyDate!=null)Text('Expected transplant date: $readyDate'),
-        if(widget.initial!=null)ListTile(title:const Text('Transplanted on'),subtitle:Text(transplantedOn ?? 'Not transplanted'),
-          onTap:capturing?null:() async {final d=await showDatePicker(context:context,initialDate:transplantedOn==null?DateTime.now():parseCalendarDate(transplantedOn!),firstDate:DateTime(1900),lastDate:DateTime(2100,12,31));if(d!=null && mounted)setState(()=>transplantedOn=calendarDate(d));},
-          trailing:IconButton(tooltip:'Clear transplant date',icon:const Icon(Icons.clear),onPressed:()=>setState(()=>transplantedOn=null))),
-        SeedPacketPhotoSlot(side:'front',draft:front,photoId:removeFront?null:widget.initial?.packetFrontId,busy:capturing,
-          onCapture:(camera)=>capture(true,camera),onRemove:()=>setState((){front=null;removeFront=true;})),
-        SeedPacketPhotoSlot(side:'back',draft:back,photoId:removeBack?null:widget.initial?.packetBackId,busy:capturing,
-          onCapture:(camera)=>capture(false,camera),onRemove:()=>setState((){back=null;removeBack=true;})),
-        if(capturing)const LinearProgressIndicator(),
+        ListTile(
+          title: const Text('Planting date'),
+          subtitle: Text(plantedOn ?? 'Not recorded'),
+          onTap: capturing
+              ? null
+              : () async {
+                  final d = await showDatePicker(
+                    context: context,
+                    initialDate: plantedOn == null
+                        ? DateTime.now()
+                        : parseCalendarDate(plantedOn!),
+                    firstDate: DateTime(1900),
+                    lastDate: DateTime(2100, 12, 31),
+                  );
+                  if (d != null && mounted) {
+                    setState(() => plantedOn = calendarDate(d));
+                  }
+                },
+          trailing: IconButton(
+            tooltip: 'Clear planting date',
+            icon: const Icon(Icons.clear),
+            onPressed: capturing
+                ? null
+                : () => setState(() => plantedOn = null),
+          ),
+        ),
+        TextField(
+          controller: days,
+          keyboardType: TextInputType.number,
+          onChanged: (_) => setState(() {}),
+          decoration: const InputDecoration(
+            labelText: 'Days until transplant (optional)',
+            helperText: 'Whole days, 0–3650',
+          ),
+        ),
+        if (readyDate != null) Text('Expected transplant date: $readyDate'),
+        if (widget.initial != null)
+          ListTile(
+            title: const Text('Transplanted on'),
+            subtitle: Text(transplantedOn ?? 'Not transplanted'),
+            onTap: capturing
+                ? null
+                : () async {
+                    final d = await showDatePicker(
+                      context: context,
+                      initialDate: transplantedOn == null
+                          ? DateTime.now()
+                          : parseCalendarDate(transplantedOn!),
+                      firstDate: DateTime(1900),
+                      lastDate: DateTime(2100, 12, 31),
+                    );
+                    if (d != null && mounted) {
+                      setState(() => transplantedOn = calendarDate(d));
+                    }
+                  },
+            trailing: IconButton(
+              tooltip: 'Clear transplant date',
+              icon: const Icon(Icons.clear),
+              onPressed: () => setState(() => transplantedOn = null),
+            ),
+          ),
+        SeedPacketPhotoSlot(
+          side: 'front',
+          draft: front,
+          photoId: removeFront ? null : widget.initial?.packetFrontId,
+          busy: capturing,
+          onCapture: (camera) => capture(true, camera),
+          onRemove: () => setState(() {
+            front = null;
+            removeFront = true;
+          }),
+        ),
+        SeedPacketPhotoSlot(
+          side: 'back',
+          draft: back,
+          photoId: removeBack ? null : widget.initial?.packetBackId,
+          busy: capturing,
+          onCapture: (camera) => capture(false, camera),
+          onRemove: () => setState(() {
+            back = null;
+            removeBack = true;
+          }),
+        ),
+        if (capturing) const LinearProgressIndicator(),
         SwitchListTile(
           title: const Text('Use classification icon'),
           value: classificationIcon,
@@ -712,40 +893,75 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
             style: TextStyle(color: Theme.of(context).colorScheme.error),
           ),
         FilledButton(
-          onPressed: capturing?null:() {
-            try {
-              final taxonomy = ref.read(taxonomyProvider);
-              if (taxonId == null || !taxonomy.isPlantIdentity(taxonId!)) {
-                throw ArgumentError('Choose a Variety');
-              }
-              final count=days.text.trim().isEmpty?null:int.tryParse(days.text.trim());
-              if(days.text.trim().isNotEmpty && count==null)throw ArgumentError('Enter whole days until transplant');
-              final author=ref.read(userProvider).valueOrNull?.id;
-              if((front!=null || back!=null) && author==null)throw StateError('Please sign in again');
-              final frontId=front!=null?const Uuid().v4():removeFront?null:widget.initial?.packetFrontId;
-              final backId=back!=null?const Uuid().v4():removeBack?null:widget.initial?.packetBackId;
-              Navigator.pop(
-                context,
-                _PlantingDraft(TrayAssignment(
-                  label: label.text.trim().isEmpty
-                      ? taxonomy.byId(taxonId!).name
-                      : label.text,
-                  taxonId: taxonId!,
-                  kind: kind,
-                  assignedAt: DateTime.now().toUtc(),
-                  symbol: classificationIcon ? null : symbol,
-                  customIconId: classificationIcon ? null : custom,
-                  plantedOn:plantedOn,transplantAfterDays:count,transplantedOn:transplantedOn,
-                  packetFrontId:frontId,packetBackId:backId,
-                ),[
-                  if(front!=null)SeedPacketPhoto(id:frontId!,authorId:author!,image:front!.image,thumbnail:front!.thumbnail),
-                  if(back!=null)SeedPacketPhoto(id:backId!,authorId:author!,image:back!.image,thumbnail:back!.thumbnail),
-                ]),
-              );
-            } catch (e) {
-              setState(() => error = '$e');
-            }
-          },
+          onPressed: capturing
+              ? null
+              : () {
+                  try {
+                    final taxonomy = ref.read(taxonomyProvider);
+                    if (taxonId == null ||
+                        !taxonomy.isPlantIdentity(taxonId!)) {
+                      throw ArgumentError('Choose a Variety');
+                    }
+                    final count = days.text.trim().isEmpty
+                        ? null
+                        : int.tryParse(days.text.trim());
+                    if (days.text.trim().isNotEmpty && count == null) {
+                      throw ArgumentError('Enter whole days until transplant');
+                    }
+                    final author = ref.read(userProvider).valueOrNull?.id;
+                    if ((front != null || back != null) && author == null) {
+                      throw StateError('Please sign in again');
+                    }
+                    final frontId = front != null
+                        ? const Uuid().v4()
+                        : removeFront
+                        ? null
+                        : widget.initial?.packetFrontId;
+                    final backId = back != null
+                        ? const Uuid().v4()
+                        : removeBack
+                        ? null
+                        : widget.initial?.packetBackId;
+                    Navigator.pop(
+                      context,
+                      _PlantingDraft(
+                        TrayAssignment(
+                          label: label.text.trim().isEmpty
+                              ? taxonomy.byId(taxonId!).name
+                              : label.text,
+                          taxonId: taxonId!,
+                          kind: kind,
+                          assignedAt: DateTime.now().toUtc(),
+                          symbol: classificationIcon ? null : symbol,
+                          customIconId: classificationIcon ? null : custom,
+                          plantedOn: plantedOn,
+                          transplantAfterDays: count,
+                          transplantedOn: transplantedOn,
+                          packetFrontId: frontId,
+                          packetBackId: backId,
+                        ),
+                        [
+                          if (front != null)
+                            SeedPacketPhoto(
+                              id: frontId!,
+                              authorId: author!,
+                              image: front!.image,
+                              thumbnail: front!.thumbnail,
+                            ),
+                          if (back != null)
+                            SeedPacketPhoto(
+                              id: backId!,
+                              authorId: author!,
+                              image: back!.image,
+                              thumbnail: back!.thumbnail,
+                            ),
+                        ],
+                      ),
+                    );
+                  } catch (e) {
+                    setState(() => error = '$e');
+                  }
+                },
           child: const Text('Apply to selected cells'),
         ),
       ],

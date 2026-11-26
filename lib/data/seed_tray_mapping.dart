@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import '../domain/models.dart';
 import '../domain/seed_trays.dart';
 
@@ -10,7 +11,7 @@ class SeedTrayMapping {
     'rows': t.rows,
     'columns': t.columns,
     'createdAt': t.createdAt.toUtc().toIso8601String(),
-    if(t.deleting)'deleting':true,
+    if (t.deleting) 'deleting': true,
   };
   static SeedTray readTray(String property, Map<String, dynamic> d) {
     _version(d);
@@ -21,7 +22,7 @@ class SeedTrayMapping {
       rows: d['rows'] as int,
       columns: d['columns'] as int,
       createdAt: DateTime.parse(d['createdAt'] as String),
-      deleting:d['deleting'] as bool? ?? false,
+      deleting: d['deleting'] as bool? ?? false,
     );
   }
 
@@ -41,8 +42,11 @@ class SeedTrayMapping {
     'assignedAt': a.assignedAt.toUtc().toIso8601String(),
     'symbol': a.symbol?.name,
     'customIconId': a.customIconId,
-    'plantedOn':a.plantedOn,'transplantAfterDays':a.transplantAfterDays,'transplantedOn':a.transplantedOn,
-    'packetFrontId':a.packetFrontId,'packetBackId':a.packetBackId,
+    'plantedOn': a.plantedOn,
+    'transplantAfterDays': a.transplantAfterDays,
+    'transplantedOn': a.transplantedOn,
+    'packetFrontId': a.packetFrontId,
+    'packetBackId': a.packetBackId,
   };
   static MapEntry<TrayPosition, TrayAssignment> readCell(
     Map<String, dynamic> d,
@@ -63,16 +67,30 @@ class SeedTrayMapping {
             ? null
             : PlantSymbol.values.byName(d['symbol'] as String),
         customIconId: d['customIconId'] as String?,
-        plantedOn:d['plantedOn'] as String?,transplantAfterDays:d['transplantAfterDays'] as int?,
-        transplantedOn:d['transplantedOn'] as String?,packetFrontId:d['packetFrontId'] as String?,packetBackId:d['packetBackId'] as String?,
+        plantedOn: d['plantedOn'] as String?,
+        transplantAfterDays: d['transplantAfterDays'] as int?,
+        transplantedOn: d['transplantedOn'] as String?,
+        packetFrontId: d['packetFrontId'] as String?,
+        packetBackId: d['packetBackId'] as String?,
       ),
     );
   }
 
-  static Map<String,dynamic> packetPhoto(SeedTray tray,SeedPacketPhoto p,{required bool connected})=>{
-    'id':p.id,'itemId':tray.id,'authorId':p.authorId,'createdAt':DateTime.now().toUtc().toIso8601String(),
-    'storagePath':'properties/${tray.propertyId}/items/${tray.id}/photos/${p.id}.jpg',
-    'image':base64Encode(p.image),'thumbnail':base64Encode(p.thumbnail),'state':connected?'pending':'local','error':null,
+  static Map<String, dynamic> packetPhoto(
+    SeedTray tray,
+    SeedPacketPhoto p, {
+    required bool connected,
+  }) => {
+    'id': p.id,
+    'itemId': tray.id,
+    'authorId': p.authorId,
+    'createdAt': DateTime.now().toUtc().toIso8601String(),
+    'storagePath':
+        'properties/${tray.propertyId}/items/${tray.id}/photos/${p.id}.jpg',
+    'image': base64Encode(p.image),
+    'thumbnail': base64Encode(p.thumbnail),
+    'state': connected ? 'pending' : 'local',
+    'error': null,
   };
 
   static void _version(Map<String, dynamic> d) {

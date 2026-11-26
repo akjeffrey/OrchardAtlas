@@ -92,7 +92,7 @@ final photoWorkerProvider = Provider<void>((ref) {
       photos,
       repo,
       (p, bytes) => uploader.upload(p, bytes, 'image/jpeg'),
-      onDiscarded:(p)=>uploader.delete(p.storagePath),
+      onDiscarded: (p) => uploader.delete(p.storagePath),
     ),
   );
 });
@@ -104,8 +104,9 @@ class PhotoQueue {
     String orchard,
     List<Map<String, dynamic>> records,
     OrchardRecords repo,
-    Future<void> Function(Photo, Uint8List) upload, {Future<void> Function(Photo)? onDiscarded}
-  ) async {
+    Future<void> Function(Photo, Uint8List) upload, {
+    Future<void> Function(Photo)? onDiscarded,
+  }) async {
     if (_running) return;
     _running = true;
     try {
@@ -126,7 +127,7 @@ class PhotoQueue {
               .watchRecords(orchard, RecordKind.photo)
               .first;
           if (!latest.any((r) => r['id'] == p.id)) {
-            if(onDiscarded!=null)await onDiscarded(p);
+            if (onDiscarded != null) await onDiscarded(p);
             continue;
           }
           await repo.putRecord(orchard, RecordKind.photo, p.id, {

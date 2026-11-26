@@ -17,7 +17,7 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
       'Delete trays with confirmed cleanup of cell entries and packet photos.',
     ],
   ),
-  const ReleaseNote('0.70.0',[
+  const ReleaseNote('0.70.0', [
     'Seed Starter trays, custom row/column counts and bulk cell selection.',
     'Seed/plant classifications and icons with offline persistence and Drive backups.',
   ]),
