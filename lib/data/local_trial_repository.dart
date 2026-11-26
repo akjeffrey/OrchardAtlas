@@ -1131,7 +1131,7 @@ class LocalTrialRepository
     if (assignment.customIconId != null &&
         !icons.any((i) => i.id == assignment.customIconId)) {
       throw ArgumentError('Choose an available icon');
-        }
+    }
     final cells = _records.putIfAbsent(RecordKind.seedCell.name, () => {});
     for (final p in positions) {
       cells[p.recordId(tray.id)] = SeedTrayMapping.cell(tray, p, assignment);

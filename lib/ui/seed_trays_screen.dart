@@ -247,7 +247,7 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
           '$occupied selected cell(s) already contain seeds or plants. Their entries will be replaced.',
         )) {
       return;
-        }
+    }
     if (!mounted) return;
     setState(() => busy = true);
     try {
