@@ -73,6 +73,7 @@ void main() {
       await tester.pumpWidget(wrap(repo, SeedTrayDetail(t.id)));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('tray-cell-1-1')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Record transplant'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('OK'));
@@ -111,6 +112,7 @@ void main() {
       await tester.pumpWidget(wrap(repo, SeedTrayDetail(t.id), camera: camera));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const ValueKey('tray-cell-1-1')));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Add seed / plant'));
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(

@@ -16,12 +16,9 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - run: dart format lib test
+      - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test
-      - name: Verify formatting produced no changes
-        if: always()
-        run: git diff --exit-code -- lib test
   security:
     runs-on: ubuntu-latest
     steps:
