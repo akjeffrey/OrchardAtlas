@@ -37,6 +37,7 @@ void main() {
     transplantAfterDays: 14,
     packetFrontId: 'front',
     packetBackId: 'back',
+    usePacketFrontIcon: true,
   );
   List<SeedPacketPhoto> photos() => [
     for (final id in ['front', 'back'])
@@ -59,6 +60,7 @@ void main() {
     final t = a.withTransplantDate('2027-01-20');
     expect(t.isTransplanted, isTrue);
     expect(t.packetFrontId, 'front');
+    expect(t.usePacketFrontIcon, isTrue);
     expect(t.plantedOn, a.plantedOn);
     expect(t.withTransplantDate(null).isTransplanted, isFalse);
     expect(() => a.withTransplantDate('2026-12-01'), throwsArgumentError);
@@ -106,6 +108,7 @@ void main() {
     final cells = await restored.watchTrayCells(t.propertyId, t.id).first;
     expect(cells[TrayPosition(1, 1)]!.transplantedOn, '2027-01-20');
     expect(cells[TrayPosition(1, 2)]!.transplantedOn, isNull);
+    expect(cells.values.every((a) => a.usePacketFrontIcon), isTrue);
     expect(
       await restored.watchRecords(t.propertyId, RecordKind.photo).first,
       hasLength(2),

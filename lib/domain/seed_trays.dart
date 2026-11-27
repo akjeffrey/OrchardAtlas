@@ -93,7 +93,11 @@ class TrayAssignment {
     this.transplantedOn,
     this.packetFrontId,
     this.packetBackId,
+    this.usePacketFrontIcon = false,
   }) : label = requiredText(label, 'Seed / plant name') {
+    if (usePacketFrontIcon && packetFrontId == null) {
+      throw ArgumentError('Add a front packet photo before using it as the cell icon');
+    }
     if (plantedOn != null) parseCalendarDate(plantedOn!);
     if (transplantedOn != null) parseCalendarDate(transplantedOn!);
     if (transplantAfterDays != null &&
@@ -111,6 +115,7 @@ class TrayAssignment {
   final DateTime assignedAt;
   final String? plantedOn, transplantedOn, packetFrontId, packetBackId;
   final int? transplantAfterDays;
+  final bool usePacketFrontIcon;
   bool get isTransplanted => transplantedOn != null;
   String? get expectedTransplantOn {
     if (plantedOn == null || transplantAfterDays == null) return null;
@@ -136,6 +141,7 @@ class TrayAssignment {
     transplantedOn: date,
     packetFrontId: packetFrontId,
     packetBackId: packetBackId,
+    usePacketFrontIcon: usePacketFrontIcon,
   );
 
   /// Null means resolve the current inherited classification icon.

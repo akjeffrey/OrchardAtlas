@@ -1,3 +1,4 @@
+import 'seed_tray_viewport.dart';
 import 'package:flutter/material.dart';
 
 import '../domain/extensions.dart';
@@ -395,7 +396,7 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
                           ),
                           const SizedBox(height: 8),
                           const Text(
-                            'Tap cells to select them. R selects a whole row; C selects a whole column. Scroll across or down for larger trays.',
+                            'Tap cells to select them. R selects a whole row; C selects a whole column. Pinch to zoom and drag to move, or use the zoom and Fit tray controls.',
                           ),
                           Wrap(
                             spacing: 8,
@@ -504,17 +505,14 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
                       ),
                     ),
                     Expanded(
-                      child: SingleChildScrollView(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                            child: SeedTrayGrid(
-                              tray: tray,
-                              cells: cells,
-                              selected: selected,
-                              onToggle: busy ? null : toggle,
-                            ),
+                      child: SeedTrayViewport(
+                        key: ValueKey(tray.id),
+                        contentSize: Size(80.0*(tray.columns+1)+32,48.0+80.0*tray.rows+24),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16,0,16,24),
+                          child: SeedTrayGrid(
+                            tray: tray,cells: cells,selected: selected,
+                            onToggle: busy ? null : toggle,
                           ),
                         ),
                       ),
@@ -647,7 +645,9 @@ class SeedTrayGrid extends ConsumerWidget {
                                           opacity: assignment.isTransplanted
                                               ? 0.45
                                               : 1.0,
-                                          child: IconPreview(
+                                          child: SeedPacketCellIcon(
+                                            photoId: assignment.usePacketFrontIcon ? assignment.packetFrontId : null,
+                                          fallback: IconPreview(
                                             size: 22,
                                             symbol:
                                                 assignment.symbol ??
@@ -658,6 +658,7 @@ class SeedTrayGrid extends ConsumerWidget {
                                                 (assignment.symbol == null
                                                     ? appearance?.customIconId
                                                     : null),
+                                          ),
                                           ),
                                         ),
                                       const SizedBox(height: 3),
@@ -718,6 +719,7 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
       ? calendarDate(DateTime.now())
       : widget.initial!.plantedOn;
   late String? transplantedOn = widget.initial?.transplantedOn;
+  late bool usePacketFrontIcon = widget.initial?.usePacketFrontIcon ?? false;
   CapturedPhoto? front, back;
   bool removeFront = false, removeBack = false, capturing = false;
   String? error;
@@ -859,6 +861,7 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
           onRemove: () => setState(() {
             front = null;
             removeFront = true;
+            usePacketFrontIcon = false;
           }),
         ),
         SeedPacketPhotoSlot(
@@ -872,13 +875,20 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
             removeBack = true;
           }),
         ),
-        if (capturing) const LinearProgressIndicator(),
         SwitchListTile(
+          title: const Text('Use packet front photo as cell icon'),
+          subtitle: const Text('Add a front photo above to use its thumbnail in the tray.'),
+          value: usePacketFrontIcon,
+          onChanged: capturing || (front == null && (removeFront || widget.initial?.packetFrontId == null))
+              ? null : (value) => setState(() => usePacketFrontIcon = value),
+        ),
+        if (capturing) const LinearProgressIndicator(),
+        if (!usePacketFrontIcon) SwitchListTile(
           title: const Text('Use classification icon'),
           value: classificationIcon,
           onChanged: (v) => setState(() => classificationIcon = v),
         ),
-        if (!classificationIcon)
+        if (!usePacketFrontIcon && !classificationIcon)
           MapIconPicker(
             symbol: symbol,
             customIconId: custom,
@@ -939,6 +949,7 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
                           transplantedOn: transplantedOn,
                           packetFrontId: frontId,
                           packetBackId: backId,
+                          usePacketFrontIcon: usePacketFrontIcon,
                         ),
                         [
                           if (front != null)

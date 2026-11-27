@@ -9,7 +9,7 @@ Names can be changed without changing tray or cell identities.
 
 Tap cells to toggle individual selection. R headers toggle entire rows and C
 headers toggle entire columns. Intersections are selected once. Select all and
-Clear selection are available. The grid scrolls in both directions; cells have
+Clear selection are available. The grid pans and zooms in both directions; cells have
 visible boundaries, selected styling and accessible position/content labels.
 
 Add seed / plant opens a shared Group → Type → Variety picker, a Seed/Plant
@@ -89,3 +89,9 @@ the tray remains visible with a retry message; repeat Delete tray to finish the
 idempotent cleanup. Other trays and orchard records are unaffected. In-flight
 uploads whose metadata was removed are discarded/cleaned up by the upload worker.
 Deploy updated Firestore rules before using connected lifecycle/photo features.
+
+## Zoom and packet-photo cell icons
+
+Pinch to zoom, drag to pan, or use Zoom in / Zoom out, Fit tray and Reset tray zoom (100%). The grid is clipped to its own viewport so controls remain accessible. Zoom is bounded from 1% to 300%; fitting uses the available grid viewport. Row/column selectors, cell selection and grey transplanted cells remain functional after transforms. Zoom/pan are local viewing state, not part of the orchard data.
+
+In Add seed / plant, capture or choose a front seed-packet photo, then enable **Use packet front photo as cell icon**. The choice applies to every selected cell and is editable for an existing single cell. Removing the front photo switches back to its retained classification/custom icon. Replacing the front image updates the icon reference; transplantation retains the choice and dims the thumbnail. Missing/corrupt thumbnails fall back to the normal icon. Thumbnails use the existing shared photo record, bounded image cache and offline/Drive backup data; no full-image downloads or duplicate per-cell photos are needed. Old assignments default the optional `usePacketFrontIcon` flag to false. Connected installations must deploy the updated Firestore cell rules.

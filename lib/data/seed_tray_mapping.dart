@@ -47,6 +47,7 @@ class SeedTrayMapping {
     'transplantedOn': a.transplantedOn,
     'packetFrontId': a.packetFrontId,
     'packetBackId': a.packetBackId,
+    if (a.usePacketFrontIcon) 'usePacketFrontIcon': true,
   };
   static MapEntry<TrayPosition, TrayAssignment> readCell(
     Map<String, dynamic> d,
@@ -72,6 +73,7 @@ class SeedTrayMapping {
         transplantedOn: d['transplantedOn'] as String?,
         packetFrontId: d['packetFrontId'] as String?,
         packetBackId: d['packetBackId'] as String?,
+        usePacketFrontIcon: d['usePacketFrontIcon'] as bool? ?? false,
       ),
     );
   }

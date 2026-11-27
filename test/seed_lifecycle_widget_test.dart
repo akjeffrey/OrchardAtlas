@@ -137,6 +137,13 @@ void main() {
       }
       expect(camera.calls, 2);
       await tester.scrollUntilVisible(
+        find.text('Use packet front photo as cell icon'),
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Use packet front photo as cell icon'));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
         find.text('Apply to selected cells'),
         160,
         scrollable: find.byType(Scrollable).first,
@@ -149,6 +156,8 @@ void main() {
         () => repo.watchTrayCells(t.propertyId, t.id).first,
       );
       expect(cells![TrayPosition(1, 1)]!.packetFrontId, isNotNull);
+      expect(cells[TrayPosition(1, 1)]!.usePacketFrontIcon, isTrue);
+      expect(find.byType(Image), findsOneWidget);
       expect(cells[TrayPosition(1, 1)]!.packetBackId, isNotNull);
       expect(
         await tester.runAsync(
