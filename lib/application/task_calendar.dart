@@ -38,7 +38,15 @@ final calendarWorkerProvider = Provider<void>((ref) {
     try {
       final scope = '${user.id}/${orchard.id}';
       if (await device.selected(scope) == null) return;
-      final all=projectedTaskEntries(plans:plans,tasks:tasks,plants:plants,sections:sections,crops:crops,taxonomy:taxonomy,through:now.add(const Duration(days:90)));
+      final all = projectedTaskEntries(
+        plans: plans,
+        tasks: tasks,
+        plants: plants,
+        sections: sections,
+        crops: crops,
+        taxonomy: taxonomy,
+        through: now.add(const Duration(days: 90)),
+      );
       await device.replace(scope, taskCalendarEvents(all));
       if (active) ref.read(calendarErrorProvider.notifier).state = null;
     } catch (e) {

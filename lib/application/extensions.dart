@@ -202,7 +202,8 @@ List<Map<String, dynamic>> dueNotifications(
               (t.id == r['id'] ||
                   t.planId == r['id'] ||
                   t.groupId == r['id']) &&
-              !t.membershipExcluded && t.status == TaskStatus.open &&
+              !t.membershipExcluded &&
+              t.status == TaskStatus.open &&
               t.dueDate != null,
         )
         .toList();
@@ -240,8 +241,18 @@ final reminderWorkerProvider = Provider<void>((ref) {
   final plants = ref.watch(plantsProvider).asData?.value.value;
   final crops = ref.watch(cropsProvider).asData?.value.value;
   final sections = ref.watch(sectionsProvider).asData?.value.value;
-  if(plans==null||plants==null||crops==null||sections==null) {return;}
-  final projection=projectedTaskEntries(plans:plans,tasks:tasks,plants:plants,sections:sections,crops:crops,taxonomy:ref.watch(taxonomyProvider),through:now.add(const Duration(days:366)));
+  if (plans == null || plants == null || crops == null || sections == null) {
+    return;
+  }
+  final projection = projectedTaskEntries(
+    plans: plans,
+    tasks: tasks,
+    plants: plants,
+    sections: sections,
+    crops: crops,
+    taxonomy: ref.watch(taxonomyProvider),
+    through: now.add(const Duration(days: 366)),
+  );
   final orchard = ref.watch(placeProvider).asData?.value;
   if (orchard == null) return;
   scheduleMicrotask(() async {

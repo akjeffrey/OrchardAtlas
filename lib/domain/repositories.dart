@@ -56,8 +56,9 @@ abstract interface class OrchardRepository {
   Stream<WriteFailure> get writeFailures;
   Stream<List<TaskPlan>> watchTaskPlans(String propertyId);
   void saveTaskPlan(TaskPlan plan);
+
   /// Submits to local persistence without waiting for a network acknowledgement.
-  Future<void> saveTaskDefinition(TaskPlan plan,List<OrchardTask> changes);
+  Future<void> saveTaskDefinition(TaskPlan plan, List<OrchardTask> changes);
   void saveTaskWithEvent(OrchardTask task, PlantEvent? event);
   void updateEvent(PlantEvent event);
   void deleteEvent(PlantEvent event);
