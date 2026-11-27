@@ -182,6 +182,7 @@ class LocalTrialRepository
           notes: t['notes'] as String,
           itemId: t['itemId'] as String?,
           dueDate: t['dueDate'] as String?,
+          membershipExcluded:t['membershipExcluded'] as bool? ?? false,
           endDate: t['endDate'] as String?,
           status: TaskStatus.values.byName(t['status'] as String),
           createdAt: DateTime.parse(t['createdAt'] as String),
@@ -746,6 +747,7 @@ class LocalTrialRepository
                     old.notes != task.notes ||
                     old.dueDate != task.dueDate ||
                     old.endDate != task.endDate ||
+                    old.membershipExcluded != task.membershipExcluded ||
                     old.eventType != task.eventType ||
                     old.eventHarvest != task.eventHarvest)))) {
       throw ArgumentError(
@@ -916,6 +918,22 @@ class LocalTrialRepository
     _plans.removeWhere((p) => p.id == plan.id);
     _plans.add(plan);
     _persist(plan.id);
+  }
+
+  @override
+  Future<void> saveTaskDefinition(TaskPlan plan,List<OrchardTask> changes) async {
+    if(plan.propertyId!=place.id) {return _for(plan.propertyId).saveTaskDefinition(plan,changes);}
+    if(changes.any((t)=>t.propertyId!=plan.propertyId)) {throw ArgumentError('Tasks must belong to this orchard');}
+    for(final task in changes) {_validateTask(task);}
+    _plans.removeWhere((p)=>p.id==plan.id);
+    _plans.add(plan);
+    for(final task in changes) {
+      final i=tasks.indexWhere((t)=>t.id==task.id);
+      if(i<0) {tasks.add(task);} else {tasks[i]=task;}
+    }
+    _persist(plan.id);
+    await _writes;
+    if(_lastWriteError!=null) {throw StateError('Could not save task on this device');}
   }
 
   @override

@@ -572,3 +572,27 @@ test('deleting a task retains a protected occurrence tombstone', async () => {
   await assertFails(updateDoc(doc(db('alice'),path),{title:'Rewrite removed task'}));
   await assertSucceeds(getDoc(doc(db('alice'),path)));
 });
+
+test('task definitions validate targets and schedule identities and block viewer edits', async () => {
+  const id='00000000-0000-4000-8000-000000000801',path=`${propertyPath}/taskPlans/${id}`;
+  const plan={schemaVersion:1,title:'Prune',target:'plants',createdAt:now,notes:'',repeat:'weekly',dueDate:'2026-11-27',includedTargets:[`p:${item}`],excludedTargets:[],legacyIds:[],scheduleId:event,scheduleFrom:'2027-01-01',currentKey:'2026-11-27',generateFrom:'2027-01-01'};
+  await assertSucceeds(setDoc(doc(db('alice'),path),plan));
+  for(const change of [{includedTargets:['bad']},{excludedTargets:[1]},{legacyIds:['bad']},{scheduleId:'bad'},{deleted:'yes'},{currentKey:'bad'}]) {
+    await assertFails(setDoc(doc(db('alice'),path),{...plan,...change}));
+  }
+  await assertFails(updateDoc(doc(db('bob'),path),{dueDate:'2027-01-01'}));
+  await assertSucceeds(updateDoc(doc(db('alice'),path),{deleted:true}));
+  await assertFails(updateDoc(doc(db('alice'),path),{deleted:false}));
+});
+test('definition and members can be saved together; completed membership stays fixed', async () => {
+  const store=db('alice'),id='00000000-0000-4000-8000-000000000802',planPath=`${propertyPath}/taskPlans/${id}`,taskPath=`${propertyPath}/tasks/${event}`;
+  const batch=writeBatch(store);
+  batch.set(doc(store,planPath),{schemaVersion:1,title:'Prune',target:'manual',createdAt:now,notes:'',repeat:'none',includedTargets:[`p:${item}`],legacyIds:[]});
+  batch.set(doc(store,taskPath),{schemaVersion:1,title:'Prune',notes:'',itemId:item,dueDate:'2026-11-27',status:'open',createdAt:now,planId:id,occurrenceOn:event,membershipExcluded:false});
+  await assertSucceeds(batch.commit());
+  await assertSucceeds(updateDoc(doc(store,taskPath),{membershipExcluded:true}));
+  await assertSucceeds(updateDoc(doc(store,taskPath),{membershipExcluded:false}));
+  await assertSucceeds(updateDoc(doc(store,taskPath),{status:'completed'}));
+  await assertFails(updateDoc(doc(store,taskPath),{membershipExcluded:true}));
+  await assertFails(updateDoc(doc(store,taskPath),{occurrenceOn:item}));
+});

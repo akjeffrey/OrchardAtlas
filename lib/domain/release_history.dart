@@ -11,9 +11,14 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Search Google Images from Custom icons, then import a saved image from your phone.',
+      'Edit repeating task start dates while preserving current completion history.',
+      'Change Group / Type / Variety targets and include or exclude individual plants.',
+      'Delete entire tasks, stop future repeats and retain completed plant activities.',
     ],
   ),
+  const ReleaseNote('0.97.0', [
+    'Search Google Images from Custom icons and import saved images.',
+  ]),
   const ReleaseNote('0.93.0', [
     'Seed tray pinch, pan, zoom buttons and Fit tray controls.',
     'Use the seed-packet front photo as a planted cell icon, including offline.',

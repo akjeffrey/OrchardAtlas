@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/task_calendar.dart';
-import '../domain/models.dart';
 import '../domain/work.dart';
 import '../data/task_calendar_device.dart';
 import 'providers.dart';
@@ -39,49 +38,7 @@ final calendarWorkerProvider = Provider<void>((ref) {
     try {
       final scope = '${user.id}/${orchard.id}';
       if (await device.selected(scope) == null) return;
-      final predicted = expandPlans(
-        plans: plans,
-        existing: tasks,
-        plants: plants,
-        sections: sections,
-        crops: crops,
-        taxonomy: taxonomy,
-        now: now.add(const Duration(days: 90)),
-      );
-      final all = [...tasks, ...predicted];
-      // A valid group with no current matching plants still has calendar dates.
-      for (final plan in plans) {
-        for (final date in occurrenceDates(
-          plan,
-          now.add(const Duration(days: 90)),
-        )) {
-          if (all.any((t) => t.planId == plan.id && t.occurrenceOn == date)) {
-            continue;
-          }
-          final start = plan.repeat == RepeatSchedule.none
-              ? plan.dueDate
-              : date;
-          if (start == null) continue;
-          all.add(
-            OrchardTask(
-              id: '${plan.id}/$date',
-              propertyId: plan.propertyId,
-              title: plan.title,
-              createdAt: plan.createdAt,
-              planId: plan.id,
-              occurrenceOn: date,
-              dueDate: start,
-              notes: plan.notes,
-              endDate: plan.endDate == null
-                  ? null
-                  : offsetCalendarDate(
-                      start,
-                      taskRangeDays(plan.dueDate!, plan.endDate!),
-                    ),
-            ),
-          );
-        }
-      }
+      final all=projectedTaskEntries(plans:plans,tasks:tasks,plants:plants,sections:sections,crops:crops,taxonomy:taxonomy,through:now.add(const Duration(days:90)));
       await device.replace(scope, taskCalendarEvents(all));
       if (active) ref.read(calendarErrorProvider.notifier).state = null;
     } catch (e) {

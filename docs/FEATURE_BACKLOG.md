@@ -4,6 +4,10 @@ GitHub issues are the source of truth for outstanding work: [open tickets](https
 
 ## Newly requested features
 
+- [x] [#77](https://github.com/akjeffrey/OrchardAtlas/issues/77) **Edit start dates:** task editing supports repeating start dates and optional valid ranges while retaining completed occurrence history.
+- [x] [#78](https://github.com/akjeffrey/OrchardAtlas/issues/78) **Delete entire tasks:** stop the definition and all future repeats, remove open work/reminders/calendar exports, retain completed activities.
+- [x] [#79](https://github.com/akjeffrey/OrchardAtlas/issues/79) **Edit plant targets:** change Group → Type → Variety criteria and persistent individual inclusions/exclusions, with per-plant completion and offline backups.
+
 - [x] **Google Images for custom icons:** search from the icon library in the device browser, save a result, then import it with existing bounded PNG normalization. No extra Google API key is required.
 
 - [x] **Seed tray zoom and packet icons:** pinch/drag the tray, zoom in/out, fit the whole tray, reset to 100%, and optionally use a seed-packet front thumbnail for planted cell icons with offline persistence.

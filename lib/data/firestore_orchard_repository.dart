@@ -578,6 +578,21 @@ class FirestoreOrchardRepository
     ).doc(plan.id).set(WorkMapping.plan(plan, native: true)),
   );
   @override
+  Future<void> saveTaskDefinition(TaskPlan plan,List<OrchardTask> changes) async {
+    if(changes.any((t)=>t.propertyId!=plan.propertyId)) {throw ArgumentError('Tasks must belong to this orchard');}
+    // The first batch makes the parent visible to all subsequent child writes.
+    var batch=firestore.batch();
+    batch.set(_collection(plan.propertyId,'taskPlans').doc(plan.id),WorkMapping.plan(plan,native:true));
+    var count=1;
+    for(final t in changes) {
+      if(count==400) {_observe(plan.id,batch.commit());batch=firestore.batch();count=0;}
+      batch.set(_collection(plan.propertyId,'tasks').doc(t.id),FirestoreMapping.taskToMap(t));
+      count++;
+    }
+    if(count>0) {_observe(plan.id,batch.commit());}
+  }
+
+  @override
   void saveTaskWithEvent(OrchardTask task, PlantEvent? event) {
     if (event != null &&
         (event.taskId != task.id ||

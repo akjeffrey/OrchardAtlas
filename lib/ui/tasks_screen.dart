@@ -65,6 +65,7 @@ class TaskMemberTile extends ConsumerWidget {
             ? 'Whole property'
             : 'Target unavailable');
     final canEdit = ref.watch(canEditOrchardProvider);
+    final linkedPlan = planForTask(task,ref.watch(taskPlansProvider).valueOrNull??[]);
     void changeStatus(TaskStatus status) {
       try {
         ref
@@ -85,7 +86,7 @@ class TaskMemberTile extends ConsumerWidget {
       title: Row(
         children: [
           Expanded(child: Text(showTitle ? task.title : target)),
-          if (showTitle && task.groupId == null && canEdit)
+          if (showTitle && linkedPlan==null && task.groupId == null && canEdit)
             IconButton(
               tooltip: 'Edit task & reminders',
               icon: const Icon(Icons.edit_outlined),
@@ -216,14 +217,15 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
             error: (e, _) => ErrorPanel(e),
             data: (snapshot) {
               final all = snapshot.value
-                  .where((t) => t.groupId == widget.id || t.planId == widget.id)
+                  .where((t) => t.groupId == widget.id || t.planId == widget.id || (plan?.legacyIds.contains(t.id)??false))
                   .toList();
+              if(plan?.deleted==true) {return const ErrorPanel('This task has been deleted. Completed plant activities are retained.');}
               if (all.isEmpty && plan == null) {
                 return const ErrorPanel('Task group unavailable');
               }
               final dates =
                   all
-                      .map((t) => t.occurrenceOn)
+                      .map((t) => plan==null?t.occurrenceOn:taskCycleKey(t,plan))
                       .whereType<String>()
                       .toSet()
                       .toList()
@@ -234,14 +236,19 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
               if (current != null && !dates.contains(current)) {
                 dates.insert(0, current);
               }
+              String occurrenceLabel(String key) {
+                final currentOccurrence=plan==null?null:taskOccurrences(plan,DateTime.now()).where((o)=>o.key==key).firstOrNull;
+                return currentOccurrence?.startsOn??all.where((t)=>(plan==null?t.occurrenceOn:taskCycleKey(t,plan))==key).firstOrNull?.dueDate??'Not dated';
+              }
+              dates.sort((a,b)=>occurrenceLabel(b).compareTo(occurrenceLabel(a)));
               final date = selected != null && dates.contains(selected)
                   ? selected
                   : current;
               final members = all
                   .where(
                     (t) =>
-                        t.status != TaskStatus.deleted &&
-                        (date == null || t.occurrenceOn == date),
+                        t.status != TaskStatus.deleted && !t.membershipExcluded &&
+                        (date == null || (plan==null?t.occurrenceOn:taskCycleKey(t,plan)) == date),
                   )
                   .toList();
               final plants =
@@ -303,7 +310,7 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
                       ),
                       items: [
                         for (final d in dates)
-                          DropdownMenuItem(value: d, child: Text(d)),
+                          DropdownMenuItem(value: d, child: Text(occurrenceLabel(d))),
                       ],
                       onChanged: (v) => setState(() => selected = v),
                     ),
@@ -545,11 +552,21 @@ class _TasksState extends ConsumerState<TasksPane> {
                 final crops =
                     ref.watch(cropsProvider).valueOrNull?.value ??
                     <CropPlanting>[];
+                bool inCurrentOccurrence(OrchardTask t) {
+                  final p=planForTask(t,plans);
+                  return visibleTask(t,plans)&&(p==null||taskCycleKey(t,p)==occurrenceDates(p,DateTime.now()).last);
+                }
+                String? groupKey(OrchardTask t)=>planForTask(t,plans)?.id??t.groupId;
+                List<OrchardTask> groupMembers(OrchardTask t) {
+                  final p=planForTask(t,plans);
+                  return snapshot.value.where((other)=>visibleTask(other,plans)&&groupKey(other)==groupKey(t)&&
+                    (p==null?other.occurrenceOn==t.occurrenceOn:taskCycleKey(other,p)==taskCycleKey(t,p))).toList();
+                }
                 final filtered =
                     snapshot.value
                         .where(
                           (t) =>
-                              (t.status != TaskStatus.deleted) &&
+                              inCurrentOccurrence(t) &&
                               (widget.itemId == null ||
                                   t.itemId == widget.itemId) &&
                               (status == null || t.status == status) &&
@@ -568,18 +585,7 @@ class _TasksState extends ConsumerState<TasksPane> {
                                         c.id == t.cropId &&
                                         taxa.contains(c.taxonId),
                                   )) &&
-                              (t.planId == null ||
-                                  plans
-                                          .where((p) => p.id == t.planId)
-                                          .firstOrNull ==
-                                      null ||
-                                  t.occurrenceOn ==
-                                      occurrenceDates(
-                                        plans.firstWhere(
-                                          (p) => p.id == t.planId,
-                                        ),
-                                        DateTime.now(),
-                                      ).last),
+                              true,
                         )
                         .toList()
                       ..sort(
@@ -588,7 +594,7 @@ class _TasksState extends ConsumerState<TasksPane> {
                 final emptyPlans = plans
                     .where(
                       (p) =>
-                          !snapshot.value.any((t) => t.planId == p.id) &&
+                          !p.deleted && !snapshot.value.any((t)=>planForTask(t,plans)?.id==p.id&&inCurrentOccurrence(t)) &&
                           widget.itemId == null &&
                           (taxa == null ||
                               p.taxonId == null ||
@@ -604,8 +610,8 @@ class _TasksState extends ConsumerState<TasksPane> {
                     .where(
                       (t) =>
                           widget.itemId != null ||
-                          t.groupId == null ||
-                          seen.add(t.groupId!),
+                          groupKey(t) == null ||
+                          seen.add(groupKey(t)!),
                     )
                     .toList();
                 return Column(
@@ -629,17 +635,17 @@ class _TasksState extends ConsumerState<TasksPane> {
                                         context.push('/task-groups/${plan.id}'),
                                   ),
                                 for (final task in entries)
-                                  if (task.groupId != null &&
+                                  if (groupKey(task) != null &&
                                       widget.itemId == null)
                                     ListTile(
                                       leading: const Icon(Icons.checklist),
-                                      title: Text(task.title),
+                                      title: Text(planForTask(task,plans)?.title??task.title),
                                       subtitle: Text(
-                                        '${task.groupScope}\n${groupProgress(snapshot.value.where((t) => t.status != TaskStatus.deleted && t.groupId == task.groupId && t.occurrenceOn == task.occurrenceOn).toList())}',
+                                        '${task.groupScope}\n${groupProgress(groupMembers(task))}',
                                       ),
                                       trailing: const Icon(Icons.chevron_right),
                                       onTap: () => context.push(
-                                        '/task-groups/${task.groupId}',
+                                        '/task-groups/${groupKey(task)}',
                                       ),
                                     )
                                   else
