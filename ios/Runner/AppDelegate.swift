@@ -93,6 +93,22 @@ import UniformTypeIdentifiers
         result("\(name) (\(build))")
         return
       }
+      if call.method == "searchIconImages" {
+        let args = call.arguments as? [String: Any]
+        guard let raw = args?["url"] as? String, let url = URL(string: raw),
+          let parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          url.scheme == "https", url.host == "www.google.com", url.path == "/search",
+          parts.queryItems?.first(where: { $0.name == "tbm" })?.value == "isch",
+          let query = parts.queryItems?.first(where: { $0.name == "q" })?.value,
+          !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, query.count <= 200 else {
+          result(FlutterError(code: "invalid_search", message: "Enter a valid Google image search", details: nil)); return
+        }
+        UIApplication.shared.open(url, options: [:]) { opened in
+          if opened { result(nil) }
+          else { result(FlutterError(code: "browser_unavailable", message: "Could not open your browser. Try again.", details: nil)) }
+        }
+        return
+      }
       guard call.method == "importIcon", let self = self else { result(FlutterMethodNotImplemented); return }
       self.iconPicker.open(result)
     }

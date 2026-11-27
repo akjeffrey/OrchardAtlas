@@ -101,3 +101,16 @@ double markerSizeForZoom(double zoom) => zoom < 13
     : zoom < 16
     ? 22
     : 28;
+
+abstract interface class IconImageSearch {
+  /// Opens a user-requested image search in the device browser.
+  Future<void> search(String query);
+}
+
+Uri googleIconImageSearchUri(String query) {
+  final text = query.trim();
+  if (text.isEmpty || text.length > 200) {
+    throw ArgumentError('Enter a search of 1–200 characters');
+  }
+  return Uri.https('www.google.com', '/search', {'tbm': 'isch', 'q': text});
+}

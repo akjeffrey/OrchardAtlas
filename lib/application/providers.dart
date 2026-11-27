@@ -68,6 +68,9 @@ final customTaxaProvider = StreamProvider<List<Taxon>>((ref) async* {
   final place = await ref.watch(placeProvider.future);
   yield* repository.watchTaxa(place.id);
 });
+final iconImageSearchProvider = Provider<IconImageSearch>(
+  (ref) => DeviceIconImageSearch(),
+);
 final iconImporterProvider = Provider<IconImporter>(
   (ref) => DeviceIconImporter(),
 );

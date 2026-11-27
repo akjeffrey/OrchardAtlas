@@ -11,10 +11,13 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Pinch, pan, zoom buttons and Fit tray controls in Seed Starter.',
-      'Choose the seed-packet front photo as the icon for planted tray cells, including offline.',
+      'Search Google Images from Custom icons, then import a saved image from your phone.',
     ],
   ),
+  const ReleaseNote('0.93.0', [
+    'Seed tray pinch, pan, zoom buttons and Fit tray controls.',
+    'Use the seed-packet front photo as a planted cell icon, including offline.',
+  ]),
   const ReleaseNote('0.87.0', [
     'Complete/reopen checkboxes, skip arrows and confirmed task-entry deletion.',
     'One edit control beside the group task heading.',

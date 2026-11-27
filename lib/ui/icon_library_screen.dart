@@ -1,3 +1,5 @@
+import 'icon_image_search_dialog.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -13,10 +15,27 @@ class IconLibraryScreen extends ConsumerStatefulWidget {
 }
 
 class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
-  bool busy = false;
+  bool busy = false, searching = false;
+  Future<void> searchImages() async {
+    if (busy || searching) {
+      return;
+    }
+    setState(() => searching = true);
+    try {
+      await showDialog<bool>(
+        context: context,
+        builder: (_) => const IconImageSearchDialog(),
+      );
+    } finally {
+      if (mounted) setState(() => searching = false);
+    }
+  }
+
   String? error;
   Future<void> importIcon() async {
-    if (busy) return;
+    if (busy) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -76,7 +95,9 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
   }
 
   Future<void> rename(MapIcon icon) async {
-    if (busy) return;
+    if (busy) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -179,7 +200,9 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
   }
 
   Future<void> remove(MapIcon icon) async {
-    if (busy) return;
+    if (busy) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -201,7 +224,7 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
         const Padding(
           padding: EdgeInsets.all(16),
           child: Text(
-            'Choose an image from your device or Drive. Images are saved as small icons for this orchard and included in its backups.',
+            'Import from your device or Drive, or search Google Images in your browser. Save a search result to Downloads or Files, then tap Import image. Imported images become small icons included in orchard backups.',
           ),
         ),
         if (error != null)
@@ -251,10 +274,22 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
         SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(12),
-            child: FilledButton.icon(
-              onPressed: busy ? null : importIcon,
-              icon: const Icon(Icons.add_photo_alternate),
-              label: Text(busy ? 'Importing…' : 'Import image'),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: busy || searching ? null : searchImages,
+                  icon: const Icon(Icons.image_search_outlined),
+                  label: const Text('Search Google Images'),
+                ),
+                FilledButton.icon(
+                  onPressed: busy || searching ? null : importIcon,
+                  icon: const Icon(Icons.add_photo_alternate),
+                  label: Text(busy ? 'Importing…' : 'Import image'),
+                ),
+              ],
             ),
           ),
         ),
