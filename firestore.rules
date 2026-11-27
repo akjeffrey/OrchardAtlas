@@ -222,7 +222,7 @@ service cloud.firestore {
         function cell(d) {
           let t = get(/databases/$(database)/documents/properties/$(propertyId)/seedTray/$(d.trayId)).data;
           return d.keys().hasAll(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId'])
-            && d.keys().hasOnly(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId','plantedOn','transplantAfterDays','transplantedOn','packetFrontId','packetBackId'])
+            && d.keys().hasOnly(['schemaVersion','id','trayId','row','column','label','taxonId','kind','assignedAt','symbol','customIconId','plantedOn','transplantAfterDays','transplantedOn','packetFrontId','packetBackId','usePacketFrontIcon'])
             && t.get('deleting',false)==false && d.schemaVersion==1 && uuid(d.trayId) && d.id==cellId
             && d.row is int && d.row>=1 && d.row<=t.rows
             && d.column is int && d.column>=1 && d.column<=t.columns
@@ -234,13 +234,15 @@ service cloud.firestore {
             && (d.get('transplantedOn',null)==null || date(d.transplantedOn))
             && (d.get('plantedOn',null)==null || d.get('transplantedOn',null)==null || d.transplantedOn>=d.plantedOn)
             && (d.get('transplantAfterDays',null)==null || (d.transplantAfterDays is int && d.transplantAfterDays>=0 && d.transplantAfterDays<=3650))
+            && d.get('usePacketFrontIcon',false) is bool
+            && (d.get('usePacketFrontIcon',false)==false || d.get('packetFrontId',null)!=null)
             && packetRef(d.get('packetFrontId',null),d.trayId) && packetRef(d.get('packetBackId',null),d.trayId)
             && validIconRef(d,propertyId);
         }
         allow read: if reader(propertyId);
         allow create: if writer(propertyId) && cell(request.resource.data);
         allow update: if writer(propertyId) && cell(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label','taxonId','kind','assignedAt','symbol','customIconId','plantedOn','transplantAfterDays','transplantedOn','packetFrontId','packetBackId']);
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['label','taxonId','kind','assignedAt','symbol','customIconId','plantedOn','transplantAfterDays','transplantedOn','packetFrontId','packetBackId','usePacketFrontIcon']);
         allow delete: if writer(propertyId);
       }
       match /members/{userId} {

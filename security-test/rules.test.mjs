@@ -527,6 +527,10 @@ test('seed lifecycle dates, packet references and resumable tray deletion enforc
   const batch=writeBatch(store);
   batch.set(doc(store,`${propertyPath}/photo/${front}`),{id:front,itemId:trayId,authorId:'alice',createdAt:'2026-11-26T00:00:00Z',storagePath:`properties/${property}/items/${trayId}/photos/${front}.jpg`,image:'bytes',thumbnail:'thumb',state:'pending',error:null});
   batch.set(doc(store,cellPath),cell);await assertSucceeds(batch.commit());
+  await assertSucceeds(updateDoc(doc(store,cellPath),{usePacketFrontIcon:true}));
+  await assertFails(updateDoc(doc(db('viewer'),cellPath),{usePacketFrontIcon:false}));
+  await assertFails(updateDoc(doc(store,cellPath),{usePacketFrontIcon:'yes'}));
+  await assertFails(updateDoc(doc(store,cellPath),{packetFrontId:null}));
   await assertFails(updateDoc(doc(store,cellPath),{transplantAfterDays:-1}));
   await assertFails(updateDoc(doc(store,cellPath),{transplantedOn:'2026-01-01'}));
   await assertFails(updateDoc(doc(db('viewer'),cellPath),{transplantedOn:'2026-12-20'}));

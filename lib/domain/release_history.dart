@@ -11,10 +11,14 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Complete or reopen tasks with a checkbox, skip with a curved arrow and delete with a trash can.',
-      'Edit group tasks beside their name at the top of the checklist, without per-member edit buttons.',
+      'Pinch, pan, zoom buttons and Fit tray controls in Seed Starter.',
+      'Choose the seed-packet front photo as the icon for planted tray cells, including offline.',
     ],
   ),
+  const ReleaseNote('0.87.0', [
+    'Complete/reopen checkboxes, skip arrows and confirmed task-entry deletion.',
+    'One edit control beside the group task heading.',
+  ]),
   const ReleaseNote('0.83.0', [
     'Task start dates, optional end dates and recurring date ranges.',
     'Multiple local reminders and optional Google Calendar sync.',
