@@ -40,7 +40,7 @@ void main(){
       contentSize:const Size(1200,1200),
       child:Stack(children:[Positioned(left:100,top:100,width:100,height:100,
         child:GestureDetector(key:const ValueKey('test-cell'),behavior:HitTestBehavior.opaque,onTap:()=>taps++,child:const ColoredBox(color:Colors.green))),]),
-    )))));
+    ))));
     await tester.pumpAndSettle();
     final viewer=find.byType(InteractiveViewer);
     double scale()=>tester.widget<InteractiveViewer>(viewer).transformationController!.value.getMaxScaleOnAxis();

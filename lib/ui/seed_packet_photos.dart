@@ -1,4 +1,5 @@
 import '../application/seed_trays.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -125,17 +126,32 @@ class SeedPacketPhotoSlot extends ConsumerWidget {
 
 /// Uses cached thumbnails rather than downloading full packet images per cell.
 class SeedPacketCellIcon extends ConsumerWidget {
-  const SeedPacketCellIcon({super.key,required this.photoId,required this.fallback});
+  const SeedPacketCellIcon({
+    super.key,
+    required this.photoId,
+    required this.fallback,
+  });
   final String? photoId;
   final Widget fallback;
   @override
-  Widget build(BuildContext context,WidgetRef ref) {
-    final bytes=photoId==null ? null : ref.watch(seedPacketThumbnailProvider(photoId!));
-    if(bytes==null) {return fallback;}
-    return ClipRRect(borderRadius:BorderRadius.circular(4),child:Image.memory(
-      bytes,width:36,height:36,fit:BoxFit.contain,cacheWidth:108,
-      semanticLabel:'Seed packet front photo',
-      errorBuilder:(_,_,_)=>fallback,
-    ));
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bytes = photoId == null
+        ? null
+        : ref.watch(seedPacketThumbnailProvider(photoId!));
+    if (bytes == null) {
+      return fallback;
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(4),
+      child: Image.memory(
+        bytes,
+        width: 36,
+        height: 36,
+        fit: BoxFit.contain,
+        cacheWidth: 108,
+        semanticLabel: 'Seed packet front photo',
+        errorBuilder: (_, _, _) => fallback,
+      ),
+    );
   }
 }

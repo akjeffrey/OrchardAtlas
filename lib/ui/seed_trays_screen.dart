@@ -1,4 +1,5 @@
 import 'seed_tray_viewport.dart';
+
 import 'package:flutter/material.dart';
 
 import '../domain/extensions.dart';
@@ -507,11 +508,16 @@ class _TrayDetailState extends ConsumerState<SeedTrayDetail> {
                     Expanded(
                       child: SeedTrayViewport(
                         key: ValueKey(tray.id),
-                        contentSize: Size(80.0*(tray.columns+1)+32,48.0+80.0*tray.rows+24),
+                        contentSize: Size(
+                          80.0 * (tray.columns + 1) + 32,
+                          48.0 + 80.0 * tray.rows + 24,
+                        ),
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(16,0,16,24),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
                           child: SeedTrayGrid(
-                            tray: tray,cells: cells,selected: selected,
+                            tray: tray,
+                            cells: cells,
+                            selected: selected,
                             onToggle: busy ? null : toggle,
                           ),
                         ),
@@ -646,19 +652,22 @@ class SeedTrayGrid extends ConsumerWidget {
                                               ? 0.45
                                               : 1.0,
                                           child: SeedPacketCellIcon(
-                                            photoId: assignment.usePacketFrontIcon ? assignment.packetFrontId : null,
-                                          fallback: IconPreview(
-                                            size: 22,
-                                            symbol:
-                                                assignment.symbol ??
-                                                appearance?.symbol ??
-                                                PlantSymbol.unknown,
-                                            customIconId:
-                                                assignment.customIconId ??
-                                                (assignment.symbol == null
-                                                    ? appearance?.customIconId
-                                                    : null),
-                                          ),
+                                            photoId:
+                                                assignment.usePacketFrontIcon
+                                                ? assignment.packetFrontId
+                                                : null,
+                                            fallback: IconPreview(
+                                              size: 22,
+                                              symbol:
+                                                  assignment.symbol ??
+                                                  appearance?.symbol ??
+                                                  PlantSymbol.unknown,
+                                              customIconId:
+                                                  assignment.customIconId ??
+                                                  (assignment.symbol == null
+                                                      ? appearance?.customIconId
+                                                      : null),
+                                            ),
                                           ),
                                         ),
                                       const SizedBox(height: 3),
@@ -877,17 +886,24 @@ class _AssignmentState extends ConsumerState<TrayAssignmentForm> {
         ),
         SwitchListTile(
           title: const Text('Use packet front photo as cell icon'),
-          subtitle: const Text('Add a front photo above to use its thumbnail in the tray.'),
+          subtitle: const Text(
+            'Add a front photo above to use its thumbnail in the tray.',
+          ),
           value: usePacketFrontIcon,
-          onChanged: capturing || (front == null && (removeFront || widget.initial?.packetFrontId == null))
-              ? null : (value) => setState(() => usePacketFrontIcon = value),
+          onChanged:
+              capturing ||
+                  (front == null &&
+                      (removeFront || widget.initial?.packetFrontId == null))
+              ? null
+              : (value) => setState(() => usePacketFrontIcon = value),
         ),
         if (capturing) const LinearProgressIndicator(),
-        if (!usePacketFrontIcon) SwitchListTile(
-          title: const Text('Use classification icon'),
-          value: classificationIcon,
-          onChanged: (v) => setState(() => classificationIcon = v),
-        ),
+        if (!usePacketFrontIcon)
+          SwitchListTile(
+            title: const Text('Use classification icon'),
+            value: classificationIcon,
+            onChanged: (v) => setState(() => classificationIcon = v),
+          ),
         if (!usePacketFrontIcon && !classificationIcon)
           MapIconPicker(
             symbol: symbol,

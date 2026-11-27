@@ -96,7 +96,9 @@ class TrayAssignment {
     this.usePacketFrontIcon = false,
   }) : label = requiredText(label, 'Seed / plant name') {
     if (usePacketFrontIcon && packetFrontId == null) {
-      throw ArgumentError('Add a front packet photo before using it as the cell icon');
+      throw ArgumentError(
+        'Add a front packet photo before using it as the cell icon',
+      );
     }
     if (plantedOn != null) parseCalendarDate(plantedOn!);
     if (transplantedOn != null) parseCalendarDate(transplantedOn!);
