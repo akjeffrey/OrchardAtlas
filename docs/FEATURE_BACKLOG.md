@@ -4,6 +4,8 @@ GitHub issues are the source of truth for outstanding work: [open tickets](https
 
 ## Newly requested features
 
+- [x] **Google Images for custom icons:** search from the icon library in the device browser, save a result, then import it with existing bounded PNG normalization. No extra Google API key is required.
+
 - [x] **Seed tray zoom and packet icons:** pinch/drag the tray, zoom in/out, fit the whole tray, reset to 100%, and optionally use a seed-packet front thumbnail for planted cell icons with offline persistence.
 
 - [x] **Task checklist controls:** completion checkbox, reversible curved-arrow skip, confirmed trash-can deletion per entry, and one group edit control beside the heading. Deleted entries stay hidden and do not regenerate in the same occurrence; future repeats remain active.

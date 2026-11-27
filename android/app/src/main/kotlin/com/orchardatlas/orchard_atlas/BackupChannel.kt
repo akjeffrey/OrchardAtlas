@@ -31,6 +31,20 @@ class BackupChannel(private val activity: Activity) : MethodChannel.MethodCallHa
                 val code = if (android.os.Build.VERSION.SDK_INT >= 28) info.longVersionCode else info.versionCode.toLong()
                 result.success("${info.versionName} ($code)")
             }
+            "searchIconImages" -> {
+                val uri = Uri.parse(call.argument<String>("url").orEmpty())
+                if (uri.scheme != "https" || uri.host != "www.google.com" || uri.path != "/search" ||
+                    uri.getQueryParameter("tbm") != "isch" || uri.getQueryParameter("q").orEmpty().trim().length !in 1..200) {
+                    result.error("invalid_search", "Enter a valid Google image search", null)
+                } else try {
+                    activity.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                    result.success(null)
+                } catch (_: android.content.ActivityNotFoundException) {
+                    result.error("browser_unavailable", "Install or enable a web browser to search Google Images.", null)
+                } catch (_: Exception) {
+                    result.error("browser_unavailable", "Could not open your browser. Try again.", null)
+                }
+            }
             "importIcon" -> {
                 if (pending != null) { result.error("busy", "A file picker is already open", null); return }
                 pending = result

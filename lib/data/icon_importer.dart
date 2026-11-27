@@ -11,3 +11,11 @@ class DeviceIconImporter implements IconImporter {
     return bytes;
   }
 }
+
+class DeviceIconImageSearch implements IconImageSearch {
+  @override
+  Future<void> search(String query) => DeviceIconImporter.channel.invokeMethod<void>(
+    'searchIconImages',
+    {'url': googleIconImageSearchUri(query).toString()},
+  );
+}
