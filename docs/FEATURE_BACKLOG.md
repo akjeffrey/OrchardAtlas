@@ -4,6 +4,8 @@ GitHub issues are the source of truth for outstanding work: [open tickets](https
 
 ## Newly requested features
 
+- [x] **Task checklist controls:** completion checkbox, reversible curved-arrow skip, confirmed trash-can deletion per entry, and one group edit control beside the heading. Deleted entries stay hidden and do not regenerate in the same occurrence; future repeats remain active.
+
 - [x] [PR #75](https://github.com/akjeffrey/OrchardAtlas/pull/75) **Task scheduling and calendar:** start date and optional end date for all task targets, recurring ranges, multiple day/week reminders, notification permissions and optional one-way Google Calendar sync through phone calendars. See [setup and behavior](task-scheduling-and-calendar.md).
 
 - [x] **Version History:** add a page in Settings and Orchard options with the installed version’s changes and four prior feature updates; keep the five-update history current for future releases.

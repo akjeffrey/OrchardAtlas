@@ -17,3 +17,7 @@ Repository interfaces separate Flutter UI/domain from device calendars. Android 
 ## Validation
 
 Domain tests cover date ordering, inclusive ranges, recurring range expansion, completion history, reminder offsets and legacy migration, unique notification IDs, past/completed suppression, grouped calendar entries, UTC calendar mapping and repository serialization. Firestore emulator tests cover date ranges, completed history and bounded reminder lists. CI also compiles Android and iOS. Device acceptance: connect an actual Google calendar, create/edit a range and grouped task, complete a member, verify one corresponding event updates in Google Calendar, toggle offline, relaunch, test notification permission denial, and disconnect. These external-account/device checks require a real configured phone.
+
+## Checklist controls
+
+Task entries use a completion checkbox, a curved arrow to skip/reopen, and a trash can with confirmation. Group task editing is available once, immediately beside the task heading; individual members have no edit button. Other entries and future repeats remain active when deleting a single group member. A `deleted` status is retained as an offline/Firestore tombstone, preventing dynamic expansion from recreating that occurrence. Deleted entries are excluded from lists, checklist totals, notifications and calendar exports. Deleting completed event-linked tasks removes their linked completion activity, as described in confirmation; independent plant activities are preserved.

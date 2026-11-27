@@ -24,6 +24,9 @@ void main() {
   Widget wrap(LocalTrialRepository repo, Widget child) => ProviderScope(
     overrides: [
       orchardRepositoryProvider.overrideWithValue(repo),
+      userProvider.overrideWith(
+        (ref) => Stream.value(OrchardUser(repo.place.ownerId)),
+      ),
       placeProvider.overrideWith((ref) async => repo.place),
       trialModeProvider.overrideWithValue(true),
     ],
@@ -46,9 +49,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Prune orchard'), findsOneWidget);
-      await tester.tap(find.byTooltip('Change task status'));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Complete'));
+      await tester.tap(find.byTooltip('Mark task complete'));
       await tester.pumpAndSettle();
       expect(repo.tasks.single.status, TaskStatus.completed);
       expect(find.text('Prune orchard'), findsNothing);

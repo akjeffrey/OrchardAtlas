@@ -16,7 +16,8 @@ enum ItemStatus { active, archived }
 
 enum PlantLifeCycle { perennial, annual }
 
-enum TaskStatus { open, completed, cancelled, skipped }
+/// Deleted entries remain as tombstones so dynamic checklists do not recreate them.
+enum TaskStatus { open, completed, cancelled, skipped, deleted }
 
 enum ItemKind { managedPlant, foragingResource }
 

@@ -30,6 +30,9 @@ void main() {
   Widget wrap(LocalTrialRepository repo, Widget child) => ProviderScope(
     overrides: [
       orchardRepositoryProvider.overrideWithValue(repo),
+      userProvider.overrideWith(
+        (ref) => Stream.value(OrchardUser(repo.place.ownerId)),
+      ),
       placeProvider.overrideWith((ref) async => repo.place),
       locationRepositoryProvider.overrideWithValue(_Gps()),
       trialModeProvider.overrideWithValue(true),
@@ -66,17 +69,14 @@ void main() {
       wrap(repo, MaterialApp(home: TaskGroupScreen(group.first.groupId!))),
     );
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Change task status').first);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Complete'));
+    expect(find.byTooltip('Edit task & reminders'), findsOneWidget);
+    await tester.tap(find.byTooltip('Mark task complete').first);
     await tester.pumpAndSettle();
     expect(
       find.textContaining('1 of 2 completed · 1 remaining'),
       findsOneWidget,
     );
-    await tester.tap(find.byTooltip('Change task status').last);
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Skip'));
+    await tester.tap(find.byTooltip('Skip task').last);
     await tester.pumpAndSettle();
     expect(
       find.textContaining('1 of 2 completed · 0 remaining'),

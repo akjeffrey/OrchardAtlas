@@ -558,3 +558,13 @@ test('reminders accept multiple bounded offsets and retain legacy format', async
   }
   await assertFails(setDoc(doc(db('bob'),path),{id:event,offsets:[7]}));
 });
+
+test('deleting a task retains a protected occurrence tombstone', async () => {
+  const path = `${propertyPath}/tasks/${event}`;
+  const task = {schemaVersion:1,title:'Prune',notes:'',itemId:item,dueDate:'2027-01-01',status:'open',createdAt:now};
+  await assertSucceeds(setDoc(doc(db('alice'),path),task));
+  await assertFails(updateDoc(doc(db('bob'),path),{status:'deleted'}));
+  await assertSucceeds(updateDoc(doc(db('alice'),path),{status:'deleted'}));
+  await assertFails(updateDoc(doc(db('alice'),path),{title:'Rewrite removed task'}));
+  await assertSucceeds(getDoc(doc(db('alice'),path)));
+});
