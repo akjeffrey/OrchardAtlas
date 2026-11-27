@@ -182,6 +182,7 @@ class LocalTrialRepository
           notes: t['notes'] as String,
           itemId: t['itemId'] as String?,
           dueDate: t['dueDate'] as String?,
+          endDate: t['endDate'] as String?,
           status: TaskStatus.values.byName(t['status'] as String),
           createdAt: DateTime.parse(t['createdAt'] as String),
         ),
@@ -497,6 +498,7 @@ class LocalTrialRepository
             'notes': t.notes,
             'itemId': t.itemId,
             'dueDate': t.dueDate,
+            'endDate': t.endDate,
             'status': t.status.name,
             'createdAt': t.createdAt.toIso8601String(),
           },
@@ -738,10 +740,8 @@ class LocalTrialRepository
             old.groupId != task.groupId ||
             old.groupScope != task.groupScope ||
             old.createdAt != task.createdAt ||
-            old.title != task.title ||
-            old.notes != task.notes ||
-            old.dueDate != task.dueDate)) {
-      throw ArgumentError('Only task status can be updated');
+            ((old.status != TaskStatus.open || task.status != TaskStatus.open) && (old.title != task.title || old.notes != task.notes || old.dueDate != task.dueDate || old.endDate != task.endDate || old.eventType != task.eventType || old.eventHarvest != task.eventHarvest)))) {
+      throw ArgumentError('Task targets and history are fixed; only open tasks can be edited');
     }
   }
 

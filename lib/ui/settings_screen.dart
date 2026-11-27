@@ -1,3 +1,4 @@
+import 'task_calendar_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -17,6 +18,9 @@ class SettingsScreen extends StatelessWidget {
     appBar: AppBar(title: const Text('Settings')),
     body: ListView(
       children: [
+        ListTile(leading: const Icon(Icons.event),title: const Text('Task calendar sync'),
+          subtitle: const Text('Connect a Google calendar on this phone'),
+          onTap:()=>Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>const TaskCalendarScreen()))),
         ListTile(
           leading: const Icon(Icons.people),
           title: const Text('Orchard sharing'),

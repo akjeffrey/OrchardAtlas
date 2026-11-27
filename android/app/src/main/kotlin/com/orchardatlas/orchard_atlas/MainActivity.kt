@@ -14,6 +14,7 @@ import java.util.Locale
 class MainActivity : FlutterActivity() {
     private lateinit var photoChannel: PhotoChannel
     private lateinit var reminderChannel: ReminderChannel
+    private lateinit var taskCalendarChannel: TaskCalendarChannel
     private lateinit var backupChannel: BackupChannel
     @Deprecated("Used by Android document providers on supported trial phones")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
@@ -24,6 +25,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         if (::reminderChannel.isInitialized && reminderChannel.permissionResult(requestCode,grantResults)) return
+        if (::taskCalendarChannel.isInitialized && taskCalendarChannel.permissionResult(requestCode,grantResults)) return
         super.onRequestPermissionsResult(requestCode,permissions,grantResults)
     }
     override fun onResume() {
@@ -65,6 +67,8 @@ class MainActivity : FlutterActivity() {
                 }catch(_:Exception){result.error("share_unavailable","No sharing app is available",null)}
             }
         }
+        taskCalendarChannel = TaskCalendarChannel(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/calendar").setMethodCallHandler(taskCalendarChannel)
         photoChannel = PhotoChannel(this)
         reminderChannel = ReminderChannel(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "orchard_atlas/photos").setMethodCallHandler(photoChannel)

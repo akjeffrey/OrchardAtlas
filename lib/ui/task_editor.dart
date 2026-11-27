@@ -1,3 +1,4 @@
+import 'task_schedule_fields.dart';
 import 'orchard_theme.dart';
 
 import 'package:flutter/material.dart';
@@ -35,7 +36,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   late HarvestUnit unit =
       (widget.plan?.eventHarvest ?? widget.task?.eventHarvest)?.unit ??
       HarvestUnit.kg;
-  int? days;
+  late String? end = widget.plan?.endDate ?? widget.task?.endDate;
+  List<int> offsets = [];
   bool initialized = false, busy = false;
   String? error;
   String get id => widget.plan?.id ?? widget.task!.id;
@@ -53,9 +55,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   Widget build(BuildContext context) {
     final reminders = ref.watch(recordsProvider(RecordKind.reminder));
     if (!initialized && reminders.hasValue) {
-      days =
-          reminders.value!.where((r) => r['id'] == id).firstOrNull?['days']
-              as int?;
+      final record = reminders.value!.where((r) => r['id'] == id).firstOrNull;
+      offsets = reminderOffsets(record);
       initialized = true;
     }
     return Scaffold(
@@ -79,34 +80,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             maxLines: 4,
             decoration: const InputDecoration(labelText: 'Task notes'),
           ),
-          ListTile(
-            title: const Text('Due date'),
-            subtitle: Text(
-              '${due ?? 'Not set'}${recurring ? ' · recurrence anchor retained' : ''}',
-            ),
-            onTap: recurring
-                ? null
-                : () async {
-                    final d = await showDatePicker(
-                      context: context,
-                      initialDate: due == null
-                          ? DateTime.now()
-                          : parseCalendarDate(due!),
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime(2100),
-                    );
-                    if (d != null && mounted) {
-                      setState(() => due = calendarDate(d));
-                    }
-                  },
-            trailing: recurring
-                ? null
-                : IconButton(
-                    tooltip: 'Clear due date',
-                    onPressed: () => setState(() => due = null),
-                    icon: const Icon(Icons.clear),
-                  ),
-          ),
+          TaskScheduleFields(start: due, end: end, offsets: offsets, fixedStart: recurring,
+            onDates: (s,e) => setState(() {due=s;end=e;}),
+            onReminders: (v) => setState(()=>offsets=v)),
           DropdownButtonFormField<String>(
             initialValue: eventType?.name ?? '',
             decoration: const InputDecoration(
@@ -138,25 +114,6 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
               onChanged: (v) => unit = v!,
             ),
           ],
-          DropdownButtonFormField<int>(
-            key: ValueKey('reminder-$initialized'),
-            initialValue: days ?? -1,
-            decoration: const InputDecoration(
-              labelText: 'Reminder at 9 AM local time',
-            ),
-            items: [
-              const DropdownMenuItem(value: -1, child: Text('Off')),
-              for (final d in [0, 1, 3, 7])
-                DropdownMenuItem(
-                  value: d,
-                  child: Text(d == 0 ? 'On due date' : '$d days before'),
-                ),
-            ],
-            onChanged: (v) => setState(() => days = v == -1 ? null : v),
-          ),
-          const Text(
-            'Reminders require notification permission. Dates without due dates do not notify. Android may delay delivery to save battery. Reopen the app after changing timezone. Each group receives one reminder per occurrence.',
-          ),
           if (error != null) Text(error!),
           FilledButton(
             onPressed: busy || !initialized
@@ -164,7 +121,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                 : () async {
                     setState(() => busy = true);
                     try {
-                      if (days != null &&
+                      if (offsets.isNotEmpty &&
                           !await ref
                               .read(reminderSchedulerProvider)
                               .requestPermission()) {
@@ -172,6 +129,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           'Notifications blocked. Enable OrchardAtlas notifications in device settings.',
                         );
                       }
+                      if (offsets.isNotEmpty && due == null) throw StateError('Set a start date for reminders');
+                      validateTaskDates(due, end);
                       final orchard = await ref.read(placeProvider.future),
                           repo = ref.read(orchardRepositoryProvider);
                       final harvest = eventType == ActivityType.harvest
@@ -189,6 +148,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           title: title.text,
                           notes: notes.text,
                           dueDate: due,
+                          endDate: end,
                           eventType: eventType,
                           eventHarvest: harvest,
                         );
@@ -209,6 +169,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                               title: title.text,
                               notes: notes.text,
                               dueDate: recurring ? t.dueDate : due,
+                              endDate: end == null ? null : recurring ? offsetCalendarDate(t.dueDate!, taskRangeDays(due!, end!)) : end,
                               eventType: t.itemId == null ? null : eventType,
                               eventHarvest: harvest,
                             ),
@@ -227,13 +188,14 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             title: title.text,
                             notes: notes.text,
                             dueDate: due,
+                          endDate: end,
                             eventType: eventType,
                             eventHarvest: harvest,
                           ),
                         );
                       }
                       final records = ref.read(orchardRecordsProvider);
-                      if (days == null) {
+                      if (offsets.isEmpty) {
                         await records.removeRecord(
                           orchard.id,
                           RecordKind.reminder,
@@ -244,7 +206,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           orchard.id,
                           RecordKind.reminder,
                           id,
-                          {'days': days},
+                          {'offsets': offsets},
                         );
                       }
                       if (context.mounted) Navigator.pop(context);

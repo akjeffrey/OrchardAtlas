@@ -1,3 +1,4 @@
+import '../application/task_calendar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -196,6 +197,7 @@ class OrchardAtlasApp extends ConsumerWidget {
     ref.watch(taskMaterializerProvider);
     ref.watch(photoWorkerProvider);
     ref.watch(reminderWorkerProvider);
+    ref.watch(calendarWorkerProvider);
     final failure = ref.watch(failuresProvider).valueOrNull;
     final dismissedFailure = ref.watch(dismissedFailureProvider);
     return MaterialApp.router(

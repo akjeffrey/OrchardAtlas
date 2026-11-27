@@ -23,6 +23,7 @@ class TaskPlan {
     this.taxonId,
     this.sectionKind = SectionKind.row,
     this.dueDate,
+    this.endDate,
     this.anchorOn,
     this.repeat = RepeatSchedule.none,
     this.eventType,
@@ -30,6 +31,7 @@ class TaskPlan {
     this.notes = '',
   }) : title = requiredText(title, 'Task title') {
     if (dueDate != null) parseCalendarDate(dueDate!);
+    validateTaskDates(dueDate, endDate);
     if (anchorOn != null) parseCalendarDate(anchorOn!);
     if (![
       'plant',
@@ -53,7 +55,7 @@ class TaskPlan {
     if (notes.length > 10000) throw ArgumentError('Notes too long');
   }
   final String id, propertyId, title, target, notes;
-  final String? itemId, sectionId, cropId, taxonId, dueDate, anchorOn;
+  final String? itemId, sectionId, cropId, taxonId, dueDate, endDate, anchorOn;
   final DateTime createdAt;
   final SectionKind sectionKind;
   final RepeatSchedule repeat;
@@ -227,6 +229,7 @@ List<OrchardTask> expandPlans({
             planId: plan.id,
             occurrenceOn: date,
             dueDate: plan.repeat == RepeatSchedule.none ? plan.dueDate : date,
+            endDate: plan.endDate == null ? null : plan.repeat == RepeatSchedule.none ? plan.endDate : offsetCalendarDate(date, taskRangeDays(plan.dueDate!, plan.endDate!)),
             eventType: target.plant == null ? null : plan.eventType,
             eventHarvest: plan.eventHarvest,
             notes: plan.notes,

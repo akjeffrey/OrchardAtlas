@@ -1,3 +1,5 @@
+import '../domain/extensions.dart';
+import 'task_schedule_fields.dart';
 import 'orchard_theme.dart';
 
 import 'package:flutter/material.dart';
@@ -65,7 +67,7 @@ class TaskMemberTile extends ConsumerWidget {
     return ListTile(
       title: Text(showTitle ? task.title : target),
       subtitle: Text(
-        '${showTitle ? '$target · ' : ''}${task.dueDate ?? 'No due date'} · ${task.status.name}${task.completedOn == null ? '' : ' · completed ${task.completedOn}'}${task.notes.isEmpty ? '' : '\n${task.notes}'}',
+        '${showTitle ? '$target · ' : ''}${task.dueDate ?? 'No start date'}${task.endDate == null ? '' : ' – ${task.endDate}'} · ${task.status.name}${task.completedOn == null ? '' : ' · completed ${task.completedOn}'}${task.notes.isEmpty ? '' : '\n${task.notes}'}',
       ),
       onTap: plant != null
           ? () => context.push('/plants/${plant.id}')
@@ -576,7 +578,10 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
   final title = TextEditingController(), notes = TextEditingController();
   String target = '', scopeTaxon = '', scopeSection = '';
   SectionKind scopeKind = SectionKind.row;
-  DateTime? dueDate;
+  DateTime? dueDate = DateTime.now();
+  String? endDate;
+  List<int> offsets = [];
+  final taskId = const Uuid().v4();
   String? error;
   bool busy = false;
   RepeatSchedule repeat = RepeatSchedule.none;
@@ -607,6 +612,8 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
     if (busy) return;
     setState(() => busy = true);
     try {
+      validateTaskDates(dueDate == null ? null : calendarDate(dueDate!), endDate);
+      if (offsets.isNotEmpty && !await ref.read(reminderSchedulerProvider).requestPermission()) throw StateError('Enable OrchardAtlas notifications in device settings');
       final place = await ref.read(placeProvider.future);
       final plants = await ref.read(plantsProvider.future);
       final sections = await ref.read(sectionsProvider.future);
@@ -617,7 +624,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
           eventType != null) {
         final crops = await ref.read(cropsProvider.future);
         final plan = TaskPlan(
-          id: const Uuid().v4(),
+          id: taskId,
           propertyId: place.id,
           title: title.text,
           createdAt: DateTime.now().toUtc(),
@@ -647,6 +654,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
           taxonId: scopeTaxon.isEmpty ? null : scopeTaxon,
           sectionKind: scopeKind,
           dueDate: dueDate == null ? null : calendarDate(dueDate!),
+          endDate: endDate,
           repeat: repeat,
           eventType: eventType,
           eventHarvest: eventType == ActivityType.harvest
@@ -670,7 +678,7 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
       } else {
         repo.saveTask(
           OrchardTask(
-            id: const Uuid().v4(),
+            id: taskId,
             propertyId: place.id,
             title: title.text,
             notes: notes.text,
@@ -680,10 +688,12 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                 : null,
             cropId: target.startsWith('crop:') ? target.substring(5) : null,
             dueDate: dueDate == null ? null : calendarDate(dueDate!),
+          endDate: endDate,
             createdAt: DateTime.now().toUtc(),
           ),
         );
       }
+      if (offsets.isNotEmpty) await ref.read(orchardRecordsProvider).putRecord(place.id, RecordKind.reminder, taskId, {'offsets':offsets});
       if (!mounted) return;
       if (context.canPop()) {
         context.pop();
@@ -865,32 +875,9 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                   onChanged: (u) => eventUnit = u!,
                 ),
               ],
-              ListTile(
-                title: const Text('Due date (optional)'),
-                subtitle: Text(
-                  dueDate == null ? 'Not set' : calendarDate(dueDate!),
-                ),
-                onTap: busy
-                    ? null
-                    : () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: dueDate ?? DateTime.now(),
-                          firstDate: DateTime(1900),
-                          lastDate: DateTime(2100, 12, 31),
-                        );
-                        if (date != null && mounted) {
-                          setState(() => dueDate = date);
-                        }
-                      },
-                trailing: dueDate == null
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear due date',
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => setState(() => dueDate = null),
-                      ),
-              ),
+              TaskScheduleFields(start: dueDate == null ? null : calendarDate(dueDate!), end: endDate, offsets: offsets,
+                onDates:(s,e)=>setState(() {dueDate=s == null ? null : parseCalendarDate(s);endDate=e;}),
+                onReminders:(v)=>setState(()=>offsets=v)),
               TextField(
                 controller: notes,
                 maxLines: 4,

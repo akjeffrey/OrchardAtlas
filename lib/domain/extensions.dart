@@ -121,3 +121,10 @@ abstract interface class SharingRepository {
   Future<Place> accept(OrchardInvitation invitation, String userId);
   Future<void> revoke(String orchard, String userId);
 }
+
+/// Accept old single reminders and the new bounded list of offsets.
+List<int> reminderOffsets(Map<String,dynamic>? record) {
+  if (record == null) return [];
+  final raw = record['offsets'] is List ? record['offsets'] as List : [record['days']];
+  return raw.whereType<int>().where((n)=>n>=0 && n<=365).toSet().take(10).toList()..sort();
+}
