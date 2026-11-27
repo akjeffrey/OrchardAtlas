@@ -95,9 +95,8 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         throw StateError('This task has already been deleted.');
       }
       final now = DateTime.now();
-      final harvest = eventType == ActivityType.harvest && !deleting
-          ? Harvest(double.parse(quantity.text), unit)
-          : latest.eventHarvest;
+      final harvest = deleting ? latest.eventHarvest : eventType == ActivityType.harvest
+          ? Harvest(double.parse(quantity.text), unit) : null;
       if (!deleting) {
         requiredText(title.text, 'Task title');
         validateTaskDates(due, end);
@@ -246,7 +245,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             excluded: excluded,
             onChanged: (m, t, i, e) {
               if (i.length > 400 || e.length > 400) {
-                setState(() => error = 'Use criteria for larger groups; at most 400 individual overrides are supported.');
+                setState(
+                  () => error = 'Use criteria for larger groups; at most 400 individual overrides are supported.',
+                );
                 return;
               }
               setState(() {

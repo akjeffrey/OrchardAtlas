@@ -81,10 +81,12 @@ void main() {
       await tester.pumpAndSettle();
       final chosen = DateTime.now().add(const Duration(days: 14));
       await tester.enterText(
-        find.descendant(
-          of: find.byType(DatePickerDialog),
-          matching: find.byType(TextField),
-        ).first,
+        find
+            .descendant(
+              of: find.byType(DatePickerDialog),
+              matching: find.byType(TextField),
+            )
+            .first,
         '${chosen.month}/${chosen.day}/${chosen.year}',
       );
       await tester.tap(find.text('OK'));

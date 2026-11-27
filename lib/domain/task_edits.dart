@@ -124,7 +124,12 @@ TaskPlan editPlan(
 TaskPlan planForLegacyTask(OrchardTask task, List<OrchardTask> tasks) {
   final members = task.groupId == null
       ? [task]
-      : tasks.where((t) => t.propertyId == task.propertyId && t.groupId == task.groupId).toList();
+      : tasks
+            .where(
+              (t) =>
+                  t.propertyId == task.propertyId && t.groupId == task.groupId,
+            )
+            .toList();
   final keys = members
       .map(taskTargetKey)
       .where((k) => k != 'property')

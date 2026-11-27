@@ -14,7 +14,7 @@ Task targets offer Whole orchard (one general checklist entry), Group / Type / V
 
 Domain changes are calculated before repository submission. Local definitions and entries persist in one snapshot and are included in Drive archives. Firestore submits bounded batches with the parent definition in the first batch; local submission does not wait for network acknowledgement, and server errors use the existing write-failure reporting. Large connected changes spanning multiple batches can briefly appear partially updated while cache snapshots arrive; completion history is protected by the rules. Concurrent edits follow existing last-write behavior. Deploy the updated Firestore rules before using connected editing.
 
-Reminder/calendar projections use the latest active definitions, omit deleted/excluded work and normalize legacy links in memory. Current calendar completion counts use the revised schedule while original plant events keep their original dates. Future reminders and calendar occurrences use the revised recurrence anchor. Calendar upload timing still depends on the phone's calendar adapter. No credentials or new native permissions are required.
+Reminder/calendar projections index parent/member links and calculate each schedule once per group, reuse unchanged records, use the latest active definitions, omit deleted/excluded work and normalize legacy links in memory. Current calendar completion counts use the revised schedule while original plant events keep their original dates. Future reminders and calendar occurrences use the revised recurrence anchor. Calendar upload timing still depends on the phone's calendar adapter. No credentials or new native permissions are required.
 
 ## Verification
 

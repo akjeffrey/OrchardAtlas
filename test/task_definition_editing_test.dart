@@ -388,24 +388,37 @@ void main() {
       expect(visibleTask(reopened.tasks.single, [removed]), isFalse);
     },
   );
-  test('reanchoring does not duplicate a target already completed on that date', () {
-    final p = plan();
-    final plants = [plant('a')];
-    final first = expand(p, [], plants);
-    final later = expand(p, first, plants, at: DateTime(2026, 12, 4));
-    final existing = [
-      ...first,
-      later.single.withStatus(TaskStatus.completed, now: now),
-    ];
-    final edited = editPlan(p, title: p.title, notes: '', dueDate: '2026-12-04', now: now);
-    final updated = apply(existing, changes(p, edited, existing, plants));
-    expect(updated.first.membershipExcluded, isTrue);
-    final projection = projectedTaskEntries(
-      plans: [edited], tasks: updated, plants: plants, sections: [], crops: [],
-      taxonomy: starterTaxonomy, through: now,
-    );
-    expect(taskCalendarEvents(projection), hasLength(1));
-    expect(expand(edited, updated, plants), isEmpty);
-  });
-
+  test(
+    'reanchoring does not duplicate a target already completed on that date',
+    () {
+      final p = plan();
+      final plants = [plant('a')];
+      final first = expand(p, [], plants);
+      final later = expand(p, first, plants, at: DateTime(2026, 12, 4));
+      final existing = [
+        ...first,
+        later.single.withStatus(TaskStatus.completed, now: now),
+      ];
+      final edited = editPlan(
+        p,
+        title: p.title,
+        notes: '',
+        dueDate: '2026-12-04',
+        now: now,
+      );
+      final updated = apply(existing, changes(p, edited, existing, plants));
+      expect(updated.first.membershipExcluded, isTrue);
+      final projection = projectedTaskEntries(
+        plans: [edited],
+        tasks: updated,
+        plants: plants,
+        sections: [],
+        crops: [],
+        taxonomy: starterTaxonomy,
+        through: now,
+      );
+      expect(taskCalendarEvents(projection), hasLength(1));
+      expect(expand(edited, updated, plants), isEmpty);
+    },
+  );
 }

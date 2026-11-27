@@ -255,27 +255,17 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
               if (current != null && !dates.contains(current)) {
                 dates.insert(0, current);
               }
-              String occurrenceLabel(String key) {
-                final currentOccurrence = plan == null
-                    ? null
-                    : taskOccurrences(
-                        plan,
-                        DateTime.now(),
-                      ).where((o) => o.key == key).firstOrNull;
-                return currentOccurrence?.startsOn ??
-                    all
-                        .where(
-                          (t) =>
-                              (plan == null
-                                  ? t.occurrenceOn
-                                  : taskCycleKey(t, plan)) ==
-                              key,
-                        )
-                        .firstOrNull
-                        ?.dueDate ??
-                    'Not dated';
+              final labels = <String, String>{};
+              for (final t in all) {
+                final key = plan == null ? t.occurrenceOn : taskCycleKey(t, plan);
+                if (key != null && t.dueDate != null) { labels.putIfAbsent(key, () => t.dueDate!); }
               }
-
+              if (plan != null) {
+                for (final o in taskOccurrences(plan, DateTime.now())) {
+                  if (o.startsOn != null) { labels[o.key] = o.startsOn!; }
+                }
+              }
+              String occurrenceLabel(String key) => labels[key] ?? 'Not dated';
               dates.sort(
                 (a, b) => occurrenceLabel(b).compareTo(occurrenceLabel(a)),
               );
@@ -586,6 +576,11 @@ class _TasksState extends ConsumerState<TasksPane> {
                 final plans =
                     ref.watch(taskPlansProvider).valueOrNull ?? <TaskPlan>[];
                 final taxonomy = ref.watch(taxonomyProvider);
+                final lookup = TaskPlanLookup(plans);
+                final currentKeys = {
+                  for (final p in plans.where((p) => !p.deleted))
+                    p.id: occurrenceDates(p, DateTime.now()).last,
+                };
                 final selectedTaxon =
                     widget.taxonId ??
                     (classification.isEmpty ? null : classification);
@@ -599,21 +594,19 @@ class _TasksState extends ConsumerState<TasksPane> {
                     ref.watch(cropsProvider).valueOrNull?.value ??
                     <CropPlanting>[];
                 bool inCurrentOccurrence(OrchardTask t) {
-                  final p = planForTask(t, plans);
-                  return visibleTask(t, plans) &&
-                      (p == null ||
-                          taskCycleKey(t, p) ==
-                              occurrenceDates(p, DateTime.now()).last);
+                  final p = lookup.forTask(t);
+                  return !t.membershipExcluded && t.status != TaskStatus.deleted &&
+                      (p == null || !p.deleted && taskCycleKey(t, p) == currentKeys[p.id]);
                 }
 
                 String? groupKey(OrchardTask t) =>
-                    planForTask(t, plans)?.id ?? t.groupId;
+                    lookup.forTask(t)?.id ?? t.groupId;
                 List<OrchardTask> groupMembers(OrchardTask t) {
-                  final p = planForTask(t, plans);
+                  final p = lookup.forTask(t);
                   return snapshot.value
                       .where(
                         (other) =>
-                            visibleTask(other, plans) &&
+                            !other.membershipExcluded && other.status != TaskStatus.deleted && !(lookup.forTask(other)?.deleted ?? false) &&
                             groupKey(other) == groupKey(t) &&
                             (p == null
                                 ? other.occurrenceOn == t.occurrenceOn
@@ -623,10 +616,16 @@ class _TasksState extends ConsumerState<TasksPane> {
                 }
 
                 String scopeLabel(OrchardTask t) {
-                  final p = planForTask(t, plans);
-                  if (p == null) { return t.groupScope; }
-                  if (p.taxonId != null && taxonomy.taxa.any((v) => v.id == p.taxonId)) {
-                    return taxonomy.ancestry(p.taxonId!).map((v) => v.name).join(' › ');
+                  final p = lookup.forTask(t);
+                  if (p == null) {
+                    return t.groupScope;
+                  }
+                  if (p.taxonId != null &&
+                      taxonomy.taxa.any((v) => v.id == p.taxonId)) {
+                    return taxonomy
+                        .ancestry(p.taxonId!)
+                        .map((v) => v.name)
+                        .join(' › ');
                   }
                   return switch (p.target) {
                     'property' => 'Whole orchard',
@@ -637,6 +636,7 @@ class _TasksState extends ConsumerState<TasksPane> {
                     _ => 'Plant',
                   };
                 }
+
                 final filtered =
                     snapshot.value
                         .where(
@@ -672,7 +672,7 @@ class _TasksState extends ConsumerState<TasksPane> {
                           !p.deleted &&
                           !snapshot.value.any(
                             (t) =>
-                                planForTask(t, plans)?.id == p.id &&
+                                lookup.forTask(t)?.id == p.id &&
                                 inCurrentOccurrence(t),
                           ) &&
                           widget.itemId == null &&
@@ -720,7 +720,7 @@ class _TasksState extends ConsumerState<TasksPane> {
                                     ListTile(
                                       leading: const Icon(Icons.checklist),
                                       title: Text(
-                                        planForTask(task, plans)?.title ??
+                                        lookup.forTask(task)?.title ??
                                             task.title,
                                       ),
                                       subtitle: Text(
