@@ -59,51 +59,52 @@ void main() {
       expect(find.text('Prune orchard'), findsOneWidget);
     },
   );
-  managementWidgetTest('task form saves a targeted task with today as its default start date', (
-    tester,
-  ) async {
-    final repo = await repository();
-    final plant = OrchardCommands(repo, starterTaxonomy).addPlant(
-      place: repo.place,
-      name: 'Apple 12',
-      taxonId: starterTaxonomy.taxa[2].id,
-      location: Coordinates(51, 1),
-    );
-    final router = GoRouter(
-      initialLocation: '/new',
-      routes: [
-        GoRoute(
-          path: '/new',
-          builder: (_, _) => TaskFormScreen(itemId: plant.id),
-        ),
-        GoRoute(
-          path: '/',
-          builder: (_, _) => const Scaffold(body: Text('Task saved')),
-        ),
-      ],
-    );
-    addTearDown(router.dispose);
-    await tester.pumpWidget(
-      wrap(repo, MaterialApp.router(routerConfig: router)),
-    );
-    await tester.pumpAndSettle();
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Task title'),
-      'Fertilize',
-    );
-    await tester.scrollUntilVisible(
-      find.text('Save task'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.tap(find.text('Save task'));
-    await tester.pumpAndSettle();
-    expect(repo.tasks.single.title, 'Fertilize');
-    expect(repo.tasks.single.itemId, plant.id);
-    expect(repo.tasks.single.dueDate, calendarDate(DateTime.now()));
-    expect(repo.tasks.single.endDate, isNull);
-    expect(find.text('Task saved'), findsOneWidget);
-  });
+  managementWidgetTest(
+    'task form saves a targeted task with today as its default start date',
+    (tester) async {
+      final repo = await repository();
+      final plant = OrchardCommands(repo, starterTaxonomy).addPlant(
+        place: repo.place,
+        name: 'Apple 12',
+        taxonId: starterTaxonomy.taxa[2].id,
+        location: Coordinates(51, 1),
+      );
+      final router = GoRouter(
+        initialLocation: '/new',
+        routes: [
+          GoRoute(
+            path: '/new',
+            builder: (_, _) => TaskFormScreen(itemId: plant.id),
+          ),
+          GoRoute(
+            path: '/',
+            builder: (_, _) => const Scaffold(body: Text('Task saved')),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        wrap(repo, MaterialApp.router(routerConfig: router)),
+      );
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Task title'),
+        'Fertilize',
+      );
+      await tester.scrollUntilVisible(
+        find.text('Save task'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(find.text('Save task'));
+      await tester.pumpAndSettle();
+      expect(repo.tasks.single.title, 'Fertilize');
+      expect(repo.tasks.single.itemId, plant.id);
+      expect(repo.tasks.single.dueDate, calendarDate(DateTime.now()));
+      expect(repo.tasks.single.endDate, isNull);
+      expect(find.text('Task saved'), findsOneWidget);
+    },
+  );
   managementWidgetTest(
     'metadata editor preserves planting history and archived status',
     (tester) async {

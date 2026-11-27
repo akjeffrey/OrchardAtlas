@@ -17,7 +17,11 @@ List<Map<String, dynamic>> taskCalendarEvents(List<OrchardTask> tasks) {
         t.status == TaskStatus.skipped) {
       continue;
     }
-    final key = t.planId == null ? t.id : '${t.planId}/${t.occurrenceOn}';
+    final key = t.planId != null
+        ? '${t.planId}/${t.occurrenceOn ?? t.dueDate}'
+        : t.groupId != null
+        ? 'group/${t.groupId}/${t.dueDate}'
+        : t.id;
     groups.putIfAbsent(key, () => []).add(t);
   }
   final entries = <Map<String, dynamic>>[];
