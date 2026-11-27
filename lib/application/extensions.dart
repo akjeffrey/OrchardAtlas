@@ -199,7 +199,7 @@ List<Map<String, dynamic>> dueNotifications(
     final matches = tasks
         .where(
           (t) =>
-              (t.id == r['id'] || t.planId == r['id']) &&
+              (t.id == r['id'] || t.planId == r['id'] || t.groupId == r['id']) &&
               t.status == TaskStatus.open &&
               t.dueDate != null,
         )

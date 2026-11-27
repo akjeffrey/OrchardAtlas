@@ -50,7 +50,7 @@ service cloud.firestore {
       return d.keys().hasAll(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt'])
         && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt', 'sectionId', 'cropId', 'groupId', 'groupScope', 'completedOn', 'planId', 'occurrenceOn', 'eventType', 'eventHarvest', 'endDate'])
         && d.schemaVersion == 1 && text(d.title) && d.notes is string && d.notes.size() <= 10000
-        && d.createdAt is timestamp && d.status in ['open', 'completed', 'cancelled', 'skipped']
+        && d.createdAt is timestamp && d.status in ['open', 'completed', 'cancelled', 'skipped', 'deleted']
         && (d.dueDate == null || date(d.dueDate))
         && taskRange(d)
         && (d.get('completedOn', null) == null || (d.status == 'completed' && date(d.completedOn)))

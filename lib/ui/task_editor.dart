@@ -12,9 +12,10 @@ import '../domain/task_edits.dart';
 import '../domain/extensions.dart';
 
 class TaskEditor extends ConsumerStatefulWidget {
-  const TaskEditor({super.key, this.task, this.plan});
+  const TaskEditor({super.key, this.task, this.plan, this.legacyGroup = false});
   final OrchardTask? task;
   final TaskPlan? plan;
+  final bool legacyGroup;
   @override
   ConsumerState<TaskEditor> createState() => _TaskEditorState();
 }
@@ -40,7 +41,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   List<int> offsets = [];
   bool initialized = false, busy = false;
   String? error;
-  String get id => widget.plan?.id ?? widget.task!.id;
+  String get id => widget.plan?.id ?? (widget.legacyGroup ? widget.task!.groupId! : widget.task!.id);
   bool get recurring =>
       widget.plan != null && widget.plan!.repeat != RepeatSchedule.none;
   @override
@@ -193,23 +194,24 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           );
                         }
                       } else {
-                        final latest = tasks.firstWhere((t) => t.id == id);
-                        if (latest.status != TaskStatus.open) {
-                          throw StateError(
-                            'Only open tasks may be edited. Completion history is retained.',
+                        final targets = tasks.where((t) =>
+                          (widget.legacyGroup ? t.groupId == id : t.id == id) && t.status == TaskStatus.open).toList();
+                        if (targets.isEmpty) {
+                          throw StateError('Only open tasks may be edited. Completion history is retained.');
+                        }
+                        for (final latest in targets) {
+                          repo.saveTask(
+                            editOpenTask(
+                              latest,
+                              title: title.text,
+                              notes: notes.text,
+                              dueDate: due,
+                              endDate: end,
+                              eventType: eventType,
+                              eventHarvest: harvest,
+                            ),
                           );
                         }
-                        repo.saveTask(
-                          editOpenTask(
-                            latest,
-                            title: title.text,
-                            notes: notes.text,
-                            dueDate: due,
-                            endDate: end,
-                            eventType: eventType,
-                            eventHarvest: harvest,
-                          ),
-                        );
                       }
                       final records = ref.read(orchardRecordsProvider);
                       if (offsets.isEmpty) {

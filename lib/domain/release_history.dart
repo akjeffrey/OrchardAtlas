@@ -11,11 +11,14 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Task start dates, optional end dates and recurring date ranges.',
-      'Multiple local reminders in days or weeks before the task start.',
-      'Connect a phone Google calendar to sync tasks and completion counts.',
+      'Complete or reopen tasks with a checkbox, skip with a curved arrow and delete with a trash can.',
+      'Edit group tasks beside their name at the top of the checklist, without per-member edit buttons.',
     ],
   ),
+  const ReleaseNote('0.83.0', [
+    'Task start dates, optional end dates and recurring date ranges.',
+    'Multiple local reminders and optional Google Calendar sync.',
+  ]),
   const ReleaseNote('0.77.0', [
     'Seed cell planting dates, expected transplant dates and actual transplant tracking.',
     'Front/back seed-packet photos and tray deletion with offline backups.',

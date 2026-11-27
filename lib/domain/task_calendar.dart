@@ -14,7 +14,8 @@ List<Map<String, dynamic>> taskCalendarEvents(List<OrchardTask> tasks) {
   for (final t in tasks) {
     if (t.dueDate == null ||
         t.status == TaskStatus.cancelled ||
-        t.status == TaskStatus.skipped) {
+        t.status == TaskStatus.skipped ||
+        t.status == TaskStatus.deleted) {
       continue;
     }
     final key = t.planId != null
