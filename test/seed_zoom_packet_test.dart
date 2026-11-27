@@ -125,7 +125,11 @@ void main() {
       expect(scale(), greaterThan(1));
       await tester.tap(find.text('Fit tray'));
       await tester.pumpAndSettle();
-      expect(scale(), lessThan(1), reason: 'Viewport: ${tester.getSize(viewer)}');
+      expect(
+        scale(),
+        lessThan(1),
+        reason: 'Viewport: ${tester.getSize(viewer)}',
+      );
       final rect = tester.getRect(viewer),
           cell = tester.getRect(find.byKey(const ValueKey('test-cell')));
       expect(rect.contains(cell.center), isTrue);

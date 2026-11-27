@@ -45,7 +45,7 @@ class _SeedTrayViewportState extends State<SeedTrayViewport> {
     final next = value.clamp(minZoom, maxZoom).toDouble();
     final center = Offset(size.width / 2, size.height / 2);
     final point = transform.toScene(center);
-    transform.value = Matrix4.diagonal3Values(next, next, 1)
+    transform.value = Matrix4.diagonal3Values(next, next, next)
       ..setTranslationRaw(
         center.dx - point.dx * next,
         center.dy - point.dy * next,
@@ -65,7 +65,7 @@ class _SeedTrayViewportState extends State<SeedTrayViewport> {
         )
         .clamp(minZoom, 1.0)
         .toDouble();
-    transform.value = Matrix4.diagonal3Values(scale, scale, 1)
+    transform.value = Matrix4.diagonal3Values(scale, scale, scale)
       ..setTranslationRaw(
         (size.width - widget.contentSize.width * scale) / 2,
         (size.height - widget.contentSize.height * scale) / 2,
