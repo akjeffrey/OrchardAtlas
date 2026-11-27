@@ -120,6 +120,7 @@ class FirestoreMapping {
     'status': p.status.name,
   };
   static Map<String, dynamic> taskExtrasToMap(OrchardTask t) => {
+    if (t.membershipExcluded) 'membershipExcluded': true,
     if (t.sectionId != null) 'sectionId': t.sectionId,
     if (t.cropId != null) 'cropId': t.cropId,
     if (t.groupId != null) 'groupId': t.groupId,
@@ -175,6 +176,7 @@ class FirestoreMapping {
             ),
       itemId: d['itemId'] as String?,
       dueDate: d['dueDate'] as String?,
+      membershipExcluded: d['membershipExcluded'] as bool? ?? false,
       endDate: d['endDate'] as String?,
       status: TaskStatus.values.byName(d['status'] as String),
       createdAt: (d['createdAt'] as Timestamp).toDate().toUtc(),

@@ -396,6 +396,7 @@ class OrchardTask {
     this.eventHarvest,
     String notes = '',
     this.status = TaskStatus.open,
+    this.membershipExcluded = false,
   }) : title = requiredText(title, 'Task title'),
        notes = optionalText(notes, 10000),
        groupScope = optionalText(groupScope, 500) {
@@ -426,6 +427,7 @@ class OrchardTask {
       completedOn;
   final DateTime createdAt;
   final TaskStatus status;
+  final bool membershipExcluded;
   OrchardTask withStatus(TaskStatus value, {DateTime? now}) => OrchardTask(
     id: id,
     propertyId: propertyId,
@@ -444,6 +446,7 @@ class OrchardTask {
     endDate: endDate,
     notes: notes,
     status: value,
+    membershipExcluded: membershipExcluded,
     completedOn: value == TaskStatus.completed
         ? calendarDate(now ?? DateTime.now())
         : null,

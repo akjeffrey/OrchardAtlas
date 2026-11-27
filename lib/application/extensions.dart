@@ -202,6 +202,7 @@ List<Map<String, dynamic>> dueNotifications(
               (t.id == r['id'] ||
                   t.planId == r['id'] ||
                   t.groupId == r['id']) &&
+              !t.membershipExcluded &&
               t.status == TaskStatus.open &&
               t.dueDate != null,
         )
@@ -240,51 +241,25 @@ final reminderWorkerProvider = Provider<void>((ref) {
   final plants = ref.watch(plantsProvider).asData?.value.value;
   final crops = ref.watch(cropsProvider).asData?.value.value;
   final sections = ref.watch(sectionsProvider).asData?.value.value;
-  final predictions =
-      plans == null || plants == null || crops == null || sections == null
-      ? <OrchardTask>[]
-      : expandPlans(
-          plans: plans,
-          existing: tasks,
-          plants: plants,
-          sections: sections,
-          crops: crops,
-          taxonomy: ref.watch(taxonomyProvider),
-          now: now.add(const Duration(days: 366)),
-        );
-  if (plans != null) {
-    for (final p in plans) {
-      for (final date in occurrenceDates(
-        p,
-        now.add(const Duration(days: 366)),
-      )) {
-        if ([
-          ...tasks,
-          ...predictions,
-        ].any((t) => t.planId == p.id && t.occurrenceOn == date)) {
-          continue;
-        }
-        predictions.add(
-          OrchardTask(
-            id: '${p.id}/$date',
-            propertyId: p.propertyId,
-            title: p.title,
-            createdAt: p.createdAt,
-            planId: p.id,
-            occurrenceOn: date,
-            dueDate: p.repeat == RepeatSchedule.none ? p.dueDate : date,
-          ),
-        );
-      }
-    }
+  if (plans == null || plants == null || crops == null || sections == null) {
+    return;
   }
+  final projection = projectedTaskEntries(
+    plans: plans,
+    tasks: tasks,
+    plants: plants,
+    sections: sections,
+    crops: crops,
+    taxonomy: ref.watch(taxonomyProvider),
+    through: now.add(const Duration(days: 366)),
+  );
   final orchard = ref.watch(placeProvider).asData?.value;
   if (orchard == null) return;
   scheduleMicrotask(() async {
     try {
       await scheduler.replace(
         orchard.id,
-        dueNotifications([...tasks, ...predictions], records, now),
+        dueNotifications(projection, records, now),
       );
     } on MissingPluginException {
       /* Simulator/unsupported platform. */

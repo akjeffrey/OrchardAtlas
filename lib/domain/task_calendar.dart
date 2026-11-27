@@ -12,7 +12,8 @@ abstract interface class TaskCalendarRepository {
 List<Map<String, dynamic>> taskCalendarEvents(List<OrchardTask> tasks) {
   final groups = <String, List<OrchardTask>>{};
   for (final t in tasks) {
-    if (t.dueDate == null ||
+    if (t.membershipExcluded ||
+        t.dueDate == null ||
         t.status == TaskStatus.cancelled ||
         t.status == TaskStatus.skipped ||
         t.status == TaskStatus.deleted) {

@@ -29,18 +29,38 @@ class TaskPlan {
     this.eventType,
     this.eventHarvest,
     this.notes = '',
-  }) : title = requiredText(title, 'Task title') {
-    if (dueDate != null) parseCalendarDate(dueDate!);
+    this.deleted = false,
+    this.scheduleId,
+    this.scheduleFrom,
+    this.currentKey,
+    this.generateFrom,
+    List<String> includedTargets = const [],
+    List<String> excludedTargets = const [],
+    List<String> legacyIds = const [],
+  }) : title = requiredText(title, 'Task title'),
+       includedTargets = List.unmodifiable(includedTargets.toSet()),
+       excludedTargets = List.unmodifiable(excludedTargets.toSet()),
+       legacyIds = List.unmodifiable(legacyIds.toSet()) {
+    if (dueDate != null) {
+      parseCalendarDate(dueDate!);
+    }
     validateTaskDates(dueDate, endDate);
-    if (anchorOn != null) parseCalendarDate(anchorOn!);
+    for (final d in [
+      anchorOn,
+      scheduleFrom,
+      generateFrom,
+    ].whereType<String>()) {
+      parseCalendarDate(d);
+    }
     if (![
       'plant',
-      'section',
-      'crop',
       'plants',
+      'section',
       'sections',
+      'crop',
       'crops',
       'property',
+      'manual',
     ].contains(target)) {
       throw ArgumentError('Invalid target');
     }
@@ -52,31 +72,69 @@ class TaskPlan {
     if (eventType == ActivityType.harvest && eventHarvest == null) {
       throw ArgumentError('Harvest quantity required');
     }
-    if (notes.length > 10000) throw ArgumentError('Notes too long');
+    if (notes.length > 10000) {
+      throw ArgumentError('Notes too long');
+    }
+    if (this.includedTargets.length > 400 ||
+        this.excludedTargets.length > 400 ||
+        this.legacyIds.length > 400) {
+      throw ArgumentError('Use at most 400 explicit targets');
+    }
+    if ([
+      ...this.includedTargets,
+      ...this.excludedTargets,
+    ].any((k) => !RegExp(r'^[pcs]:.+$').hasMatch(k))) {
+      throw ArgumentError('Invalid task target key');
+    }
+    if (scheduleId != null && (scheduleFrom == null || currentKey == null)) {
+      throw ArgumentError(
+        'A changed schedule needs its current occurrence identity',
+      );
+    }
   }
   final String id, propertyId, title, target, notes;
-  final String? itemId, sectionId, cropId, taxonId, dueDate, endDate, anchorOn;
+  final String? itemId,
+      sectionId,
+      cropId,
+      taxonId,
+      dueDate,
+      endDate,
+      anchorOn,
+      scheduleId,
+      scheduleFrom,
+      currentKey,
+      generateFrom;
   final DateTime createdAt;
   final SectionKind sectionKind;
   final RepeatSchedule repeat;
   final ActivityType? eventType;
   final Harvest? eventHarvest;
+  final bool deleted;
+  final List<String> includedTargets, excludedTargets, legacyIds;
 }
 
 String linkedEventId(String taskId) =>
     const Uuid().v5(Namespace.url.value, 'orchard-atlas/task-event/$taskId');
 
-List<String> occurrenceDates(TaskPlan plan, DateTime now) {
+class TaskOccurrence {
+  const TaskOccurrence(this.key, this.startsOn);
+  final String key;
+  final String? startsOn;
+}
+
+List<TaskOccurrence> taskOccurrences(TaskPlan plan, DateTime now) {
+  if (plan.deleted) {
+    return [];
+  }
   final start = parseCalendarDate(
     plan.dueDate ?? calendarDate(plan.createdAt.toLocal()),
   );
-  final today = parseCalendarDate(calendarDate(now));
   if (plan.repeat == RepeatSchedule.none) {
-    return [plan.anchorOn ?? calendarDate(start)];
+    return [TaskOccurrence(plan.anchorOn ?? calendarDate(start), plan.dueDate)];
   }
-  final result = <String>[];
+  final today = calendarDate(now), result = <TaskOccurrence>[];
   for (var i = 0; ; i++) {
-    final date = switch (plan.repeat) {
+    final d = calendarDate(switch (plan.repeat) {
       RepeatSchedule.daily => DateTime(start.year, start.month, start.day + i),
       RepeatSchedule.weekly => DateTime(
         start.year,
@@ -86,17 +144,34 @@ List<String> occurrenceDates(TaskPlan plan, DateTime now) {
       RepeatSchedule.monthly => _month(start, i),
       RepeatSchedule.yearly => _month(start, i * 12),
       RepeatSchedule.none => start,
-    };
-    if (date.isAfter(today)) {
-      if (result.isEmpty) result.add(calendarDate(date));
+    });
+    if (plan.generateFrom != null && d.compareTo(plan.generateFrom!) < 0) {
+      continue;
+    }
+    final key = plan.scheduleId == null
+        ? d
+        : d == plan.scheduleFrom
+        ? plan.currentKey!
+        : const Uuid().v5(
+            Namespace.url.value,
+            '${plan.id}/${plan.scheduleId}/$d',
+          );
+    if (d.compareTo(today) > 0) {
+      if (result.isEmpty) {
+        result.add(TaskOccurrence(key, d));
+      }
       break;
     }
-    result.add(calendarDate(date));
-    if (date.isAtSameMomentAs(today)) break;
+    result.add(TaskOccurrence(key, d));
+    if (d == today) {
+      break;
+    }
   }
   return result;
 }
 
+List<String> occurrenceDates(TaskPlan plan, DateTime now) =>
+    taskOccurrences(plan, now).map((o) => o.key).toList();
 DateTime _month(DateTime start, int offset) {
   final first = DateTime(start.year, start.month + offset);
   return DateTime(
@@ -105,6 +180,165 @@ DateTime _month(DateTime start, int offset) {
     math.min(start.day, DateTime(first.year, first.month + 1, 0).day),
   );
 }
+
+String taskTargetKey(OrchardTask t) => t.itemId != null
+    ? 'p:${t.itemId}'
+    : t.cropId != null
+    ? 'c:${t.cropId}'
+    : t.sectionId != null
+    ? 's:${t.sectionId}'
+    : 'property';
+bool belongsToTaskPlan(OrchardTask t, TaskPlan p) =>
+    t.propertyId == p.propertyId &&
+    (t.planId == p.id || t.groupId == p.id || p.legacyIds.contains(t.id));
+
+/// Indexes parent and legacy links once for large task collections.
+class TaskPlanLookup {
+  TaskPlanLookup(List<TaskPlan> plans) {
+    for (final p in plans) {
+      _definitions['${p.propertyId}/${p.id}'] = p;
+      for (final id in p.legacyIds) {
+        _legacy['${p.propertyId}/$id'] = p;
+      }
+    }
+  }
+  final _definitions = <String, TaskPlan>{};
+  final _legacy = <String, TaskPlan>{};
+  TaskPlan? forTask(OrchardTask t) =>
+      _definitions['${t.propertyId}/${t.planId}'] ??
+      _definitions['${t.propertyId}/${t.groupId}'] ??
+      _legacy['${t.propertyId}/${t.id}'];
+}
+
+TaskPlan? planForTask(OrchardTask task, List<TaskPlan> plans) =>
+    plans.where((p) => belongsToTaskPlan(task, p)).firstOrNull;
+String taskCycleKey(OrchardTask t, TaskPlan p) =>
+    t.occurrenceOn ??
+    p.anchorOn ??
+    t.dueDate ??
+    calendarDate(t.createdAt.toLocal());
+bool visibleTask(OrchardTask t, List<TaskPlan> plans) =>
+    !t.membershipExcluded &&
+    t.status != TaskStatus.deleted &&
+    !(planForTask(t, plans)?.deleted ?? false);
+
+Set<String> matchingTaskTargets(
+  TaskPlan plan, {
+  required List<ManagedPlant> plants,
+  required List<OrchardSection> sections,
+  required List<CropPlanting> crops,
+  required Taxonomy taxonomy,
+  bool overrides = true,
+}) {
+  if (plan.deleted) {
+    return {};
+  }
+  final taxa = plan.taxonId == null
+      ? null
+      : taxonomy.descendants(plan.taxonId!);
+  final scope = plan.sectionId == null
+      ? null
+      : sectionDescendants(plan.sectionId!, sections);
+  final activePlants = plants.where(
+    (p) => p.propertyId == plan.propertyId && p.status == ItemStatus.active,
+  );
+  final activeCrops = crops.where(
+    (c) => c.propertyId == plan.propertyId && c.status == CropStatus.growing,
+  );
+  final activeSections = sections.where((s) => s.propertyId == plan.propertyId);
+  final valid = {
+    for (final p in activePlants) 'p:${p.id}',
+    for (final c in activeCrops) 'c:${c.id}',
+    for (final s in activeSections) 's:${s.id}',
+    'property',
+  };
+  final keys = <String>{};
+  if (plan.target == 'plant') {
+    keys.add('p:${plan.itemId}');
+  }
+  if (plan.target == 'crop') {
+    keys.add('c:${plan.cropId}');
+  }
+  if (plan.target == 'section') {
+    keys.add('s:${plan.sectionId}');
+  }
+  if (plan.target == 'property') {
+    keys.add('property');
+  }
+  if (plan.target == 'plants' || plan.target == 'crops') {
+    if (plan.target == 'plants') {
+      keys.addAll(
+        activePlants
+            .where(
+              (p) =>
+                  (taxa == null || taxa.contains(p.taxonId)) &&
+                  (scope == null || scope.contains(p.sectionId)),
+            )
+            .map((p) => 'p:${p.id}'),
+      );
+    }
+    keys.addAll(
+      activeCrops
+          .where(
+            (c) =>
+                (taxa == null || taxa.contains(c.taxonId)) &&
+                (scope == null || scope.contains(c.sectionId)),
+          )
+          .map((c) => 'c:${c.id}'),
+    );
+  }
+  if (plan.target == 'sections') {
+    keys.addAll(
+      activeSections
+          .where(
+            (s) =>
+                s.kind == plan.sectionKind &&
+                (scope == null || scope.contains(s.id)),
+          )
+          .map((s) => 's:${s.id}'),
+    );
+  }
+  if (overrides) {
+    keys.addAll(plan.includedTargets);
+    keys.removeAll(plan.excludedTargets);
+  }
+  return keys.intersection(valid);
+}
+
+OrchardTask taskWithMembership(OrchardTask t, bool excluded) => OrchardTask(
+  id: t.id,
+  propertyId: t.propertyId,
+  title: t.title,
+  notes: t.notes,
+  createdAt: t.createdAt,
+  itemId: t.itemId,
+  sectionId: t.sectionId,
+  cropId: t.cropId,
+  groupId: t.groupId,
+  groupScope: t.groupScope,
+  dueDate: t.dueDate,
+  endDate: t.endDate,
+  completedOn: t.completedOn,
+  planId: t.planId,
+  occurrenceOn: t.occurrenceOn,
+  eventType: t.eventType,
+  eventHarvest: t.eventHarvest,
+  status: t.status,
+  membershipExcluded: excluded,
+);
+bool alreadyRecordedTarget(
+  Iterable<OrchardTask> members,
+  String key,
+  String? date,
+) =>
+    date != null &&
+    members.any(
+      (t) =>
+          taskTargetKey(t) == key &&
+          t.dueDate == date &&
+          t.status != TaskStatus.open &&
+          t.status != TaskStatus.deleted,
+    );
 
 List<OrchardTask> expandPlans({
   required List<TaskPlan> plans,
@@ -115,129 +349,78 @@ List<OrchardTask> expandPlans({
   required Taxonomy taxonomy,
   required DateTime now,
 }) {
-  final known = existing.map((t) => t.id).toSet(), result = <OrchardTask>[];
-  for (final plan in plans) {
-    final taxa = plan.taxonId == null
-        ? null
-        : taxonomy.descendants(plan.taxonId!);
-    final scope = plan.sectionId == null
-        ? null
-        : sectionDescendants(plan.sectionId!, sections);
-    final targets = <({String? plant, String? section, String? crop})>[];
-    if (plan.target == 'plant') {
-      if (plants.any(
-        (p) =>
-            p.propertyId == plan.propertyId &&
-            p.id == plan.itemId &&
-            p.status == ItemStatus.active,
-      )) {
-        targets.add((plant: plan.itemId, section: null, crop: null));
+  final result = <OrchardTask>[], known = existing.map((t) => t.id).toSet();
+  for (final plan in plans.where((p) => !p.deleted)) {
+    final keys = matchingTaskTargets(
+      plan,
+      plants: plants,
+      sections: sections,
+      crops: crops,
+      taxonomy: taxonomy,
+    );
+    final occurrences = taskOccurrences(plan, now),
+        current = occurrences.last.key;
+    final members = existing.where((t) => belongsToTaskPlan(t, plan)).toList();
+    final membersByCycle = <String, Set<String>>{};
+    final recordedByDate = <String, Set<String>>{};
+    for (final t in members) {
+      membersByCycle
+          .putIfAbsent(taskCycleKey(t, plan), () => {})
+          .add(taskTargetKey(t));
+      if (t.dueDate != null &&
+          t.status != TaskStatus.open &&
+          t.status != TaskStatus.deleted) {
+        recordedByDate.putIfAbsent(t.dueDate!, () => {}).add(taskTargetKey(t));
       }
-    } else if (plan.target == 'plants') {
-      for (final p in plants.where(
-        (p) =>
-            p.propertyId == plan.propertyId &&
-            p.status == ItemStatus.active &&
-            (taxa == null || taxa.contains(p.taxonId)) &&
-            (scope == null || scope.contains(p.sectionId)),
-      )) {
-        targets.add((plant: p.id, section: null, crop: null));
-      }
-      for (final c in crops.where(
-        (c) =>
-            c.propertyId == plan.propertyId &&
-            c.status == CropStatus.growing &&
-            (taxa == null || taxa.contains(c.taxonId)) &&
-            (scope == null || scope.contains(c.sectionId)),
-      )) {
-        targets.add((plant: null, section: null, crop: c.id));
-      }
-    } else if (plan.target == 'sections') {
-      for (final s in sections.where(
-        (s) =>
-            s.propertyId == plan.propertyId &&
-            s.kind == plan.sectionKind &&
-            (scope == null || scope.contains(s.id)),
-      )) {
-        targets.add((plant: null, section: s.id, crop: null));
-      }
-    } else if (plan.target == 'crops') {
-      for (final c in crops.where(
-        (c) =>
-            c.propertyId == plan.propertyId &&
-            c.status == CropStatus.growing &&
-            (taxa == null || taxa.contains(c.taxonId)) &&
-            (scope == null || scope.contains(c.sectionId)),
-      )) {
-        targets.add((plant: null, section: null, crop: c.id));
-      }
-    } else if (plan.target == 'section') {
-      if (sections.any(
-        (s) => s.propertyId == plan.propertyId && s.id == plan.sectionId,
-      )) {
-        targets.add((plant: null, section: plan.sectionId, crop: null));
-      }
-    } else if (plan.target == 'crop') {
-      if (crops.any(
-        (c) => c.propertyId == plan.propertyId && c.id == plan.cropId,
-      )) {
-        targets.add((plant: null, section: null, crop: plan.cropId));
-      }
-    } else {
-      targets.add((plant: null, section: null, crop: null));
     }
-    final dates = occurrenceDates(plan, now);
-    final current = dates.last;
-    for (final date in dates) {
-      for (final target in targets) {
-        // New matches join the current occurrence; historic completed membership stays intact.
-        if (date != current &&
-            existing.any(
-              (t) => t.planId == plan.id && t.occurrenceOn == date,
-            )) {
+    for (final occurrence in occurrences) {
+      if (occurrence.key != current &&
+          membersByCycle.containsKey(occurrence.key)) {
+        continue;
+      }
+      for (final key in keys) {
+        if (recordedByDate[occurrence.startsOn]?.contains(key) ?? false) {
           continue;
         }
-        final targetKey =
-            target.plant ??
-            target.section ??
-            (target.crop == null
-                ? 'property'
-                : plan.target == 'plants'
-                ? 'crop:${target.crop}'
-                : target.crop!);
+        if (membersByCycle[occurrence.key]?.contains(key) ?? false) {
+          continue;
+        }
+        final kind = key == 'property' ? 'property' : key.substring(0, 1),
+            targetId = key == 'property' ? null : key.substring(2);
+        final oldTargetKey =
+            kind == 'c' && !['crop', 'crops'].contains(plan.target)
+            ? 'crop:$targetId'
+            : targetId ?? 'property';
         final id = const Uuid().v5(
           Namespace.url.value,
-          '${plan.id}/$date/$targetKey',
+          '${plan.id}/${occurrence.key}/$oldTargetKey',
         );
-        if (!known.add(id)) continue;
+        if (!known.add(id)) {
+          continue;
+        }
         result.add(
           OrchardTask(
             id: id,
             propertyId: plan.propertyId,
             title: plan.title,
             createdAt: plan.createdAt,
-            itemId: target.plant,
-            sectionId: target.section,
-            cropId: target.crop,
-            groupId:
-                target.plant == null &&
-                    target.section == null &&
-                    target.crop == null
-                ? null
-                : plan.id,
+            itemId: kind == 'p' ? targetId : null,
+            sectionId: kind == 's' ? targetId : null,
+            cropId: kind == 'c' ? targetId : null,
+            groupId: key == 'property' ? null : plan.id,
             groupScope: plan.target,
             planId: plan.id,
-            occurrenceOn: date,
-            dueDate: plan.repeat == RepeatSchedule.none ? plan.dueDate : date,
+            occurrenceOn: occurrence.key,
+            dueDate: occurrence.startsOn,
             endDate: plan.endDate == null
                 ? null
                 : plan.repeat == RepeatSchedule.none
                 ? plan.endDate
                 : offsetCalendarDate(
-                    date,
+                    occurrence.startsOn!,
                     taskRangeDays(plan.dueDate!, plan.endDate!),
                   ),
-            eventType: target.plant == null ? null : plan.eventType,
+            eventType: kind == 'p' ? plan.eventType : null,
             eventHarvest: plan.eventHarvest,
             notes: plan.notes,
           ),
@@ -342,3 +525,118 @@ List<ManagedPlant> orderedRowPlants(
     final order = rowPosition(a, row).compareTo(rowPosition(b, row));
     return order == 0 ? a.createdAt.compareTo(b.createdAt) : order;
   });
+
+/// Calendar/reminder projection normalizes legacy links without rewriting facts.
+List<OrchardTask> projectedTaskEntries({
+  required List<TaskPlan> plans,
+  required List<OrchardTask> tasks,
+  required List<ManagedPlant> plants,
+  required List<OrchardSection> sections,
+  required List<CropPlanting> crops,
+  required Taxonomy taxonomy,
+  required DateTime through,
+}) {
+  final predicted = expandPlans(
+    plans: plans,
+    existing: tasks,
+    plants: plants,
+    sections: sections,
+    crops: crops,
+    taxonomy: taxonomy,
+    now: through,
+  );
+  final raw = [...tasks, ...predicted];
+  final lookup = TaskPlanLookup(plans);
+  final occurrences = <String, Map<String, TaskOccurrence>>{
+    for (final p in plans.where((p) => !p.deleted))
+      p.id: {for (final o in taskOccurrences(p, through)) o.key: o},
+  };
+  final representedCycles = <String>{};
+  final result = <OrchardTask>[];
+  for (final t in raw) {
+    final p = lookup.forTask(t);
+    if (p != null) {
+      representedCycles.add('${p.id}/${taskCycleKey(t, p)}');
+    }
+    if (t.membershipExcluded ||
+        t.status == TaskStatus.deleted ||
+        (p?.deleted ?? false)) {
+      continue;
+    }
+    if (p == null) {
+      result.add(t);
+      continue;
+    }
+    final key = taskCycleKey(t, p);
+    final occurrence = occurrences[p.id]?[key];
+    final start = occurrence?.startsOn ?? t.dueDate;
+    final end = occurrence == null
+        ? t.endDate
+        : p.endDate == null
+        ? null
+        : p.repeat == RepeatSchedule.none
+        ? p.endDate
+        : offsetCalendarDate(start!, taskRangeDays(p.dueDate!, p.endDate!));
+    final title = occurrence == null ? t.title : p.title;
+    final notes = occurrence == null ? t.notes : p.notes;
+    if (t.planId == p.id &&
+        t.occurrenceOn == key &&
+        t.dueDate == start &&
+        t.endDate == end &&
+        t.title == title &&
+        t.notes == notes) {
+      result.add(t);
+    } else {
+      result.add(
+        OrchardTask(
+          id: t.id,
+          propertyId: t.propertyId,
+          title: title,
+          notes: notes,
+          createdAt: t.createdAt,
+          itemId: t.itemId,
+          sectionId: t.sectionId,
+          cropId: t.cropId,
+          groupId: t.groupId,
+          groupScope: t.groupScope,
+          dueDate: start,
+          endDate: end,
+          completedOn: t.completedOn,
+          planId: p.id,
+          occurrenceOn: key,
+          eventType: t.eventType,
+          eventHarvest: t.eventHarvest,
+          status: t.status,
+        ),
+      );
+    }
+  }
+  for (final p in plans.where((p) => !p.deleted)) {
+    for (final o in occurrences[p.id]!.values) {
+      if (representedCycles.contains('${p.id}/${o.key}')) {
+        continue;
+      }
+      result.add(
+        OrchardTask(
+          id: '${p.id}/${o.key}',
+          propertyId: p.propertyId,
+          title: p.title,
+          notes: p.notes,
+          createdAt: p.createdAt,
+          planId: p.id,
+          occurrenceOn: o.key,
+          dueDate: o.startsOn,
+          endDate: p.endDate == null
+              ? null
+              : p.repeat == RepeatSchedule.none
+              ? p.endDate
+              : offsetCalendarDate(
+                  o.startsOn!,
+                  taskRangeDays(p.dueDate!, p.endDate!),
+                ),
+        ),
+      );
+    }
+  }
+  return result;
+}
