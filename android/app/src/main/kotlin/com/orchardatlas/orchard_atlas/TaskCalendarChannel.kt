@@ -128,8 +128,10 @@ class TaskCalendarChannel(private val activity: MainActivity) : MethodChannel.Me
                 val eventMarker = "$marker/$id"
                 values.put(CalendarContract.Events.DESCRIPTION, description + "\n" + eventMarker)
                 var recovered: Long? = null
-                resolver.query(CalendarContract.Events.CONTENT_URI, arrayOf("_id"), "calendar_id=? AND description LIKE ? AND deleted=0", arrayOf(calendar.toString(), "%$eventMarker"), null)?.use { c ->
-                    if (c.moveToFirst()) recovered = c.getLong(0)
+                resolver.query(CalendarContract.Events.CONTENT_URI, arrayOf("_id", "description"), "calendar_id=? AND description LIKE ? AND deleted=0", arrayOf(calendar.toString(), "%$eventMarker"), null)?.use { c ->
+                    while (c.moveToNext()) {
+                        if (c.getString(1).orEmpty().endsWith(eventMarker)) { recovered = c.getLong(0); break }
+                    }
                 }
                 val eventId = recovered ?: ContentUris.parseId(checkNotNull(resolver.insert(CalendarContract.Events.CONTENT_URI, values)))
                 saved.put(id, eventId); remember()

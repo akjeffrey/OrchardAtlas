@@ -263,8 +263,8 @@ int compareTasks(OrchardTask a, OrchardTask b, TaskSort sort, DateTime now) {
         : 1;
   }
   final today = calendarDate(now),
-      aOverdue = a.dueDate!.compareTo(today) < 0,
-      bOverdue = b.dueDate!.compareTo(today) < 0;
+      aOverdue = (a.endDate ?? a.dueDate!).compareTo(today) < 0,
+      bOverdue = (b.endDate ?? b.dueDate!).compareTo(today) < 0;
   if (aOverdue != bOverdue) return aOverdue ? 1 : -1;
   return a.dueDate!.compareTo(b.dueDate!);
 }

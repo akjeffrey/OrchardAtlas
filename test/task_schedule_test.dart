@@ -1,3 +1,5 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:orchard_atlas/data/local_trial_repository.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:orchard_atlas/domain/models.dart';
 import 'package:orchard_atlas/domain/extensions.dart';
@@ -23,6 +25,7 @@ OrchardTask task({
   status: status,
 );
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   test('date ranges reject missing starts and reversed dates', () {
     expect(() => task(end: '2027-03-27'), throwsArgumentError);
     expect(() => validateTaskDates(null, '2027-03-28'), throwsArgumentError);
@@ -156,4 +159,26 @@ void main() {
       );
     },
   );
+  test('offline edits, completion and multiple reminders survive reopening', () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final repo = await LocalTrialRepository.open(preferences);
+    final orchard = repo.place.id;
+    final original = OrchardTask(id: 'range', propertyId: orchard, title: 'Prune', createdAt: DateTime.utc(2027), dueDate: '2027-03-28', endDate: '2027-03-30');
+    repo.saveTask(original);
+    final edited = editOpenTask(original, title: 'Prune trees', notes: 'Row one', dueDate: '2027-03-29', endDate: '2027-03-31');
+    repo.saveTask(edited);
+    repo.saveTask(edited.withStatus(TaskStatus.completed));
+    await repo.putRecord(orchard, RecordKind.reminder, 'range', {'offsets': [0, 7, 14]});
+    final reopened = await LocalTrialRepository.open(preferences);
+    final saved = (await reopened.watchTasks(orchard).first).value.single;
+    expect(saved.title, 'Prune trees');
+    expect(saved.dueDate, '2027-03-29');
+    expect(saved.endDate, '2027-03-31');
+    expect(saved.status, TaskStatus.completed);
+    expect(reminderOffsets((await reopened.watchRecords(orchard, RecordKind.reminder).first).single), [0, 7, 14]);
+    expect(() => reopened.saveTask(editOpenTask(saved, title: 'Forbidden', notes: '', dueDate: saved.dueDate, endDate: saved.endDate)), returnsNormally);
+    expect((await reopened.watchTasks(orchard).first).value.single.title, 'Prune trees');
+  });
+
 }

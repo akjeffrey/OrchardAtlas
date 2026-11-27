@@ -59,7 +59,7 @@ void main() {
       expect(find.text('Prune orchard'), findsOneWidget);
     },
   );
-  managementWidgetTest('task form saves a targeted task without a due date', (
+  managementWidgetTest('task form saves a targeted task with today as its default start date', (
     tester,
   ) async {
     final repo = await repository();
@@ -100,7 +100,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(repo.tasks.single.title, 'Fertilize');
     expect(repo.tasks.single.itemId, plant.id);
-    expect(repo.tasks.single.dueDate, isNull);
+    expect(repo.tasks.single.dueDate, calendarDate(DateTime.now()));
+    expect(repo.tasks.single.endDate, isNull);
     expect(find.text('Task saved'), findsOneWidget);
   });
   managementWidgetTest(
