@@ -257,12 +257,18 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
               }
               final labels = <String, String>{};
               for (final t in all) {
-                final key = plan == null ? t.occurrenceOn : taskCycleKey(t, plan);
-                if (key != null && t.dueDate != null) { labels.putIfAbsent(key, () => t.dueDate!); }
+                final key = plan == null
+                    ? t.occurrenceOn
+                    : taskCycleKey(t, plan);
+                if (key != null && t.dueDate != null) {
+                  labels.putIfAbsent(key, () => t.dueDate!);
+                }
               }
               if (plan != null) {
                 for (final o in taskOccurrences(plan, DateTime.now())) {
-                  if (o.startsOn != null) { labels[o.key] = o.startsOn!; }
+                  if (o.startsOn != null) {
+                    labels[o.key] = o.startsOn!;
+                  }
                 }
               }
               String occurrenceLabel(String key) => labels[key] ?? 'Not dated';
@@ -595,8 +601,11 @@ class _TasksState extends ConsumerState<TasksPane> {
                     <CropPlanting>[];
                 bool inCurrentOccurrence(OrchardTask t) {
                   final p = lookup.forTask(t);
-                  return !t.membershipExcluded && t.status != TaskStatus.deleted &&
-                      (p == null || !p.deleted && taskCycleKey(t, p) == currentKeys[p.id]);
+                  return !t.membershipExcluded &&
+                      t.status != TaskStatus.deleted &&
+                      (p == null ||
+                          !p.deleted &&
+                              taskCycleKey(t, p) == currentKeys[p.id]);
                 }
 
                 String? groupKey(OrchardTask t) =>
@@ -606,7 +615,9 @@ class _TasksState extends ConsumerState<TasksPane> {
                   return snapshot.value
                       .where(
                         (other) =>
-                            !other.membershipExcluded && other.status != TaskStatus.deleted && !(lookup.forTask(other)?.deleted ?? false) &&
+                            !other.membershipExcluded &&
+                            other.status != TaskStatus.deleted &&
+                            !(lookup.forTask(other)?.deleted ?? false) &&
                             groupKey(other) == groupKey(t) &&
                             (p == null
                                 ? other.occurrenceOn == t.occurrenceOn

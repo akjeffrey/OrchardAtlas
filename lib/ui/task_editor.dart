@@ -95,8 +95,11 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         throw StateError('This task has already been deleted.');
       }
       final now = DateTime.now();
-      final harvest = deleting ? latest.eventHarvest : eventType == ActivityType.harvest
-          ? Harvest(double.parse(quantity.text), unit) : null;
+      final harvest = deleting
+          ? latest.eventHarvest
+          : eventType == ActivityType.harvest
+          ? Harvest(double.parse(quantity.text), unit)
+          : null;
       if (!deleting) {
         requiredText(title.text, 'Task title');
         validateTaskDates(due, end);
@@ -143,6 +146,10 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
         taxonomy: ref.read(taxonomyProvider),
         now: now,
       );
+      if ((await ref.read(placeProvider.future)).id != orchard.id ||
+          !ref.read(canEditOrchardProvider)) {
+        throw StateError('Orchard or edit permission changed. Reopen this task.');
+      }
       await ref
           .read(orchardRepositoryProvider)
           .saveTaskDefinition(edited, changes);

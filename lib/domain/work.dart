@@ -191,12 +191,15 @@ String taskTargetKey(OrchardTask t) => t.itemId != null
 bool belongsToTaskPlan(OrchardTask t, TaskPlan p) =>
     t.propertyId == p.propertyId &&
     (t.planId == p.id || t.groupId == p.id || p.legacyIds.contains(t.id));
+
 /// Indexes parent and legacy links once for large task collections.
 class TaskPlanLookup {
   TaskPlanLookup(List<TaskPlan> plans) {
     for (final p in plans) {
       _definitions['${p.propertyId}/${p.id}'] = p;
-      for (final id in p.legacyIds) { _legacy['${p.propertyId}/$id'] = p; }
+      for (final id in p.legacyIds) {
+        _legacy['${p.propertyId}/$id'] = p;
+      }
     }
   }
   final _definitions = <String, TaskPlan>{};
@@ -361,8 +364,12 @@ List<OrchardTask> expandPlans({
     final membersByCycle = <String, Set<String>>{};
     final recordedByDate = <String, Set<String>>{};
     for (final t in members) {
-      membersByCycle.putIfAbsent(taskCycleKey(t, plan), () => {}).add(taskTargetKey(t));
-      if (t.dueDate != null && t.status != TaskStatus.open && t.status != TaskStatus.deleted) {
+      membersByCycle
+          .putIfAbsent(taskCycleKey(t, plan), () => {})
+          .add(taskTargetKey(t));
+      if (t.dueDate != null &&
+          t.status != TaskStatus.open &&
+          t.status != TaskStatus.deleted) {
         recordedByDate.putIfAbsent(t.dueDate!, () => {}).add(taskTargetKey(t));
       }
     }
@@ -530,53 +537,105 @@ List<OrchardTask> projectedTaskEntries({
   required DateTime through,
 }) {
   final predicted = expandPlans(
-    plans: plans, existing: tasks, plants: plants, sections: sections,
-    crops: crops, taxonomy: taxonomy, now: through,
+    plans: plans,
+    existing: tasks,
+    plants: plants,
+    sections: sections,
+    crops: crops,
+    taxonomy: taxonomy,
+    now: through,
   );
   final raw = [...tasks, ...predicted];
   final lookup = TaskPlanLookup(plans);
   final occurrences = <String, Map<String, TaskOccurrence>>{
     for (final p in plans.where((p) => !p.deleted))
-      p.id: { for (final o in taskOccurrences(p, through)) o.key: o },
+      p.id: {for (final o in taskOccurrences(p, through)) o.key: o},
   };
   final representedCycles = <String>{};
   final result = <OrchardTask>[];
   for (final t in raw) {
     final p = lookup.forTask(t);
-    if (p != null) { representedCycles.add('${p.id}/${taskCycleKey(t, p)}'); }
-    if (t.membershipExcluded || t.status == TaskStatus.deleted || (p?.deleted ?? false)) { continue; }
-    if (p == null) { result.add(t); continue; }
+    if (p != null) {
+      representedCycles.add('${p.id}/${taskCycleKey(t, p)}');
+    }
+    if (t.membershipExcluded ||
+        t.status == TaskStatus.deleted ||
+        (p?.deleted ?? false)) {
+      continue;
+    }
+    if (p == null) {
+      result.add(t);
+      continue;
+    }
     final key = taskCycleKey(t, p);
     final occurrence = occurrences[p.id]?[key];
     final start = occurrence?.startsOn ?? t.dueDate;
-    final end = occurrence == null ? t.endDate : p.endDate == null ? null :
-      p.repeat == RepeatSchedule.none ? p.endDate : offsetCalendarDate(start!, taskRangeDays(p.dueDate!, p.endDate!));
+    final end = occurrence == null
+        ? t.endDate
+        : p.endDate == null
+        ? null
+        : p.repeat == RepeatSchedule.none
+        ? p.endDate
+        : offsetCalendarDate(start!, taskRangeDays(p.dueDate!, p.endDate!));
     final title = occurrence == null ? t.title : p.title;
     final notes = occurrence == null ? t.notes : p.notes;
-    if (t.planId == p.id && t.occurrenceOn == key && t.dueDate == start &&
-        t.endDate == end && t.title == title && t.notes == notes) {
+    if (t.planId == p.id &&
+        t.occurrenceOn == key &&
+        t.dueDate == start &&
+        t.endDate == end &&
+        t.title == title &&
+        t.notes == notes) {
       result.add(t);
     } else {
-      result.add(OrchardTask(
-        id: t.id, propertyId: t.propertyId, title: title, notes: notes,
-        createdAt: t.createdAt, itemId: t.itemId, sectionId: t.sectionId,
-        cropId: t.cropId, groupId: t.groupId, groupScope: t.groupScope,
-        dueDate: start, endDate: end, completedOn: t.completedOn,
-        planId: p.id, occurrenceOn: key, eventType: t.eventType,
-        eventHarvest: t.eventHarvest, status: t.status,
-      ));
+      result.add(
+        OrchardTask(
+          id: t.id,
+          propertyId: t.propertyId,
+          title: title,
+          notes: notes,
+          createdAt: t.createdAt,
+          itemId: t.itemId,
+          sectionId: t.sectionId,
+          cropId: t.cropId,
+          groupId: t.groupId,
+          groupScope: t.groupScope,
+          dueDate: start,
+          endDate: end,
+          completedOn: t.completedOn,
+          planId: p.id,
+          occurrenceOn: key,
+          eventType: t.eventType,
+          eventHarvest: t.eventHarvest,
+          status: t.status,
+        ),
+      );
     }
   }
   for (final p in plans.where((p) => !p.deleted)) {
     for (final o in occurrences[p.id]!.values) {
-      if (representedCycles.contains('${p.id}/${o.key}')) { continue; }
-      result.add(OrchardTask(
-        id: '${p.id}/${o.key}', propertyId: p.propertyId, title: p.title,
-        notes: p.notes, createdAt: p.createdAt, planId: p.id,
-        occurrenceOn: o.key, dueDate: o.startsOn,
-        endDate: p.endDate == null ? null : p.repeat == RepeatSchedule.none ?
-          p.endDate : offsetCalendarDate(o.startsOn!, taskRangeDays(p.dueDate!, p.endDate!)),
-      ));
+      if (representedCycles.contains('${p.id}/${o.key}')) {
+        continue;
+      }
+      result.add(
+        OrchardTask(
+          id: '${p.id}/${o.key}',
+          propertyId: p.propertyId,
+          title: p.title,
+          notes: p.notes,
+          createdAt: p.createdAt,
+          planId: p.id,
+          occurrenceOn: o.key,
+          dueDate: o.startsOn,
+          endDate: p.endDate == null
+              ? null
+              : p.repeat == RepeatSchedule.none
+              ? p.endDate
+              : offsetCalendarDate(
+                  o.startsOn!,
+                  taskRangeDays(p.dueDate!, p.endDate!),
+                ),
+        ),
+      );
     }
   }
   return result;
