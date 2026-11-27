@@ -41,7 +41,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
   List<int> offsets = [];
   bool initialized = false, busy = false;
   String? error;
-  String get id => widget.plan?.id ?? (widget.legacyGroup ? widget.task!.groupId! : widget.task!.id);
+  String get id =>
+      widget.plan?.id ??
+      (widget.legacyGroup ? widget.task!.groupId! : widget.task!.id);
   bool get recurring =>
       widget.plan != null && widget.plan!.repeat != RepeatSchedule.none;
   @override
@@ -194,10 +196,19 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           );
                         }
                       } else {
-                        final targets = tasks.where((t) =>
-                          (widget.legacyGroup ? t.groupId == id : t.id == id) && t.status == TaskStatus.open).toList();
+                        final targets = tasks
+                            .where(
+                              (t) =>
+                                  (widget.legacyGroup
+                                      ? t.groupId == id
+                                      : t.id == id) &&
+                                  t.status == TaskStatus.open,
+                            )
+                            .toList();
                         if (targets.isEmpty) {
-                          throw StateError('Only open tasks may be edited. Completion history is retained.');
+                          throw StateError(
+                            'Only open tasks may be edited. Completion history is retained.',
+                          );
                         }
                         for (final latest in targets) {
                           repo.saveTask(

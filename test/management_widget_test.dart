@@ -24,7 +24,9 @@ void main() {
   Widget wrap(LocalTrialRepository repo, Widget child) => ProviderScope(
     overrides: [
       orchardRepositoryProvider.overrideWithValue(repo),
-      userProvider.overrideWith((ref) => Stream.value(OrchardUser(repo.place.ownerId))),
+      userProvider.overrideWith(
+        (ref) => Stream.value(OrchardUser(repo.place.ownerId)),
+      ),
       placeProvider.overrideWith((ref) async => repo.place),
       trialModeProvider.overrideWithValue(true),
     ],

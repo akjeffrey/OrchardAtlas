@@ -67,18 +67,20 @@ class TaskMemberTile extends ConsumerWidget {
     final canEdit = ref.watch(canEditOrchardProvider);
     void changeStatus(TaskStatus status) {
       try {
-        ref.read(commandsProvider).changeTaskStatus(
-          task,
-          status,
-          ref.read(userProvider).valueOrNull?.id ??
-              ref.read(placeProvider).value!.ownerId,
-        );
+        ref
+            .read(commandsProvider)
+            .changeTaskStatus(
+              task,
+              status,
+              ref.read(userProvider).valueOrNull?.id ??
+                  ref.read(placeProvider).value!.ownerId,
+            );
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('$e')));
       }
     }
+
     return ListTile(
       title: Row(
         children: [
@@ -88,8 +90,11 @@ class TaskMemberTile extends ConsumerWidget {
               tooltip: 'Edit task & reminders',
               icon: const Icon(Icons.edit_outlined),
               onPressed: () {
-                final plan = ref.read(taskPlansProvider).valueOrNull
-                    ?.where((p) => p.id == task.planId).firstOrNull;
+                final plan = ref
+                    .read(taskPlansProvider)
+                    .valueOrNull
+                    ?.where((p) => p.id == task.planId)
+                    .firstOrNull;
                 Navigator.push(
                   context,
                   MaterialPageRoute<void>(
@@ -112,7 +117,8 @@ class TaskMemberTile extends ConsumerWidget {
           : null,
       leading: Tooltip(
         message: task.status == TaskStatus.completed
-            ? 'Mark task incomplete' : 'Mark task complete',
+            ? 'Mark task incomplete'
+            : 'Mark task complete',
         child: Checkbox(
           value: task.status == TaskStatus.completed,
           onChanged: canEdit
@@ -127,37 +133,49 @@ class TaskMemberTile extends ConsumerWidget {
         children: [
           IconButton(
             tooltip: task.status == TaskStatus.skipped
-                ? 'Reopen skipped task' : 'Skip task',
+                ? 'Reopen skipped task'
+                : 'Skip task',
             icon: const Icon(Icons.redo_rounded),
             isSelected: task.status == TaskStatus.skipped,
             onPressed: canEdit
-                ? () => changeStatus(task.status == TaskStatus.skipped
-                    ? TaskStatus.open : TaskStatus.skipped)
+                ? () => changeStatus(
+                    task.status == TaskStatus.skipped
+                        ? TaskStatus.open
+                        : TaskStatus.skipped,
+                  )
                 : null,
           ),
           IconButton(
             tooltip: 'Delete task',
             icon: const Icon(Icons.delete_outline),
-            onPressed: !canEdit ? null : () async {
-              final confirmed = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('Delete task?'),
-                  content: Text(
-                    '${showTitle ? task.title : target} will be removed from this checklist. '
-                    '${task.planId == null && task.groupId == null ? '' : 'Only this entry is removed; future repeats and other targets remain. '}'
-                    '${task.eventType == null ? '' : 'Its linked completion activity will also be removed.'}',
-                  ),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep task')),
-                    FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
-                  ],
-                ),
-              );
-              if (confirmed == true && context.mounted) {
-                changeStatus(TaskStatus.deleted);
-              }
-            },
+            onPressed: !canEdit
+                ? null
+                : () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete task?'),
+                        content: Text(
+                          '${showTitle ? task.title : target} will be removed from this checklist. '
+                          '${task.planId == null && task.groupId == null ? '' : 'Only this entry is removed; future repeats and other targets remain. '}'
+                          '${task.eventType == null ? '' : 'Its linked completion activity will also be removed.'}',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Keep task'),
+                          ),
+                          FilledButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed == true && context.mounted) {
+                      changeStatus(TaskStatus.deleted);
+                    }
+                  },
           ),
         ],
       ),
@@ -220,7 +238,11 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
                   ? selected
                   : current;
               final members = all
-                  .where((t) => t.status != TaskStatus.deleted && (date == null || t.occurrenceOn == date))
+                  .where(
+                    (t) =>
+                        t.status != TaskStatus.deleted &&
+                        (date == null || t.occurrenceOn == date),
+                  )
                   .toList();
               final plants =
                   ref.watch(plantsProvider).valueOrNull?.value ??
@@ -230,17 +252,38 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
                 children: [
                   Row(
                     children: [
-                      Expanded(child: Text(
-                        plan?.title ?? all.where((t) => t.status == TaskStatus.open).firstOrNull?.title ?? all.first.title,
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      )),
+                      Expanded(
+                        child: Text(
+                          plan?.title ??
+                              all
+                                  .where((t) => t.status == TaskStatus.open)
+                                  .firstOrNull
+                                  ?.title ??
+                              all.first.title,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
                       if (ref.watch(canEditOrchardProvider))
                         IconButton(
                           tooltip: 'Edit task & reminders',
                           icon: const Icon(Icons.edit_outlined),
                           onPressed: () => Navigator.push(
                             context,
-                            MaterialPageRoute<void>(builder: (_) => plan != null ? TaskEditor(plan: plan) : TaskEditor(task: all.where((t) => t.status == TaskStatus.open).firstOrNull ?? all.first, legacyGroup: true)),
+                            MaterialPageRoute<void>(
+                              builder: (_) => plan != null
+                                  ? TaskEditor(plan: plan)
+                                  : TaskEditor(
+                                      task:
+                                          all
+                                              .where(
+                                                (t) =>
+                                                    t.status == TaskStatus.open,
+                                              )
+                                              .firstOrNull ??
+                                          all.first,
+                                      legacyGroup: true,
+                                    ),
+                            ),
                           ),
                         ),
                     ],
@@ -280,7 +323,9 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
                         value: '',
                         child: Text('All statuses'),
                       ),
-                      for (final s in TaskStatus.values.where((s) => s != TaskStatus.deleted))
+                      for (final s in TaskStatus.values.where(
+                        (s) => s != TaskStatus.deleted,
+                      ))
                         DropdownMenuItem(value: s.name, child: Text(s.name)),
                     ],
                     onChanged: (v) => setState(
@@ -290,9 +335,15 @@ class _TaskGroupState extends ConsumerState<TaskGroupScreen> {
                     ),
                   ),
                   if (members.isEmpty)
-                    Text(all.any((t) => t.status == TaskStatus.deleted && (date == null || t.occurrenceOn == date))
-                      ? 'No remaining tasks for this occurrence.'
-                      : 'No matching targets yet. This task remains valid.'),
+                    Text(
+                      all.any(
+                            (t) =>
+                                t.status == TaskStatus.deleted &&
+                                (date == null || t.occurrenceOn == date),
+                          )
+                          ? 'No remaining tasks for this occurrence.'
+                          : 'No matching targets yet. This task remains valid.',
+                    ),
                   for (final t in members.where(
                     (t) =>
                         (status == null || t.status == status) &&
@@ -376,7 +427,9 @@ class _TasksState extends ConsumerState<TasksPane> {
                     value: 'all',
                     child: Text('All statuses'),
                   ),
-                  for (final s in TaskStatus.values.where((s) => s != TaskStatus.deleted))
+                  for (final s in TaskStatus.values.where(
+                    (s) => s != TaskStatus.deleted,
+                  ))
                     DropdownMenuItem(value: s.name, child: Text(s.name)),
                 ],
                 onChanged: (s) => setState(
