@@ -11,12 +11,15 @@ List<ReleaseNote> recentReleases(String installedVersion) => [
     RegExp(r'\d+\.\d+\.\d+').firstMatch(installedVersion)?.group(0) ??
         installedVersion,
     const [
-      'Seed cell planting dates, days until transplant and calculated expected transplant dates.',
-      'Record or undo actual transplants; retained cells turn grey with a check mark.',
-      'Capture front/back seed-packet photos while planting and include them in offline backups.',
-      'Delete trays with confirmed cleanup of cell entries and packet photos.',
+      'Task start dates, optional end dates and recurring date ranges.',
+      'Multiple local reminders in days or weeks before the task start.',
+      'Connect a phone Google calendar to sync tasks and completion counts.',
     ],
   ),
+  const ReleaseNote('0.77.0', [
+    'Seed cell planting dates, expected transplant dates and actual transplant tracking.',
+    'Front/back seed-packet photos and tray deletion with offline backups.',
+  ]),
   const ReleaseNote('0.70.0', [
     'Seed Starter trays, custom row/column counts and bulk cell selection.',
     'Seed/plant classifications and icons with offline persistence and Drive backups.',

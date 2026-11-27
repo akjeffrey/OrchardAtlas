@@ -14,6 +14,7 @@ class WorkMapping {
     'taxonId': p.taxonId,
     'sectionKind': p.sectionKind.name,
     'dueDate': p.dueDate,
+    'endDate': p.endDate,
     'repeat': p.repeat.name,
     if (p.anchorOn != null) 'anchorOn': p.anchorOn,
     'eventType': p.eventType?.name,
@@ -44,6 +45,7 @@ class WorkMapping {
         ? SectionKind.area
         : SectionKind.values.byName(d['sectionKind'] as String? ?? 'row'),
     dueDate: d['dueDate'] as String?,
+    endDate: d['endDate'] as String?,
     anchorOn: d['anchorOn'] as String?,
     repeat: RepeatSchedule.values.byName(d['repeat'] as String? ?? 'none'),
     eventType: d['eventType'] == null

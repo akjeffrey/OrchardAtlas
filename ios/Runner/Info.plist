@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>NSCalendarsUsageDescription</key>
+	<string>Choose a calendar to sync OrchardAtlas tasks and date ranges.</string>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Choose a calendar and keep OrchardAtlas task events updated without modifying your other events.</string>
 	<key>NSCameraUsageDescription</key><string>Take photos of plants and foraging resources.</string>
 	<key>NSPhotoLibraryUsageDescription</key><string>Attach photos to orchard records.</string>
     <key>GoogleMapsAPIKey</key>

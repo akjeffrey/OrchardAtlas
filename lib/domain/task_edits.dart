@@ -7,6 +7,7 @@ OrchardTask editOpenTask(
   required String title,
   required String notes,
   String? dueDate,
+  String? endDate,
   ActivityType? eventType,
   Harvest? eventHarvest,
 }) {
@@ -25,6 +26,7 @@ OrchardTask editOpenTask(
     planId: old.planId,
     occurrenceOn: old.occurrenceOn,
     dueDate: dueDate,
+    endDate: endDate,
     status: old.status,
     eventType: eventType,
     eventHarvest: eventHarvest,
@@ -36,6 +38,7 @@ TaskPlan editPlan(
   required String title,
   required String notes,
   String? dueDate,
+  String? endDate,
   ActivityType? eventType,
   Harvest? eventHarvest,
 }) => TaskPlan(
@@ -51,6 +54,7 @@ TaskPlan editPlan(
   taxonId: old.taxonId,
   sectionKind: old.sectionKind,
   dueDate: old.repeat == RepeatSchedule.none ? dueDate : old.dueDate,
+  endDate: endDate,
   anchorOn: old.repeat == RepeatSchedule.none
       ? old.anchorOn ?? occurrenceDates(old, DateTime.now()).single
       : old.anchorOn,

@@ -204,24 +204,24 @@ List<Map<String, dynamic>> dueNotifications(
               t.dueDate != null,
         )
         .toList();
-    final days = r['days'] as int;
-    if (days < 0 || days > 365) continue;
-    final dates = <String, List<OrchardTask>>{};
-    for (final t in matches) {
-      dates.putIfAbsent(t.dueDate!, () => []).add(t);
-    }
-    for (final entry in dates.entries) {
-      final due = parseCalendarDate(entry.key);
-      final day = due.subtract(Duration(days: days));
-      final time = DateTime(day.year, day.month, day.day, 9);
-      // Past reminders are not delivered again on every restart.
-      if (!time.isAfter(now)) continue;
-      result.add({
-        'id': '${r['id']}/${entry.key}',
-        'title': entry.value.first.title,
-        'body': '${entry.value.length} open target(s) · due ${entry.key}',
-        'time': time.millisecondsSinceEpoch,
-      });
+    for (final days in reminderOffsets(r)) {
+      final dates = <String, List<OrchardTask>>{};
+      for (final t in matches) {
+        dates.putIfAbsent(t.dueDate!, () => []).add(t);
+      }
+      for (final entry in dates.entries) {
+        final due = parseCalendarDate(entry.key);
+        final day = DateTime(due.year, due.month, due.day - days);
+        final time = DateTime(day.year, day.month, day.day, 9);
+        // Past reminders are not delivered again on every restart.
+        if (!time.isAfter(now)) continue;
+        result.add({
+          'id': '${r['id']}/${entry.key}/$days',
+          'title': entry.value.first.title,
+          'body': '${entry.value.length} open target(s) · starts ${entry.key}',
+          'time': time.millisecondsSinceEpoch,
+        });
+      }
     }
   }
   result.sort((a, b) => (a['time'] as int).compareTo(b['time'] as int));
@@ -248,8 +248,34 @@ final reminderWorkerProvider = Provider<void>((ref) {
           sections: sections,
           crops: crops,
           taxonomy: ref.watch(taxonomyProvider),
-          now: now.add(const Duration(days: 30)),
+          now: now.add(const Duration(days: 366)),
         );
+  if (plans != null) {
+    for (final p in plans) {
+      for (final date in occurrenceDates(
+        p,
+        now.add(const Duration(days: 366)),
+      )) {
+        if ([
+          ...tasks,
+          ...predictions,
+        ].any((t) => t.planId == p.id && t.occurrenceOn == date)) {
+          continue;
+        }
+        predictions.add(
+          OrchardTask(
+            id: '${p.id}/$date',
+            propertyId: p.propertyId,
+            title: p.title,
+            createdAt: p.createdAt,
+            planId: p.id,
+            occurrenceOn: date,
+            dueDate: p.repeat == RepeatSchedule.none ? p.dueDate : date,
+          ),
+        );
+      }
+    }
+  }
   final orchard = ref.watch(placeProvider).asData?.value;
   if (orchard == null) return;
   scheduleMicrotask(() async {

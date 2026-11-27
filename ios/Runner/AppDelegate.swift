@@ -1,6 +1,7 @@
 import Flutter
 import UIKit
 import UserNotifications
+import EventKit
 import GoogleMaps
 import CoreLocation
 import ImageIO
@@ -8,6 +9,7 @@ import UniformTypeIdentifiers
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
+  private let taskCalendar = OrchardTaskCalendar()
   private let geocoder = CLGeocoder()
   private let photoPicker = OrchardPhotoPicker()
   private let iconPicker = OrchardIconPicker()
@@ -50,6 +52,10 @@ import UniformTypeIdentifiers
       guard call.method == "capture", let self = self else { result(FlutterMethodNotImplemented); return }
       let args = call.arguments as? [String: Any]
       self.photoPicker.open(camera: args?["camera"] as? Bool ?? false, result: result)
+    }
+    let calendarChannel = FlutterMethodChannel(name: "orchard_atlas/calendar", binaryMessenger: registrar.messenger())
+    calendarChannel.setMethodCallHandler { [weak self] call, result in
+      self?.taskCalendar.handle(call, result: result)
     }
     let reminders = FlutterMethodChannel(name: "orchard_atlas/reminders", binaryMessenger: registrar.messenger())
     reminders.setMethodCallHandler { call, result in
@@ -215,5 +221,100 @@ private final class OrchardPhotoPicker: NSObject, UIImagePickerControllerDelegat
       picker.dismiss(animated:true); reply?(FlutterError(code:"photo_failed",message:"Photo too large",details:nil)); return
     }
     picker.dismiss(animated: true) { reply?(["image":FlutterStandardTypedData(bytes:image),"thumbnail":FlutterStandardTypedData(bytes:thumbnail)]) }
+  }
+}
+
+/// Google calendars added to iOS Settings are synchronized by the system.
+private final class OrchardTaskCalendar {
+  private let store = EKEventStore()
+  private let defaults = UserDefaults.standard
+  private var allowed: Bool {
+    let status = EKEventStore.authorizationStatus(for: .event)
+    if #available(iOS 17.0, *) { return status == .fullAccess }
+    return status == .authorized
+  }
+  func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    if call.method == "calendars" && !allowed {
+      let callback: (Bool, Error?) -> Void = { granted, _ in
+        DispatchQueue.main.async {
+          if granted { self.perform(call, result: result) }
+          else { result(FlutterError(code: "calendar_permission", message: "Allow full Calendar access in iOS Settings to connect Google Calendar.", details: nil)) }
+        }
+      }
+      if #available(iOS 17.0, *) { store.requestFullAccessToEvents(completion: callback) }
+      else { store.requestAccess(to: .event, completion: callback) }
+      return
+    }
+    perform(call, result: result)
+  }
+  private func perform(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    let args = call.arguments as? [String: Any] ?? [:]
+    let scope = args["scope"] as? String ?? ""
+    let key = "orchard-calendar/\(scope)"
+    if call.method == "selected" { result(defaults.string(forKey: key)); return }
+    guard allowed else { result(FlutterError(code: "calendar_permission", message: "Calendar access has been revoked.", details: nil)); return }
+    do {
+      switch call.method {
+      case "calendars":
+        result(store.calendars(for: .event).filter { $0.allowsContentModifications }.map {
+          ["id": $0.calendarIdentifier, "name": $0.title, "account": $0.source.title]
+        })
+      case "select":
+        let next = args["calendar"] as? String
+        if let next = next {
+          guard let calendar = store.calendar(withIdentifier: next), calendar.allowsContentModifications else {
+            result(FlutterError(code: "calendar_missing", message: "Choose a writable calendar.", details: nil)); return
+          }
+        }
+        if defaults.string(forKey: key) != next {
+          if let old = defaults.string(forKey: key) { try replace(scope, calendarID: old, rows: []) }
+          defaults.set(next, forKey: key)
+        }
+        result(nil)
+      case "replace":
+        if let calendar = defaults.string(forKey: key) {
+          try replace(scope, calendarID: calendar, rows: args["events"] as? [[String: Any]] ?? [])
+        }
+        result(nil)
+      default: result(FlutterMethodNotImplemented)
+      }
+    } catch { result(FlutterError(code: "calendar_sync", message: error.localizedDescription, details: nil)) }
+  }
+  private func replace(_ scope: String, calendarID: String, rows: [[String: Any]]) throws {
+    guard let calendar = store.calendar(withIdentifier: calendarID), calendar.allowsContentModifications else {
+      throw NSError(domain: "OrchardAtlas", code: 1, userInfo: [NSLocalizedDescriptionKey: "The selected calendar is unavailable. Reconnect in Settings."])
+    }
+    let key = "orchard-events/\(scope)/\(calendarID)"
+    var saved = defaults.dictionary(forKey: key) as? [String: String] ?? [:]
+    let marker = "[OrchardAtlas:\(scope)]"
+    let desired = Set(rows.compactMap { $0["id"] as? String })
+    for id in Array(saved.keys) where !desired.contains(id) {
+      if let event = store.event(withIdentifier: saved[id]!), event.calendar.calendarIdentifier == calendarID, event.notes?.contains(marker) == true {
+        try store.remove(event, span: .thisEvent, commit: true)
+      }
+      saved.removeValue(forKey: id); defaults.set(saved, forKey: key)
+    }
+    for row in rows {
+      guard let id = row["id"] as? String, let title = row["title"] as? String,
+        let start = row["start"] as? NSNumber, let end = row["end"] as? NSNumber else { continue }
+      let token = "\(marker)/\(id)"
+      let startDate = Date(timeIntervalSince1970: start.doubleValue / 1000)
+      let endDate = Date(timeIntervalSince1970: end.doubleValue / 1000)
+      var event = saved[id].flatMap { store.event(withIdentifier: $0) }
+      if event?.calendar.calendarIdentifier != calendarID || event?.notes?.contains(marker) != true { event = nil }
+      // Recover a save interrupted before the local identifier was recorded.
+      if event == nil {
+        let predicate = store.predicateForEvents(withStart: startDate, end: endDate, calendars: [calendar])
+        event = store.events(matching: predicate).first { $0.notes?.hasSuffix(token) == true }
+      }
+      let target = event ?? EKEvent(eventStore: store)
+      let notes = "\(row["description"] as? String ?? "")\n\(marker)\n\(token)"
+      if target.title == title && target.notes == notes && target.startDate == startDate && target.endDate == endDate { continue }
+      target.calendar = calendar; target.title = title; target.notes = notes
+      target.isAllDay = true; target.timeZone = TimeZone(secondsFromGMT: 0)
+      target.startDate = startDate; target.endDate = endDate; target.alarms = []
+      try store.save(target, span: .thisEvent, commit: true)
+      saved[id] = target.eventIdentifier; defaults.set(saved, forKey: key)
+    }
   }
 }

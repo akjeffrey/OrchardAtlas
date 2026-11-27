@@ -387,6 +387,7 @@ class OrchardTask {
     this.groupId,
     String groupScope = '',
     this.dueDate,
+    this.endDate,
     this.completedOn,
     this.planId,
     this.occurrenceOn,
@@ -398,6 +399,7 @@ class OrchardTask {
        notes = optionalText(notes, 10000),
        groupScope = optionalText(groupScope, 500) {
     if (dueDate != null) parseCalendarDate(dueDate!);
+    validateTaskDates(dueDate, endDate);
     if (completedOn != null) parseCalendarDate(completedOn!);
     if ([itemId, sectionId, cropId].whereType<String>().length > 1) {
       throw ArgumentError('Choose one task target');
@@ -414,7 +416,13 @@ class OrchardTask {
   final ActivityType? eventType;
   final Harvest? eventHarvest;
   final String id, propertyId, title, notes, groupScope;
-  final String? itemId, sectionId, cropId, groupId, dueDate, completedOn;
+  final String? itemId,
+      sectionId,
+      cropId,
+      groupId,
+      dueDate,
+      endDate,
+      completedOn;
   final DateTime createdAt;
   final TaskStatus status;
   OrchardTask withStatus(TaskStatus value, {DateTime? now}) => OrchardTask(
@@ -432,6 +440,7 @@ class OrchardTask {
     groupId: groupId,
     groupScope: groupScope,
     dueDate: dueDate,
+    endDate: endDate,
     notes: notes,
     status: value,
     completedOn: value == TaskStatus.completed
@@ -479,4 +488,27 @@ class Permission {
   const Permission(this.propertyId, this.userId, this.role);
   final String propertyId, userId;
   final PermissionRole role;
+}
+
+/// Existing dueDate is the persisted start date for backward compatibility.
+void validateTaskDates(String? start, String? end) {
+  if (end == null) return;
+  parseCalendarDate(end);
+  if (start == null || end.compareTo(start) < 0) {
+    throw ArgumentError('End date must be on or after the start date');
+  }
+}
+
+int taskRangeDays(String start, String end) {
+  final a = parseCalendarDate(start), b = parseCalendarDate(end);
+  return DateTime.utc(
+    b.year,
+    b.month,
+    b.day,
+  ).difference(DateTime.utc(a.year, a.month, a.day)).inDays;
+}
+
+String offsetCalendarDate(String date, int days) {
+  final d = parseCalendarDate(date);
+  return calendarDate(DateTime(d.year, d.month, d.day + days));
 }

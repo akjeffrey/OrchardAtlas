@@ -536,3 +536,25 @@ test('seed lifecycle dates, packet references and resumable tray deletion enforc
   await assertFails(updateDoc(doc(store,cellPath),{label:'Late edit'}));
   await assertSucceeds(deleteDoc(doc(store,cellPath)));await assertSucceeds(deleteDoc(doc(store,`${propertyPath}/photo/${front}`)));await assertSucceeds(deleteDoc(doc(store,path)));
 });
+
+
+test('task date ranges validate order and cannot rewrite completed history', async () => {
+  const path = `${propertyPath}/tasks/${event}`;
+  const task = {schemaVersion:1,title:'Prune',notes:'',itemId:item,dueDate:'2027-03-28',endDate:'2027-03-30',status:'open',createdAt:now};
+  await assertSucceeds(setDoc(doc(db('alice'),path),task));
+  await assertFails(updateDoc(doc(db('alice'),path),{endDate:'2027-03-27'}));
+  await assertFails(updateDoc(doc(db('alice'),path),{dueDate:null}));
+  await assertFails(updateDoc(doc(db('bob'),path),{endDate:'2027-04-01'}));
+  await assertSucceeds(updateDoc(doc(db('alice'),path),{endDate:'2027-04-01'}));
+  await assertSucceeds(updateDoc(doc(db('alice'),path),{status:'completed'}));
+  await assertFails(updateDoc(doc(db('alice'),path),{endDate:'2027-04-02'}));
+});
+test('reminders accept multiple bounded offsets and retain legacy format', async () => {
+  const path = `${propertyPath}/reminder/${event}`;
+  await assertSucceeds(setDoc(doc(db('alice'),path),{id:event,days:7}));
+  await assertSucceeds(setDoc(doc(db('alice'),path),{id:event,offsets:[0,7,14,365]}));
+  for (const offsets of [[-1],[366],['7'],Array(11).fill(1)]) {
+    await assertFails(setDoc(doc(db('alice'),path),{id:event,offsets}));
+  }
+  await assertFails(setDoc(doc(db('bob'),path),{id:event,offsets:[7]}));
+});

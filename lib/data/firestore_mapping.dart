@@ -138,6 +138,7 @@ class FirestoreMapping {
   static Map<String, dynamic> taskToMap(OrchardTask t) => {
     'schemaVersion': 1,
     ...taskExtrasToMap(t),
+    if (t.endDate != null) 'endDate': t.endDate,
     'title': t.title,
     'notes': t.notes,
     'itemId': t.itemId,
@@ -174,6 +175,7 @@ class FirestoreMapping {
             ),
       itemId: d['itemId'] as String?,
       dueDate: d['dueDate'] as String?,
+      endDate: d['endDate'] as String?,
       status: TaskStatus.values.byName(d['status'] as String),
       createdAt: (d['createdAt'] as Timestamp).toDate().toUtc(),
     );

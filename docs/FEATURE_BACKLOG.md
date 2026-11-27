@@ -4,6 +4,8 @@ GitHub issues are the source of truth for outstanding work: [open tickets](https
 
 ## Newly requested features
 
+- [x] [PR #75](https://github.com/akjeffrey/OrchardAtlas/pull/75) **Task scheduling and calendar:** start date and optional end date for all task targets, recurring ranges, multiple day/week reminders, notification permissions and optional one-way Google Calendar sync through phone calendars. See [setup and behavior](task-scheduling-and-calendar.md).
+
 - [x] **Version History:** add a page in Settings and Orchard options with the installed version’s changes and four prior feature updates; keep the five-update history current for future releases.
 - [x] [#62](https://github.com/akjeffrey/OrchardAtlas/issues/62) **Seasonal planting classification selectors:** use the same cascading Group → Type → Variety dropdowns as Add Plant, including consistent catalog/custom-option behavior. Preserve the other seasonal planting draft fields.
 - [x] [#63](https://github.com/akjeffrey/OrchardAtlas/issues/63) **Annual/perennial conversion:** let users convert an existing plant in either direction while preserving classification, location, metadata, history and task/harvest links. Change management in place without moving storage records; ask for a season when needed and persist conversions offline and in backups.

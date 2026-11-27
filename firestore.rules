@@ -43,12 +43,16 @@ service cloud.firestore {
     function date(value) {
       return value is string && value.matches('^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$');
     }
+    function taskRange(d) { return d.get('endDate',null)==null || (date(d.endDate) && d.get('dueDate',null)!=null && d.endDate>=d.dueDate); }
+    function offset(n) { return n is int && n>=0 && n<=365; }
+    function offsetAt(a,i) { return a.size()<=i || offset(a[i]); }
     function validTask(d, propertyId) {
       return d.keys().hasAll(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt'])
-        && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt', 'sectionId', 'cropId', 'groupId', 'groupScope', 'completedOn', 'planId', 'occurrenceOn', 'eventType', 'eventHarvest'])
+        && d.keys().hasOnly(['schemaVersion', 'title', 'notes', 'itemId', 'dueDate', 'status', 'createdAt', 'sectionId', 'cropId', 'groupId', 'groupScope', 'completedOn', 'planId', 'occurrenceOn', 'eventType', 'eventHarvest', 'endDate'])
         && d.schemaVersion == 1 && text(d.title) && d.notes is string && d.notes.size() <= 10000
         && d.createdAt is timestamp && d.status in ['open', 'completed', 'cancelled', 'skipped']
         && (d.dueDate == null || date(d.dueDate))
+        && taskRange(d)
         && (d.get('completedOn', null) == null || (d.status == 'completed' && date(d.completedOn)))
         && d.get('groupScope', '') is string && d.get('groupScope', '').size() <= 500
         && (d.get('groupId', null) == null || (d.groupId is string && uuid(d.groupId) && (d.itemId != null || d.get('sectionId', null) != null || d.get('cropId', null) != null)))
@@ -169,12 +173,13 @@ service cloud.firestore {
     }
     function validPlan(d,propertyId) {
       return d.keys().hasAll(['schemaVersion','title','target','createdAt','notes','repeat'])
-        && d.keys().hasOnly(['schemaVersion','title','target','createdAt','notes','repeat','itemId','sectionId','cropId','taxonId','sectionKind','dueDate','eventType','eventHarvest','anchorOn'])
+        && d.keys().hasOnly(['schemaVersion','title','target','createdAt','notes','repeat','itemId','sectionId','cropId','taxonId','sectionKind','dueDate','eventType','eventHarvest','anchorOn','endDate'])
         && d.schemaVersion==1 && text(d.title) && d.notes is string && d.notes.size()<=10000 && d.createdAt is timestamp
         && d.target in ['plant','plants','section','sections','crop','crops','property']
         && d.repeat in ['none','daily','weekly','monthly','yearly']
         && (d.get('sectionKind','row') in ['area','row'])
         && (d.get('dueDate',null)==null || date(d.dueDate))
+        && taskRange(d)
         && (d.get('anchorOn',null)==null || date(d.anchorOn))
         && (d.get('taxonId',null)==null || (d.taxonId is string && uuid(d.taxonId)))
         && (d.get('itemId',null)==null || (d.itemId is string && uuid(d.itemId) && exists(/databases/$(database)/documents/properties/$(propertyId)/items/$(d.itemId))))
@@ -271,8 +276,11 @@ service cloud.firestore {
       match /reminder/{reminderId} {
         allow read: if reader(propertyId);
         allow create, update: if writer(propertyId) && uuid(reminderId)
-          && request.resource.data.keys().hasOnly(['id','days']) && request.resource.data.id==reminderId
-          && request.resource.data.days is int && request.resource.data.days>=0 && request.resource.data.days<=365;
+          && request.resource.data.keys().hasOnly(['id','days','offsets']) && request.resource.data.id==reminderId
+          && ((request.resource.data.get('offsets',null)==null && offset(request.resource.data.days))
+            || (request.resource.data.offsets is list && request.resource.data.offsets.size()<=10
+              && offsetAt(request.resource.data.offsets,0) && offsetAt(request.resource.data.offsets,1) && offsetAt(request.resource.data.offsets,2) && offsetAt(request.resource.data.offsets,3) && offsetAt(request.resource.data.offsets,4)
+              && offsetAt(request.resource.data.offsets,5) && offsetAt(request.resource.data.offsets,6) && offsetAt(request.resource.data.offsets,7) && offsetAt(request.resource.data.offsets,8) && offsetAt(request.resource.data.offsets,9)));
         allow delete: if writer(propertyId);
       }
       match /activityRevision/{revisionId} {
@@ -347,7 +355,7 @@ service cloud.firestore {
         allow update: if writer(propertyId) && validTask(request.resource.data, propertyId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completedOn'])
           || (writer(propertyId) && validTask(request.resource.data,propertyId) && resource.data.status=='open'
-          && request.resource.data.status=='open' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','notes','dueDate','eventType','eventHarvest']));
+          && request.resource.data.status=='open' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title','notes','dueDate','endDate','eventType','eventHarvest']));
         allow delete: if writer(propertyId);
       }
       match /icons/{iconId} {
