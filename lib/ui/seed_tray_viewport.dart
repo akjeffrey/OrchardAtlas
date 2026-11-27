@@ -17,11 +17,9 @@ class SeedTrayViewport extends StatefulWidget {
 
 class _SeedTrayViewportState extends State<SeedTrayViewport> {
   final transform = TransformationController();
-  final viewportKey = GlobalKey();
+  Size viewportSize = Size.zero;
   static const minZoom = 0.01, maxZoom = 3.0;
   double get zoom => transform.value.getMaxScaleOnAxis();
-  Size? get viewport =>
-      (viewportKey.currentContext?.findRenderObject() as RenderBox?)?.size;
   @override
   void initState() {
     super.initState();
@@ -40,8 +38,8 @@ class _SeedTrayViewportState extends State<SeedTrayViewport> {
   }
 
   void zoomTo(double value) {
-    final size = viewport;
-    if (size == null) {
+    final size = viewportSize;
+    if (size.isEmpty) {
       return;
     }
     final next = value.clamp(minZoom, maxZoom).toDouble();
@@ -56,8 +54,8 @@ class _SeedTrayViewportState extends State<SeedTrayViewport> {
   }
 
   void fit() {
-    final size = viewport;
-    if (size == null) {
+    final size = viewportSize;
+    if (size.isEmpty) {
       return;
     }
     final scale = math
@@ -110,22 +108,26 @@ class _SeedTrayViewportState extends State<SeedTrayViewport> {
       ),
       Expanded(
         child: LayoutBuilder(
-          key: viewportKey,
-          builder: (context, constraints) => InteractiveViewer(
-            key: const ValueKey('tray-interactive-viewer'),
-            transformationController: transform,
-            constrained: false,
-            alignment: Alignment.topLeft,
-            minScale: minZoom,
-            maxScale: maxZoom,
-            boundaryMargin: const EdgeInsets.all(200),
-            trackpadScrollCausesScale: true,
-            child: SizedBox(
-              width: widget.contentSize.width,
-              height: widget.contentSize.height,
-              child: widget.child,
-            ),
-          ),
+          builder: (context, constraints) {
+            viewportSize = constraints.biggest;
+            return SizedBox.expand(
+              child: InteractiveViewer(
+                key: const ValueKey('tray-interactive-viewer'),
+                transformationController: transform,
+                constrained: false,
+                alignment: Alignment.topLeft,
+                minScale: minZoom,
+                maxScale: maxZoom,
+                boundaryMargin: const EdgeInsets.all(200),
+                trackpadScrollCausesScale: true,
+                child: SizedBox(
+                  width: widget.contentSize.width,
+                  height: widget.contentSize.height,
+                  child: widget.child,
+                ),
+              ),
+            );
+          },
         ),
       ),
     ],

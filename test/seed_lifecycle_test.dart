@@ -82,6 +82,7 @@ void main() {
           'transplantedOn',
           'packetFrontId',
           'packetBackId',
+          'usePacketFrontIcon',
         ].contains(k),
       );
     expect(SeedTrayMapping.readCell(old).value.plantedOn, isNull);
