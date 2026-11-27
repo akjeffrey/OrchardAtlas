@@ -148,7 +148,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
       );
       if ((await ref.read(placeProvider.future)).id != orchard.id ||
           !ref.read(canEditOrchardProvider)) {
-        throw StateError('Orchard or edit permission changed. Reopen this task.');
+        throw StateError('Orchard access changed. Reopen this task.');
       }
       await ref
           .read(orchardRepositoryProvider)
