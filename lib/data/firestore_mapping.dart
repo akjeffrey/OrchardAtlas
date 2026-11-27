@@ -138,7 +138,7 @@ class FirestoreMapping {
   static Map<String, dynamic> taskToMap(OrchardTask t) => {
     'schemaVersion': 1,
     ...taskExtrasToMap(t),
-    'endDate': t.endDate,
+    if (t.endDate != null) 'endDate': t.endDate,
     'title': t.title,
     'notes': t.notes,
     'itemId': t.itemId,

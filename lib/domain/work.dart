@@ -229,7 +229,14 @@ List<OrchardTask> expandPlans({
             planId: plan.id,
             occurrenceOn: date,
             dueDate: plan.repeat == RepeatSchedule.none ? plan.dueDate : date,
-            endDate: plan.endDate == null ? null : plan.repeat == RepeatSchedule.none ? plan.endDate : offsetCalendarDate(date, taskRangeDays(plan.dueDate!, plan.endDate!)),
+            endDate: plan.endDate == null
+                ? null
+                : plan.repeat == RepeatSchedule.none
+                ? plan.endDate
+                : offsetCalendarDate(
+                    date,
+                    taskRangeDays(plan.dueDate!, plan.endDate!),
+                  ),
             eventType: target.plant == null ? null : plan.eventType,
             eventHarvest: plan.eventHarvest,
             notes: plan.notes,

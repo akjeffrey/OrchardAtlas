@@ -612,8 +612,16 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
     if (busy) return;
     setState(() => busy = true);
     try {
-      validateTaskDates(dueDate == null ? null : calendarDate(dueDate!), endDate);
-      if (offsets.isNotEmpty && !await ref.read(reminderSchedulerProvider).requestPermission()) throw StateError('Enable OrchardAtlas notifications in device settings');
+      validateTaskDates(
+        dueDate == null ? null : calendarDate(dueDate!),
+        endDate,
+      );
+      if (offsets.isNotEmpty &&
+          !await ref.read(reminderSchedulerProvider).requestPermission()) {
+        throw StateError(
+          'Enable OrchardAtlas notifications in device settings',
+        );
+      }
       final place = await ref.read(placeProvider.future);
       final plants = await ref.read(plantsProvider.future);
       final sections = await ref.read(sectionsProvider.future);
@@ -688,12 +696,19 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                 : null,
             cropId: target.startsWith('crop:') ? target.substring(5) : null,
             dueDate: dueDate == null ? null : calendarDate(dueDate!),
-          endDate: endDate,
+            endDate: endDate,
             createdAt: DateTime.now().toUtc(),
           ),
         );
       }
-      if (offsets.isNotEmpty) await ref.read(orchardRecordsProvider).putRecord(place.id, RecordKind.reminder, taskId, {'offsets':offsets});
+      if (offsets.isNotEmpty) {
+        await ref.read(orchardRecordsProvider).putRecord(
+          place.id,
+          RecordKind.reminder,
+          taskId,
+          {'offsets': offsets},
+        );
+      }
       if (!mounted) return;
       if (context.canPop()) {
         context.pop();
@@ -875,9 +890,16 @@ class _TaskFormState extends ConsumerState<TaskFormScreen> {
                   onChanged: (u) => eventUnit = u!,
                 ),
               ],
-              TaskScheduleFields(start: dueDate == null ? null : calendarDate(dueDate!), end: endDate, offsets: offsets,
-                onDates:(s,e)=>setState(() {dueDate=s == null ? null : parseCalendarDate(s);endDate=e;}),
-                onReminders:(v)=>setState(()=>offsets=v)),
+              TaskScheduleFields(
+                start: dueDate == null ? null : calendarDate(dueDate!),
+                end: endDate,
+                offsets: offsets,
+                onDates: (s, e) => setState(() {
+                  dueDate = s == null ? null : parseCalendarDate(s);
+                  endDate = e;
+                }),
+                onReminders: (v) => setState(() => offsets = v),
+              ),
               TextField(
                 controller: notes,
                 maxLines: 4,

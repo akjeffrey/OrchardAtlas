@@ -740,8 +740,17 @@ class LocalTrialRepository
             old.groupId != task.groupId ||
             old.groupScope != task.groupScope ||
             old.createdAt != task.createdAt ||
-            ((old.status != TaskStatus.open || task.status != TaskStatus.open) && (old.title != task.title || old.notes != task.notes || old.dueDate != task.dueDate || old.endDate != task.endDate || old.eventType != task.eventType || old.eventHarvest != task.eventHarvest)))) {
-      throw ArgumentError('Task targets and history are fixed; only open tasks can be edited');
+            ((old.status != TaskStatus.open ||
+                    task.status != TaskStatus.open) &&
+                (old.title != task.title ||
+                    old.notes != task.notes ||
+                    old.dueDate != task.dueDate ||
+                    old.endDate != task.endDate ||
+                    old.eventType != task.eventType ||
+                    old.eventHarvest != task.eventHarvest)))) {
+      throw ArgumentError(
+        'Task targets and history are fixed; only open tasks can be edited',
+      );
     }
   }
 

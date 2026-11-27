@@ -80,9 +80,17 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
             maxLines: 4,
             decoration: const InputDecoration(labelText: 'Task notes'),
           ),
-          TaskScheduleFields(start: due, end: end, offsets: offsets, fixedStart: recurring,
-            onDates: (s,e) => setState(() {due=s;end=e;}),
-            onReminders: (v) => setState(()=>offsets=v)),
+          TaskScheduleFields(
+            start: due,
+            end: end,
+            offsets: offsets,
+            fixedStart: recurring,
+            onDates: (s, e) => setState(() {
+              due = s;
+              end = e;
+            }),
+            onReminders: (v) => setState(() => offsets = v),
+          ),
           DropdownButtonFormField<String>(
             initialValue: eventType?.name ?? '',
             decoration: const InputDecoration(
@@ -129,7 +137,9 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                           'Notifications blocked. Enable OrchardAtlas notifications in device settings.',
                         );
                       }
-                      if (offsets.isNotEmpty && due == null) throw StateError('Set a start date for reminders');
+                      if (offsets.isNotEmpty && due == null) {
+                        throw StateError('Set a start date for reminders');
+                      }
                       validateTaskDates(due, end);
                       final orchard = await ref.read(placeProvider.future),
                           repo = ref.read(orchardRepositoryProvider);
@@ -169,7 +179,14 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                               title: title.text,
                               notes: notes.text,
                               dueDate: recurring ? t.dueDate : due,
-                              endDate: end == null ? null : recurring ? offsetCalendarDate(t.dueDate!, taskRangeDays(due!, end!)) : end,
+                              endDate: end == null
+                                  ? null
+                                  : recurring
+                                  ? offsetCalendarDate(
+                                      t.dueDate!,
+                                      taskRangeDays(due!, end!),
+                                    )
+                                  : end,
                               eventType: t.itemId == null ? null : eventType,
                               eventHarvest: harvest,
                             ),
@@ -188,7 +205,7 @@ class _TaskEditorState extends ConsumerState<TaskEditor> {
                             title: title.text,
                             notes: notes.text,
                             dueDate: due,
-                          endDate: end,
+                            endDate: end,
                             eventType: eventType,
                             eventHarvest: harvest,
                           ),

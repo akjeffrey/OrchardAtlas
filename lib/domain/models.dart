@@ -416,7 +416,13 @@ class OrchardTask {
   final ActivityType? eventType;
   final Harvest? eventHarvest;
   final String id, propertyId, title, notes, groupScope;
-  final String? itemId, sectionId, cropId, groupId, dueDate, endDate, completedOn;
+  final String? itemId,
+      sectionId,
+      cropId,
+      groupId,
+      dueDate,
+      endDate,
+      completedOn;
   final DateTime createdAt;
   final TaskStatus status;
   OrchardTask withStatus(TaskStatus value, {DateTime? now}) => OrchardTask(
@@ -494,10 +500,15 @@ void validateTaskDates(String? start, String? end) {
 }
 
 int taskRangeDays(String start, String end) {
-  final a=parseCalendarDate(start), b=parseCalendarDate(end);
-  return DateTime.utc(b.year,b.month,b.day).difference(DateTime.utc(a.year,a.month,a.day)).inDays;
+  final a = parseCalendarDate(start), b = parseCalendarDate(end);
+  return DateTime.utc(
+    b.year,
+    b.month,
+    b.day,
+  ).difference(DateTime.utc(a.year, a.month, a.day)).inDays;
 }
+
 String offsetCalendarDate(String date, int days) {
-  final d=parseCalendarDate(date);
-  return calendarDate(DateTime(d.year,d.month,d.day+days));
+  final d = parseCalendarDate(date);
+  return calendarDate(DateTime(d.year, d.month, d.day + days));
 }
