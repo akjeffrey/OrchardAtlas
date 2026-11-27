@@ -1,4 +1,5 @@
 import 'icon_image_search_dialog.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -16,7 +17,9 @@ class IconLibraryScreen extends ConsumerStatefulWidget {
 class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
   bool busy = false, searching = false;
   Future<void> searchImages() async {
-    if (busy || searching) {return;}
+    if (busy || searching) {
+      return;
+    }
     setState(() => searching = true);
     try {
       await showDialog<bool>(
@@ -27,9 +30,12 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
       if (mounted) setState(() => searching = false);
     }
   }
+
   String? error;
   Future<void> importIcon() async {
-    if (busy) {return;}
+    if (busy) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -89,7 +95,9 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
   }
 
   Future<void> rename(MapIcon icon) async {
-    if (busy) {return;}
+    if (busy) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -192,7 +200,9 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
   }
 
   Future<void> remove(MapIcon icon) async {
-    if (busy) {return;}
+    if (busy) {
+      return;
+    }
     setState(() {
       busy = true;
       error = null;
@@ -214,7 +224,7 @@ class _IconLibraryState extends ConsumerState<IconLibraryScreen> {
         const Padding(
           padding: EdgeInsets.all(16),
           child: Text(
-            'Import from your device or Drive, or search Google Images in your browser. Save a search result to your phone, then tap Import image. Imported images become small icons included in orchard backups.',
+            'Import from your device or Drive, or search Google Images in your browser. Save a search result to Downloads or Files, then tap Import image. Imported images become small icons included in orchard backups.',
           ),
         ),
         if (error != null)

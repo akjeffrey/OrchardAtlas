@@ -1,6 +1,6 @@
 # Custom icon image search
 
-In Settings → Custom icons, tap **Search Google Images**, enter a query (1–200 characters), and tap **Search images**. Google Images opens in the device browser. Save an image using the browser, return to OrchardAtlas, and tap **Import image** to select the downloaded file. Preview/name/save continues through the existing icon importer. Imports are normalized to PNG at most 96 × 96 pixels and 32 KB; transparency, orchard scoping and offline backups follow the existing icon behavior.
+In Settings → Custom icons, tap **Search Google Images**, enter a query (1–200 characters), and tap **Search images**. Google Images opens in the device browser. Save an image to Downloads or Files using the browser (on iOS, use Share → Save to Files), return to OrchardAtlas, and tap **Import image** to select the downloaded file. Preview/name/save continues through the existing icon importer. Imports are normalized to PNG at most 96 × 96 pixels and 32 KB; transparency, orchard scoping and offline backups follow the existing icon behavior.
 
 Only the entered query is sent to Google when the user presses Search; orchard records and photos are not sent. Search needs an internet connection and browser. Existing image import and saved icons remain available offline. Cancellation creates no icons. Browser launch errors keep the query available to retry. The app does not scrape Google results or automatically download result URLs.
 
